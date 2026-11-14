@@ -1,0 +1,7 @@
+{
+  "appId": "es.rutasratoners.app",
+  "appName": "RutasRatoners",
+  "webDir": "dist",
+  "android": { "allowMixedContent": false },
+  "plugins": { "CapacitorHttp": { "enabled": false } }
+}
