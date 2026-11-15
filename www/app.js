@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.2.0';
+  var APP_VERSION = '0.3.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -525,7 +525,7 @@
   $('#chipWake').addEventListener('click', function () { Platform.keepAwake(!Platform.isAwake()); });
 
   /* ---------- vistas ---------- */
-  var views = { map: $('#view-map'), rides: $('#view-rides'), detail: $('#view-detail'), stats: $('#view-stats'), garage: $('#view-garage'), settings: $('#view-settings'), profile: $('#view-profile') };
+  var views = { map: $('#view-map'), rides: $('#view-rides'), detail: $('#view-detail'), stats: $('#view-stats'), garage: $('#view-garage'), settings: $('#view-settings'), profile: $('#view-profile'), club: $('#view-club') };
   var currentView = 'map';
   function showView(name) {
     currentView = name;
@@ -533,6 +533,7 @@
     $$('.tab').forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.view === (name === 'detail' ? 'rides' : (name === 'profile' ? 'map' : name)))); });
     if (name === 'map') { if (!rec) startGps('fg'); if (map) setTimeout(function () { map.resize(); }, 50); }
     else if (!rec && gpsMode === 'fg' && name !== 'detail') stopGps();
+    if (name === 'club' && window.RGClub) RGClub.show();
     if (name === 'rides') renderRides();
     if (name === 'stats') renderStats();
     if (name === 'garage') renderGarage();
@@ -1132,6 +1133,12 @@
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, activePlan: function () { return planMode ? null : activePlan; },
     isRec: function () { return !!rec; }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { startRide(false); }, enterPlanMode: enterPlanMode,
+    plans: function () { return plans.slice(); },
+    usePlan: function (p) {   // guarda (o actualiza) una ruta planificada y la deja lista para «Iniciar ruta»
+      var i = -1; plans.forEach(function (x, k) { if (x.id === p.id) i = k; });
+      if (i >= 0) plans[i] = p; else plans.unshift(p);
+      return savePlans().then(function () { if (planMode) exitPlanMode(); showView('map'); followPlan(p, true); });
+    },
     setWaypoints: function (pts, name) {
       if (!planMode) enterPlanMode(); if (!planMode) return false;
       clearPlan(); pts.forEach(function (p) { addWaypoint(p.lat, p.lon); });

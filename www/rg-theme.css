@@ -179,3 +179,53 @@ th{letter-spacing:0;text-transform:none}
 .map-top .bar .chip{font-size:12px;white-space:nowrap}
 .map-top .timer{font-size:18px;padding:7px 12px}
 .avatar{width:40px;height:40px}
+
+/* interruptores: el toque tiene que llegar a la casilla, no al dibujo que la tapa */
+.switch input{z-index:1}
+.switch span{pointer-events:none}
+
+/* ---------- comunidad ---------- */
+.tab{min-width:0;font-size:10.5px;letter-spacing:-.01em}
+.tab svg{width:21px;height:21px}
+.club{display:flex;flex-direction:column;gap:12px}
+#clPane{display:flex;flex-direction:column;gap:12px}
+.club-head{display:flex;align-items:center;gap:12px}
+.club-title{flex:1;min-width:0}
+.club-title b{display:block;font-family:var(--font-display);font-weight:700;font-size:22px;line-height:1.15}
+.club-title .muted{font-size:14px}
+.club-card{background:var(--color-surface);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:6px;border:0;text-align:left;color:var(--color-text);width:100%}
+.club-card>b{font-family:var(--font-display);font-weight:650;font-size:18px;line-height:1.2}
+.club-card p{margin:2px 0;white-space:pre-wrap;font-size:15px;line-height:1.45}
+.club-card .muted{font-size:14px}
+.club-card input[type=text]{width:100%;border:1.5px solid var(--color-line);border-radius:14px;background:var(--color-bg);padding:12px 14px;font-size:16px;outline:none}
+.club-card .plan-link{margin:6px 0 0}
+.club-add{width:100%}
+.ev-when{font-weight:700;font-size:13.5px;color:var(--color-accent)}
+.ev-route{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--color-bg);border-radius:14px;padding:8px 8px 8px 12px;margin-top:4px;font-weight:650;font-size:14.5px}
+.ev-route span{display:flex;align-items:center;gap:8px;min-width:0}
+.ev-route svg{width:18px;height:18px;flex:none;color:var(--color-accent)}
+.ev-go{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.ev-go .btn{flex:1 1 auto}
+.ev-admin{display:flex;gap:18px;margin-top:6px;padding-top:10px;border-top:1px solid var(--color-line)}
+.link.danger{color:var(--color-error)}
+.club-card .link{align-self:flex-start;margin-top:4px}
+.club-page{cursor:pointer}
+.club-person{display:flex;align-items:center;gap:12px;padding:8px 0}
+.club-person>div{flex:1;min-width:0}
+.club-person b{display:block;font-weight:650}
+.club-person .muted{font-size:13.5px}
+.club-person .link{font-size:13.5px;flex:none}
+.club-code{font-family:var(--font-display);font-weight:700;font-size:54px;letter-spacing:.12em;text-align:center;background:var(--color-surface);border-radius:20px;padding:18px 0;-webkit-user-select:text;user-select:text}
+.club-body{white-space:pre-wrap;font-size:16px;line-height:1.5;margin:0}
+.club-link{display:flex;flex-direction:column;gap:6px}
+.club-link .btn{width:100%;background:var(--rg-accent-soft);color:var(--color-accent)}
+.club-codechip{appearance:none;border:1.5px dashed var(--color-line);background:none;border-radius:14px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;color:var(--color-text)}
+.club-codechip b{font-family:var(--font-display);font-size:18px;letter-spacing:.06em}
+.club-codechip span{font-size:13px;font-weight:650;color:var(--color-accent)}
+.club-linkrow{display:flex;flex-direction:column;gap:6px;background:var(--color-surface);border-radius:16px;padding:10px;margin-bottom:8px}
+.club-linkrow input{margin-top:0}
+.rg-form select{display:block;width:100%;margin-top:6px;border:1.5px solid var(--color-line);border-radius:14px;background:var(--color-surface);padding:14px;font:inherit;font-size:16px;color:var(--color-text)}
+.rg-sheet-in>.btn{width:100%}
+.tab{flex:1 1 0}
+.tab[data-view="club"]{flex:1.45 1 0}
+.tabs{padding:6px 4px;gap:0}

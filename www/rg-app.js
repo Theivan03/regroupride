@@ -225,7 +225,9 @@
       return sb.from('profiles').select('name').eq('id', user.id).maybeSingle().then(function (p) { profile = p.data || null; });
     }).catch(function () {}).then(renderAccount);
   }
+  var authListeners = [];
   function renderAccount() {
+    authListeners.forEach(function (f) { try { f(user); } catch (e) {} });
     var box = $('#rgAccount'); if (!box) return;
     if (user) {
       var name = (profile && profile.name) || (user.user_metadata && user.user_metadata.name) || 'Tu cuenta';
@@ -287,5 +289,6 @@
   });
   if (sb) sb.auth.onAuthStateChange(function (ev, session) { var had = !!user; user = (session && session.user) || null; if (had !== !!user) renderAccount(); });
   sync();
-  window.RGCloud = { openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; } };
+  window.RGCloud = { sb: sb, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
+    onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, busy: busy, msg: msg, esc: esc };
 })();
