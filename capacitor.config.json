@@ -1,6 +1,6 @@
 {
-  "appId": "es.rutasratoners.app",
-  "appName": "RutasRatoners",
+  "appId": "com.regroupride.app",
+  "appName": "ReGroupRide",
   "webDir": "dist",
   "android": { "allowMixedContent": false },
   "plugins": { "CapacitorHttp": { "enabled": false } }

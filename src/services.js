@@ -128,7 +128,7 @@ export async function getPosition() {
     const perm = await Geolocation.checkPermissions();
     if (perm.location !== 'granted') {
       const req = await Geolocation.requestPermissions({ permissions: ['location'] });
-      if (req.location !== 'granted') throw new Error('Sin permiso de ubicación. Actívalo en Ajustes → Aplicaciones → RutasRatoners.');
+      if (req.location !== 'granted') throw new Error('Sin permiso de ubicación. Actívalo en Ajustes → Aplicaciones → ReGroupRide.');
     }
   }
   const p = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });

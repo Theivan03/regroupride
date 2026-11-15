@@ -1,4 +1,4 @@
-package es.rutasratoners.app;
+package com.regroupride.app;
 
 import com.getcapacitor.BridgeActivity;
 

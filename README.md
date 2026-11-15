@@ -1,4 +1,4 @@
-# RutasRatoners
+# ReGroupRide
 
 App para rodar en grupo: rutas desde Google Maps, «Iniciar ruta», «Reengancharme» y, en próximas fases, ubicación del grupo en vivo, avisos desde la pantalla de bloqueo, gasolineras y eventos de la comunidad.
 
@@ -19,7 +19,7 @@ El documento completo del proyecto (funciones y fases) está en Claude: «App pa
 1. **Supabase:** en el SQL Editor, ejecuta `supabase/schema.sql` entero. Se puede ejecutar más de una vez.
 2. Pon la URL y la clave *anon/publishable* en `src/config.js`.
 3. Regístrate en la app y hazte administrador con la última línea de `supabase/schema.sql`.
-4. **APK:** cada `git push` a `main` compila en GitHub Actions y publica `rutasratoners.apk` en *Releases → latest*. Se firma siempre con la misma clave de pruebas (`android/debug.keystore`), así que se instala encima de la versión anterior sin desinstalar.
+4. **APK:** cada `git push` a `main` compila en GitHub Actions y publica `regroupride.apk` en *Releases → latest*. Se firma siempre con la misma clave de pruebas (`android/debug.keystore`), así que se instala encima de la versión anterior sin desinstalar.
 
 ## Desarrollo
 

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">RutasRatoners</string>
-    <string name="title_activity_main">RutasRatoners</string>
-    <string name="package_name">es.rutasratoners.app</string>
-    <string name="custom_url_scheme">es.rutasratoners.app</string>
+    <string name="app_name">ReGroupRide</string>
+    <string name="title_activity_main">ReGroupRide</string>
+    <string name="package_name">com.regroupride.app</string>
+    <string name="custom_url_scheme">com.regroupride.app</string>
 </resources>

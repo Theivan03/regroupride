@@ -27,7 +27,7 @@ export async function profileScreen(app, { user, admin, onSignOut }) {
     </form>
     ${admin ? '<a class="btn" href="#/admin">Panel de administración</a>' : ''}
     <button class="btn danger" id="out">Cerrar sesión</button>
-    <p class="muted small" style="text-align:center">RutasRatoners ${APP_VERSION}</p>`;
+    <p class="muted small" style="text-align:center">ReGroupRide ${APP_VERSION}</p>`;
   let isPublic = p.is_public;
   app.querySelectorAll('#pub [data-v]').forEach((b) => (b.onclick = () => {
     isPublic = b.dataset.v === '1';

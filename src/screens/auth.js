@@ -1,7 +1,7 @@
 import { $, esc, toast, busy, ICONS } from '../ui.js';
 import { signIn, signUp, resetPassword, errText, configured } from '../services.js';
 
-const logo = `<div class="logo"><div class="mark">${ICONS.road}</div><b>Rutas<i>Ratoners</i></b></div>`;
+const logo = `<div class="logo"><div class="mark">${ICONS.road}</div><b>ReGroup<i>Ride</i></b></div>`;
 
 export function setupScreen(app) {
   app.innerHTML = `${logo}

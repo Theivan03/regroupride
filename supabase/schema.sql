@@ -1,4 +1,4 @@
--- RutasRatoners · esquema de la fase 1
+-- ReGroupRide · esquema de la fase 1
 -- Cómo usarlo: Supabase → SQL Editor → New query → pegar todo este archivo → Run.
 -- Se puede ejecutar más de una vez sin romper nada.
 

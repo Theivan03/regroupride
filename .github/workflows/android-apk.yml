@@ -1,4 +1,4 @@
-# Compila el APK de pruebas de RutasRatoners en GitHub (no hace falta Android Studio).
+# Compila el APK de pruebas de ReGroupRide en GitHub (no hace falta Android Studio).
 # Se ejecuta en cada push a main y también a mano desde Actions → "Android APK" → "Run workflow".
 # El APK queda en Releases → "latest" para descargarlo directamente en el móvil.
 name: Android APK
@@ -57,19 +57,19 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
-          cp app/build/outputs/apk/debug/app-debug.apk ../rutasratoners.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../regroupride.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: rutasratoners-apk
-          path: rutasratoners.apk
+          name: regroupride-apk
+          path: regroupride.apk
 
       - name: Publicar en la release "latest"
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: RutasRatoners (última compilación)
+          name: ReGroupRide (última compilación)
           body: "APK de pruebas. Para instalar: descárgalo en el móvil, ábrelo y permite instalar desde este origen. Se puede instalar encima de la versión anterior."
-          files: rutasratoners.apk
+          files: regroupride.apk
           prerelease: true
           make_latest: true

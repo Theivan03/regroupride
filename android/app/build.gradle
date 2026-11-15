@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "es.rutasratoners.app"
+    namespace = "com.regroupride.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "es.rutasratoners.app"
+        applicationId "com.regroupride.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

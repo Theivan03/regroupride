@@ -36,9 +36,9 @@ test('formato api=1', () => {
 });
 
 test('lugar suelto y texto con enlace dentro', () => {
-  const r = parseGoogleMapsUrl('Mira: https://www.google.com/maps/place/Bar+Ratoners/@38.70,-0.05,17z más texto');
+  const r = parseGoogleMapsUrl('Mira: https://www.google.com/maps/place/Bar+Ruta/@38.70,-0.05,17z más texto');
   assert.equal(r.points.length, 1);
-  assert.equal(r.points[0].name, 'Bar Ratoners');
+  assert.equal(r.points[0].name, 'Bar Ruta');
 });
 
 test('enlaces cortos y errores', () => {
