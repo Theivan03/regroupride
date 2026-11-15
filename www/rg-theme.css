@@ -250,3 +250,31 @@ th{letter-spacing:0;text-transform:none}
 .rg-ava.warn{background:rgba(255,200,87,.2);color:#B7791F}
 .rg-ava.bad{background:rgba(229,72,77,.18);color:#E5484D}
 .plan-actions .btn svg{width:18px;height:18px}
+
+/* ---------- pantalla de ruta poco intrusiva ---------- */
+/* menú lateral: un solo botón; el resto aparece al tocarlo */
+.map-ctrls>button{display:none}
+.map-ctrls>#btnMore,.map-ctrls.open>button,.map-ctrls>#btnFollow[aria-pressed="false"],.map-ctrls>#btnGroup[aria-pressed="true"]{display:flex}
+.map-ctrls #btnMore[aria-expanded="true"]{color:var(--color-accent)}
+.map-ctrls #btnMore svg{width:22px;height:22px}
+/* ruta en marcha: solo «Parar» y el botón de información; los datos, en una tira pequeña opcional */
+#hudCard{padding:8px;border-radius:20px}
+#hudCard .hud{display:none}
+#hudCard .hud-actions{margin-top:0;gap:8px}
+#hudCard .btn.big.stop{min-height:50px;font-size:17px;border-radius:14px}
+#hudCard .btn.icon{width:50px;min-height:50px;border-radius:14px}
+.hud-mini{appearance:none;border:0;background:none;color:var(--color-text);width:100%;display:flex;justify-content:space-around;align-items:baseline;gap:10px;padding:2px 6px 8px;font-family:var(--font-text);font-size:13px;font-weight:600;color:var(--color-text-2);white-space:nowrap}
+.hud-mini b{font-family:var(--font-display);font-weight:700;font-size:17px;color:var(--color-text);font-variant-numeric:tabular-nums}
+/* ruta seleccionada: una línea fina; durante la ruta se oculta (el cartel de arriba ya dice lo que queda) */
+body.rg-rec #followCard{display:none}
+.card.slim{padding:4px 4px 4px 14px;border-radius:14px;gap:4px;margin-bottom:6px}
+.follow-txt{display:flex;align-items:baseline;gap:8px;white-space:nowrap;overflow:hidden}
+.card.slim .name{font-size:14px;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+.follow-txt .muted{font-size:12.5px;flex:none}
+.card.slim .btn.small.icon{width:36px;min-height:36px}
+.card.slim .btn.small.icon svg{width:17px;height:17px}
+/* permisos */
+.perm{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}
+.perm b{display:block;font-weight:650}
+.perm .muted{font-size:13px;display:block;line-height:1.3}
+.perm .mstatus{flex:none}

@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.4.1';
+  var APP_VERSION = '0.4.2';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -469,7 +469,8 @@
     LS.del('inclina.recording');
     return DB.getRide(id).then(function (r) { if (!r) return; r.inProgress = false; r.recovered = true; r.end = r.saved || r.start + 1; return DB.putRide(r); }).catch(function () {});
   }
-  $('#btnRide').addEventListener('click', function () { startRide(false); });
+  function askAndStart() { if (window.RGPerm) RGPerm.ensure().then(function (ok) { if (ok) startRide(false); }); else startRide(false); }
+  $('#btnRide').addEventListener('click', askAndStart);
   $('#btnStop').addEventListener('click', stopRide);
   window.addEventListener('pagehide', function () { if (rec) persistRec(); });
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && rec) Platform.keepAwake(true); });
@@ -1134,7 +1135,7 @@
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, activePlan: function () { return planMode ? null : activePlan; },
     isRec: function () { return !!rec; }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
-    startRide: function () { startRide(false); }, enterPlanMode: enterPlanMode,
+    startRide: function () { askAndStart(); }, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); },
     plans: function () { return plans.slice(); },
     usePlan: function (p) {   // guarda (o actualiza) una ruta planificada y la deja lista para «Iniciar ruta»
       var i = -1; plans.forEach(function (x, k) { if (x.id === p.id) i = k; });

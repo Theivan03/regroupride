@@ -41,6 +41,7 @@
       nav.active = false; nav.planId = null; nav.tr = null; nav.rejoin = null; nav.last = null; drawRejoin(); renderBanner(null);
     }
     if (!on) renderBanner(null);
+    document.body.classList.toggle('rg-rec', A.isRec());
     drawStops();
     if (window.RGGroup) RGGroup.sync();
   }
@@ -326,6 +327,83 @@
     });
     load();
   }
+
+  /* ================= pantalla de ruta: poco intrusiva ================= */
+  // Menú lateral plegado en un solo botón: se abre al tocarlo y se cierra al tocar fuera o al elegir una opción.
+  var ctrls = $('#mapCtrls'), more = $('#btnMore');
+  function setMenu(open) { if (!ctrls) return; ctrls.classList.toggle('open', open); more.setAttribute('aria-expanded', String(open)); }
+  if (more) {
+    more.addEventListener('click', function (e) { e.stopPropagation(); setMenu(!ctrls.classList.contains('open')); });
+    ctrls.addEventListener('click', function (e) { if (e.target.closest('button') && e.target.closest('button') !== more) setMenu(false); });
+    document.addEventListener('pointerdown', function (e) { if (ctrls.classList.contains('open') && !ctrls.contains(e.target)) setMenu(false); }, true);
+  }
+  // Velocidad e inclinación: una tira pequeña que se enseña con el botón de al lado de «Parar».
+  var hudBtn = $('#btnHudInfo'), hudMini = $('#hudMini'), hudTimer = null;
+  function hudFill() {
+    var sp = $('#hudSpeed'), ln = $('#gaugeMini .num'), km = $('#hudMeta b');
+    $('#hmSpeed').textContent = sp ? sp.textContent : '—'; $('#hmLean').textContent = ln ? ln.textContent : '0°'; $('#hmKm').textContent = km ? km.textContent : '';
+  }
+  function hudApply() {
+    var on = !!A.settings.hudInfo; if (!hudBtn) return;
+    hudBtn.setAttribute('aria-pressed', String(on)); hudMini.hidden = !on;
+    if (on && !hudTimer) { hudFill(); hudTimer = setInterval(function () { if (!$('#hudCard').hidden) hudFill(); }, 400); }
+    if (!on && hudTimer) { clearInterval(hudTimer); hudTimer = null; }
+  }
+  if (hudBtn) {
+    hudBtn.addEventListener('click', function () { A.settings.hudInfo = !A.settings.hudInfo; A.saveSettings(); hudApply(); });
+    hudMini.addEventListener('click', function () { A.openLeanFull(); });
+    hudApply();
+  }
+
+  /* ================= permisos ================= */
+  // Android solo enseña su ventana de permiso una vez. Antes de cada ruta se comprueba; si falta, se explica y se pide.
+  function locState() { return (native && P.Geolocation) ? P.Geolocation.checkPermissions().then(function (s) { return s.location || 'prompt'; }, function () { return 'unknown'; }) : Promise.resolve('granted'); }
+  function notifState() { return (native && P.LocalNotifications) ? P.LocalNotifications.checkPermissions().then(function (s) { return s.display || 'prompt'; }, function () { return 'unknown'; }) : Promise.resolve('granted'); }
+  function askNotifNow() { return (native && P.LocalNotifications) ? P.LocalNotifications.requestPermissions().then(function (s) { return s.display; }, function () { return 'unknown'; }) : Promise.resolve('granted'); }
+  // Si la comprobación falla o tarda, no bloquea: se deja empezar y el propio GPS pedirá el permiso.
+  function quick(p, ms, fallback) { return Promise.race([p, new Promise(function (r) { setTimeout(function () { r(fallback); }, ms); })]).catch(function () { return fallback; }); }
+  function ensure() {
+    return quick(locState(), 3000, 'unknown').then(function (st) {
+      if (st === 'granted' || st === 'unknown') { notifState().then(function (n) { if (n !== 'granted' && n !== 'denied') askNotifNow(); }); return true; }
+      return new Promise(function (resolve) { explain(st === 'denied', resolve); });
+    });
+  }
+  function explain(denied, done) {
+    sheet('<div class="head"><h1>Permiso de ubicación</h1></div>' +
+      '<p>ReGroupRide necesita tu ubicación para seguir la ruta, avisarte si te sales y grabar el recorrido.</p>' +
+      '<p class="muted">Con la ruta en marcha sigue funcionando con la pantalla apagada, y verás un aviso fijo mientras tanto. Al parar la ruta deja de usarse. Los sensores de inclinación no necesitan permiso en Android.</p>' +
+      (denied ? '<div class="notice">El permiso está denegado y Android ya no deja volver a preguntar. Ábrelo en los ajustes del teléfono: Permisos → Ubicación → «Permitir solo con la app en uso».</div><button class="btn big primary" id="pmSet" type="button">Abrir ajustes del teléfono</button><button class="btn" id="pmRe" type="button">Ya lo he activado</button>'
+              : '<button class="btn big primary" id="pmAsk" type="button">Dar permiso</button>') +
+      '<button class="btn rg-skip" id="pmNo" type="button">Ahora no</button>');
+    var finish = function (ok) { closeSheet(); if (!ok) A.toast('Sin permiso de ubicación no se puede seguir ni grabar la ruta.', 'warn'); renderPerms(); done(ok); };
+    $('#pmNo').addEventListener('click', function () { finish(false); });
+    if ($('#pmAsk')) $('#pmAsk').addEventListener('click', function () {
+      P.Geolocation.requestPermissions({ permissions: ['location'] }).then(function (s) { return s.location; }, function () { return 'denied'; }).then(function (st) {
+        if (st === 'granted') { askNotifNow().then(function () { finish(true); }); } else explain(true, done);
+      });
+    });
+    if ($('#pmSet')) $('#pmSet').addEventListener('click', function () { if (window.Platform) Platform.openLocationSettings(); });
+    if ($('#pmRe')) $('#pmRe').addEventListener('click', function () { locState().then(function (st) { if (st === 'granted') finish(true); else A.toast('Todavía no está activado.', 'warn'); }); });
+  }
+  var PERM_TXT = { granted: ['Concedido', 'ok'], denied: ['Denegado', 'due'], prompt: ['Sin pedir todavía', 'soon'], 'prompt-with-rationale': ['Sin conceder', 'soon'], unknown: ['No se puede comprobar', ''] };
+  function renderPerms() {
+    var box = $('#rgPerms'); if (!box) return;
+    if (!native) { box.hidden = true; return; }
+    Promise.all([locState(), notifState()]).then(function (r) {
+      var row = function (name, why, st) { var t = PERM_TXT[st] || PERM_TXT.unknown; return '<div class="perm"><div><b>' + name + '</b><span class="muted">' + why + '</span></div><span class="mstatus ' + t[1] + '">' + t[0] + '</span></div>'; };
+      box.hidden = false;
+      box.innerHTML = '<span class="label">Permisos</span>' + row('Ubicación', 'Para seguir y grabar la ruta.', r[0]) + row('Notificaciones', 'Aviso de «fuera de ruta» y aviso fijo durante la ruta.', r[1]) +
+        '<div class="perm"><div><b>Sensores de inclinación</b><span class="muted">Android no pide permiso para usarlos.</span></div><span class="mstatus ok">Disponible</span></div>' +
+        ((r[0] !== 'granted' || r[1] !== 'granted') ? '<div class="rg-row"><button class="btn small primary" id="pmFix" type="button">Revisar permisos</button></div>' : '');
+      if ($('#pmFix')) $('#pmFix').addEventListener('click', function () {
+        if (r[0] !== 'granted') ensure().then(renderPerms);
+        else askNotifNow().then(function (n) { if (n !== 'granted' && window.Platform) Platform.openLocationSettings(); renderPerms(); });
+      });
+    });
+  }
+  window.RGPerm = { ensure: ensure, render: renderPerms };
+  var tabSet = document.querySelector('.tab[data-view="settings"]'); if (tabSet) tabSet.addEventListener('click', renderPerms);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !$('#view-settings').hidden) renderPerms(); });
 
   // Indicaciones por voz
   var sw = $('#setNavVoice');
