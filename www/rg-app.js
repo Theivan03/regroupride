@@ -222,6 +222,7 @@
     if (m.indexOf('password should be') >= 0) return 'La contraseña tiene que tener al menos 6 caracteres.';
     if (m.indexOf('not confirmed') >= 0) return 'Confirma tu correo antes de entrar (mira tu bandeja de entrada).';
     if (m.indexOf('logins are disabled') >= 0 || m.indexOf('signups not allowed') >= 0 || m.indexOf('provider is not enabled') >= 0) return 'El registro por correo está desactivado en el servidor.';
+    if (m.indexOf('could not find the function') >= 0 || m.indexOf('could not find the table') >= 0) return 'Esta función aún no está activada en el servidor (falta ejecutar un archivo .sql en Supabase).';
     if (m.indexOf('fetch') >= 0 || m.indexOf('network') >= 0) return 'Sin conexión con el servidor. Revisa tu cobertura.';
     return (e && e.message) || String(e);
   }
