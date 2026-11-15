@@ -16,6 +16,20 @@ var RGLib = (function () {
   function decodeSeg(s) { try { return decodeURIComponent(s.replace(/\+/g, ' ')).trim(); } catch (e) { return s.replace(/\+/g, ' ').trim(); } }
   function isShortLink(u) { return /^(https?:\/\/)?(maps\.app\.goo\.gl|goo\.gl\/maps)\//i.test(String(u).trim()); }
   function extractUrl(t) { var m = String(t || '').match(/https?:\/\/[^\s<>"']+/i); return m ? m[0] : null; }
+  // Busca una dirección de Google Maps dentro de un texto: una URL, una cabecera de redirección o una página.
+  // Google a veces la manda dentro de otra (pantalla de cookies: ...?continue=<url>), escapada o como enlace de app.
+  function findMapsUrl(text) {
+    var t = String(text || ''), RE = /https?:\/\/(?:www\.|maps\.)?google\.[a-z.]+\/maps[^\s"'<>\\]*/i, i, m, v;
+    var forms = [t, t.replace(/\\u003d/gi, '=').replace(/\\u0026/gi, '&').replace(/\\\//g, '/').replace(/&amp;/g, '&')];
+    for (i = 0; i < forms.length; i++) {
+      m = forms[i].match(/[?&](?:continue|link|url|q)=(https?(?::|%3A)[^&\s"'<>]+)/i);
+      if (m) { try { v = decodeURIComponent(m[1]); } catch (e) { v = m[1]; } if (RE.test(v) && /\/maps\/(dir|place|@|search)|[?&]q=/.test(v)) return v.match(RE)[0]; }
+      m = forms[i].match(RE); if (m && !/\/maps\/(api|vt|preview|rpc|_)/.test(m[0])) return m[0];
+      m = forms[i].match(/intent:\/\/((?:www\.|maps\.)?google\.[a-z.]+\/maps[^\s"'<>#]*)/i); if (m) return 'https://' + m[1];
+      m = forms[i].match(/https?%3A%2F%2F(?:www\.|maps\.)?google\.[a-z.]+%2Fmaps[^\s"'<>&]*/i); if (m) { try { return decodeURIComponent(m[0]); } catch (e) {} }
+    }
+    return null;
+  }
   // Mete un punto de paso donde menos alarga el recorrido.
   function insertByDetour(pts, via) {
     if (pts.length < 2) return pts.concat([via]);
@@ -83,10 +97,11 @@ var RGLib = (function () {
   }
   // Punto de la línea más cercano a p. Solo mira por delante de `from` (menos una tolerancia): así en rutas de ida
   // y vuelta no salta al otro sentido.
-  function project(p, line, from, back) {
+  function project(p, line, from, back, maxAlong) {
     var best = null, min = Math.max(0, (from || 0) - (back == null ? 300 : back)), c = line.c, cum = line.cum;
     for (var i = 0; i < c.length - 1; i++) {
       if (cum[i + 1] < min) continue;
+      if (maxAlong != null && cum[i] > maxAlong) break;
       var r = projSeg(p, c[i], c[i + 1]), along = cum[i] + r.t * (cum[i + 1] - cum[i]);
       if (along < min) continue;
       if (!best || r.d < best.d) best = { d: r.d, along: along, i: i };
@@ -165,7 +180,11 @@ var RGLib = (function () {
     var OFF = opts.offDist || 60, OFF_S = (opts.offSecs || 8) * 1000, BACK_S = (opts.backSecs || 4) * 1000;
     var s = { along: 0, off: 0, offRoute: false, started: false, finished: false, offSince: null, onSince: null, said: {}, stepIdx: 0 };
     function update(fix, now) {
-      var ev = [], acc = Math.min(fix.acc || 0, 40), pr = project(fix, line, s.along), lim = OFF + acc;
+      // Primero busca cerca de por donde ibas: en rutas circulares o que pasan dos veces por el mismo sitio,
+      // el punto «más cercano» de toda la ruta puede ser el final. Solo si ahí no estás, mira el resto.
+      var ev = [], acc = Math.min(fix.acc || 0, 40), lim = OFF + acc;
+      var pr = project(fix, line, s.along, 300, s.along + 1500 + (fix.v || 0) * 10);
+      if (!pr || pr.d > lim) { var far = project(fix, line, s.along); if (far && (!pr || far.d < pr.d)) pr = far; }
       s.off = pr.d;
       if (pr.d <= lim) {
         s.offSince = null;
@@ -195,7 +214,7 @@ var RGLib = (function () {
   }
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
-  return { dist: dist, parseMapsUrl: parseMapsUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
+  return { dist: dist, findMapsUrl: findMapsUrl, parseMapsUrl: parseMapsUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
     rejoinTarget: rejoinTarget, stepsFromOsrm: stepsFromOsrm, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = RGLib;

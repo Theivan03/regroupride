@@ -133,13 +133,26 @@
     if (navigator.clipboard && navigator.clipboard.readText) return navigator.clipboard.readText();
     return Promise.reject(new Error('sin portapapeles'));
   }
+  // Los enlaces cortos (maps.app.goo.gl) no llevan los puntos: hay que preguntar a Google a dónde apuntan.
+  // Primero se lee solo la redirección (sin seguirla); si no la da, se sigue y se busca la dirección en la respuesta.
+  var UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+  function header(h, name) { for (var k in (h || {})) if (k.toLowerCase() === name) return h[k]; return ''; }
   function expandShort(url) {
     if (!P.CapacitorHttp) return Promise.reject(new Error('Los enlaces cortos solo se pueden abrir desde la app del móvil. Aquí, pega el enlace largo.'));
-    return P.CapacitorHttp.request({ url: url, method: 'GET', headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36' } }).then(function (r) {
-      if (r.url && /google\.[a-z.]+\/maps/i.test(r.url)) return r.url;
-      var body = typeof r.data === 'string' ? r.data : '', m = body.match(/https:\/\/www\.google\.[a-z.]+\/maps\/[^"'\s<>\\]+/i);
-      if (m) return m[0].replace(/\\u0026/g, '&').replace(/&amp;/g, '&');
-      throw new Error('No he podido abrir el enlace corto. Copia el enlace completo desde el navegador.');
+    var seen = '';
+    function ask(u, follow) { return P.CapacitorHttp.request({ url: u, method: 'GET', headers: { 'User-Agent': UA, 'Accept-Language': 'es-ES,es' }, disableRedirects: !follow, connectTimeout: 10000, readTimeout: 10000 }); }
+    function pick(r) {
+      var loc = header(r.headers, 'location'), body = typeof r.data === 'string' ? r.data : '';
+      seen = 'estado ' + r.status + (loc ? ', ' + loc.slice(0, 60) : (r.url ? ', ' + String(r.url).slice(0, 60) : ''));
+      return L.findMapsUrl(loc) || L.findMapsUrl(r.url) || L.findMapsUrl(body.slice(0, 400000));
+    }
+    return ask(url, false).then(function (r) {
+      var found = pick(r); if (found) return found;
+      var loc = header(r.headers, 'location');
+      return ask(loc && /^https?:/i.test(loc) ? loc : url, true).then(pick);
+    }, function () { return ask(url, true).then(pick); }).then(function (found) {
+      if (found) return found;
+      throw new Error('No he podido abrir el enlace corto (' + seen + '). Abre el enlace en el navegador y copia la dirección completa.');
     });
   }
   function importLink(text) {
@@ -151,7 +164,7 @@
       if (r.error) throw new Error(r.error === 'short' ? 'No he podido abrir el enlace corto.' : r.error);
       if (!r.points.length) throw new Error('El enlace usa nombres de sitios que no puedo situar (' + r.unresolved.join(', ') + '). Tócalos en el mapa.');
       var names = r.points.filter(function (p) { return p.name && !p.via; }).map(function (p) { return p.name.split(',')[0]; });
-      A.setWaypoints(r.points, names.length >= 2 ? (names[0] + ' – ' + names[names.length - 1]).slice(0, 60) : '');
+      A.setWaypoints(r.points, names.length >= 2 ? (names[0] === names[names.length - 1] ? 'Circular desde ' + names[0] : names[0] + ' – ' + names[names.length - 1]).slice(0, 60) : '');
       A.toast(r.unresolved.length ? 'Leídos ' + r.points.length + ' puntos. Faltan por situar: ' + r.unresolved.join(', ') + '. Tócalos en el mapa.' : 'Ruta leída: ' + r.points.length + ' puntos.', r.unresolved.length ? 'warn' : 'ok');
       var inp = $('#planLink'); if (inp) inp.value = '';
     }).catch(function (e) { A.toast(e && e.message ? e.message : String(e), 'bad'); }).then(function () { if (btn) btn.disabled = false; });

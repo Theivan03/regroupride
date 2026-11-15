@@ -24,6 +24,25 @@ t('formato api=1, lugar suelto, cortos y errores', function () {
   assert.ok(L.isShortLink('https://maps.app.goo.gl/AbCd123')); assert.equal(L.parseMapsUrl('https://maps.app.goo.gl/AbCd123').error, 'short'); assert.ok(L.parseMapsUrl('hola').error);
 });
 
+t('ruta real de 16 puntos con nombres, barras codificadas y vuelta al inicio', function () {
+  var u = 'https://www.google.com/maps/dir/Estaci%C3%B3n+de+Servicio+Repsol,+Av.+Universitat,+S.N,+03009+Alicante/38.4432762,-0.638148/38.573175,-0.5898003/38.6277134,-0.5664904/38.7074659,-0.6522081/38.7834206,-0.5171418/38.7818667,-0.4275188/38.7853859,-0.3364889/38.8149182,-0.3561771/Restaurante%2FAlbergue+del+Serpis,+Les+Fontetes,+s%2Fn,+03860+L%27Orxa,+Alicante/38.827928,-0.2751228/38.7689865,-0.2721261/38.741984,-0.3154749/GASOLINERA+BENILLOBA+LEYBL,+Avinguda+d%27Alcoi,+03810+Benilloba,+Alicante/38.5624587,-0.4702267/Estaci%C3%B3n+de+Servicio+Repsol,+Av.+Universitat,+S.N,+03009+Alicante/@38.4999052,-0.519574,68418m/data=!3m1!1e3!4m38!4m37!1m5!1m1!1s0xd62369501ec889f:0x8d1c38cd99db3471!2m2!1d-0.508851!2d38.3762127!1m0!1m0!1m0!1m0!1m0!1m0!1m0!1m0!1m5!1m1!1s0xd6192c4384d3cc7:0xf5574a55a858502e!2m2!1d-0.312078!2d38.8473991!1m0!1m0!1m0!1m5!1m1!1s0xd618944f4108b7d:0xba3391eabc4d9b8!2m2!1d-0.3865755!2d38.6988919!1m0!1m5!1m1!1s0xd62369501ec889f:0x8d1c38cd99db3471!2m2!1d-0.508851!2d38.3762127!3e0?entry=ttu&g_ep=XXXX';
+  var r = L.parseMapsUrl(u);
+  assert.equal(r.points.length, 16); assert.equal(r.unresolved.length, 0);
+  assert.equal(r.points[0].lat, 38.3762127); assert.equal(r.points[9].name.indexOf('Restaurante/Albergue del Serpis'), 0); assert.equal(r.points[9].lat, 38.8473991);
+  assert.equal(r.points[13].lon, -0.3865755); assert.equal(r.points[15].lat, r.points[0].lat);
+});
+t('encontrar la dirección de Maps en redirecciones y páginas', function () {
+  var full = 'https://www.google.com/maps/dir/38.1,-0.2/38.3,-0.4/@38.2,-0.3,12z/data=!4m2!4m1!3e0?entry=ttu';
+  assert.equal(L.findMapsUrl(full), full);
+  assert.equal(L.findMapsUrl('https://consent.google.com/ml?continue=' + encodeURIComponent(full) + '&gl=ES&hl=es'), full);
+  assert.equal(L.findMapsUrl('<html><a href="' + full.replace(/&/g, '&amp;') + '">x</a>'), full);
+  assert.equal(L.findMapsUrl('window.location="' + full.replace(/\//g, '\\/') + '";'), full);
+  assert.equal(L.findMapsUrl('intent://www.google.com/maps/dir/38.1,-0.2/38.3,-0.4#Intent;scheme=https;end'), 'https://www.google.com/maps/dir/38.1,-0.2/38.3,-0.4');
+  assert.equal(L.findMapsUrl('content="0;url=' + encodeURIComponent(full) + '"'), full);
+  assert.equal(L.findMapsUrl('https://www.google.com/maps/api/js?x=1 nada más'), null); assert.equal(L.findMapsUrl('hola'), null);
+  assert.equal(L.parseMapsUrl(L.findMapsUrl('https://consent.google.com/ml?continue=' + encodeURIComponent(full))).points.length, 2);
+});
+
 // Ruta recta hacia el este por el paralelo 38.6 (unos 35 km), con un giro a mitad.
 var coords = []; for (var i = 0; i <= 40; i++) coords.push([-0.5 + i * 0.01, 38.6]);
 var steps = [{ lat: 38.6, lon: -0.3, text: 'gira a la derecha', icon: 'right', name: 'CV-70' }, { lat: 38.6, lon: -0.1, text: 'has llegado al final de la ruta', icon: 'arrive', name: '' }];
@@ -56,6 +75,15 @@ t('ida y vuelta por la misma carretera no salta de sentido', function () {
   var out = seg(-0.5, -0.4, 38.6, 100), loop = out.concat(out.slice(0, -1).reverse()), tr = L.Tracker(loop, []);
   var ev = run(tr, seg(-0.5, -0.4, 38.6, 20).concat(seg(-0.4, -0.45, 38.6, 20)), 20);
   assert.ok(ev.last.along > tr.line.total * 0.7, ev.last.along + ' de ' + tr.line.total);
+});
+t('ruta circular: al salir no se da por terminada y acaba al volver', function () {
+  var sq = seg(-0.5, -0.45, 38.6, 100); var up = []; for (var y = 38.6; y <= 38.63; y += 0.001) up.push([-0.45, y]);
+  var back = seg(-0.45, -0.5, 38.63, 100), down = []; for (y = 38.63; y >= 38.6; y -= 0.001) down.push([-0.5, y]);
+  var loop = sq.concat(up, back, down, [[-0.5, 38.6]]), tr = L.Tracker(loop, []);
+  var ev = run(tr, [[-0.50002, 38.60003], [-0.5001, 38.59995], [-0.4998, 38.60001], [-0.4995, 38.6]], 5);
+  assert.ok(!ev.last.finished && ev.last.along < 300, 'along ' + ev.last.along);
+  var e2 = run(tr, sq.concat(up, back, down), 25, ev.now);
+  assert.ok(e2.last.finished, 'restan ' + e2.last.remaining); assert.equal(e2.filter(function (e) { return e.type === 'off'; }).length, 0);
 });
 t('fin de ruta y punto de reenganche por delante', function () {
   var tr = L.Tracker(coords, steps), ev = run(tr, seg(-0.5, -0.1, 38.6, 40), 25);
