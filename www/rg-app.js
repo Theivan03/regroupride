@@ -161,7 +161,60 @@
     var file = (p.name || 'ruta').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50) || 'ruta';
     Platform.downloadCsv(file + '.gpx', L.planToGpx(p), 'Ruta ' + (p.name || '')).then(function () { if (!native) A.toast('GPX descargado.', 'ok'); }, function (e) { if (!/cancel/i.test(String(e && e.message))) A.toast('No se ha podido compartir el GPX.', 'bad'); });
   }
-  window.RGNav = { onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx };
+  /* ---- importar un GPX como ruta a seguir ---- */
+  var gpxMode = null, OSRM = 'https://router.project-osrm.org/route/v1/driving/';
+  // Indicaciones de giro: se pide a OSRM la ruta pasando por puntos del propio trazado (uno cada 1,5 km) y solo se
+  // aprovechan los tramos en los que va por la misma carretera. El trazado que se sigue es siempre el del archivo.
+  function gpxSteps(line) {
+    var vias = L.viaPoints(line, 1500), CH = 40, i0 = 0, out = { steps: [], ok: 0, bad: 0, dur: 0 };
+    var skip = function (part) { out.bad += part.length - 1; out.dur += (part[part.length - 1].along - part[0].along) / 15; };
+    if (navigator.onLine === false) { skip(vias); return Promise.resolve(out); }
+    function next() {
+      if (i0 >= vias.length - 1) return out;
+      var start = i0, part = vias.slice(start, start + CH + 1), isEnd = start + CH >= vias.length - 1; i0 += CH;
+      var url = OSRM + part.map(function (v) { return v.lon.toFixed(5) + ',' + v.lat.toFixed(5); }).join(';') + '?overview=false&steps=true';
+      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctrl) setTimeout(function () { ctrl.abort(); }, 9000);
+      return fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j.routes || !j.routes[0]) { skip(part); return; }
+        var r = L.trackSteps(j.routes[0], vias, start, line, isEnd);
+        out.steps = out.steps.concat(r.steps); out.ok += r.ok; out.bad += r.bad; out.dur += r.dur;
+      }, function () { skip(part); }).then(next);
+    }
+    return Promise.resolve().then(next);
+  }
+  function gpxAsPlan(g) {
+    var simp = Geo.simplify(g.coords.map(function (c) { return [0, c[1], c[0]]; }), 8).map(function (p) { return [p[2], p[1]]; });
+    var line = L.makeLine(simp), km = Math.round(line.total / 100) / 10;
+    var plan = { id: Date.now(), name: g.name.slice(0, 60), wps: g.wps, coords: simp, dist: km, dur: Math.round(line.total / 15), routed: true, steps: [], created: Date.now(), gpx: true };
+    A.toast('Leyendo la ruta del archivo…');
+    return gpxSteps(line).then(function (r) {
+      plan.steps = r.steps; if (r.ok) plan.dur = Math.round(r.dur);
+      var total = r.ok + r.bad, part = total ? r.ok / total : 0;
+      return A.usePlan(plan).then(function () {
+        var d = String(km).replace('.', ',') + ' km, ' + g.wps.length + ' paradas. ';
+        A.toast('Ruta importada: ' + d + (part === 1 ? 'Con indicaciones de giro.' : (part >= 0.9 ? 'Con indicaciones de giro en casi todo el recorrido.' : (part > 0 ? 'Indicaciones de giro en parte del recorrido; en el resto, sigue la línea.' : 'Sin indicaciones de giro (no hay conexión): sigue la línea del mapa.'))), part > 0 ? 'ok' : 'warn');
+      });
+    }).catch(function (e) { A.toast('No se pudo importar: ' + (e && e.message || e), 'bad'); });
+  }
+  function gpxPicked(text, fname) {
+    var mode = gpxMode, g; gpxMode = null;
+    try { g = L.gpxToPlan(text); } catch (e) { A.toast('No se pudo importar: ' + e.message, 'bad'); return; }
+    if (!g.name) g.name = String(fname || '').replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' ').trim() || 'Ruta GPX';
+    if (g.route) {     // solo puntos sueltos: al planificador, que calcula la carretera entre ellos
+      A.showView('map');
+      if (A.setWaypoints(g.wps.map(function (w) { return { lat: w[0], lon: w[1], name: w[2] }; }), g.name) !== false) A.toast('El archivo trae ' + g.wps.length + ' puntos sin trazado. Revisa la ruta y pulsa «Guardar».', 'ok');
+      return;
+    }
+    if (!g.timed || mode === 'plan') { gpxAsPlan(g); return; }
+    sheet('<div class="head"><h1>Importar GPX</h1></div><p>«' + esc(g.name) + '» es un recorrido grabado. ¿Qué quieres hacer con él?</p>' +
+      '<button class="btn big primary" id="gxPlan" type="button">Seguirlo como ruta</button><button class="btn" id="gxRec" type="button">Guardarlo en mis rutas grabadas</button><button class="btn rg-skip" id="gxNo" type="button">Cancelar</button>');
+    $('#gxPlan').addEventListener('click', function () { closeSheet(); gpxAsPlan(g); });
+    $('#gxRec').addEventListener('click', function () { closeSheet(); A.importRecordedGpx(text, fname); });
+    $('#gxNo').addEventListener('click', closeSheet);
+  }
+  if ($('#planGpx')) $('#planGpx').addEventListener('click', function () { gpxMode = 'plan'; var f = $('#gpxFile'); f.value = ''; f.click(); });
+
+  window.RGNav = { gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx };
 
   /* ================= importar enlace de Google Maps ================= */
   function readClipboard() {
@@ -338,22 +391,11 @@
     document.addEventListener('pointerdown', function (e) { if (ctrls.classList.contains('open') && !ctrls.contains(e.target)) setMenu(false); }, true);
   }
   // Velocidad e inclinación: una tira pequeña que se enseña con el botón de al lado de «Parar».
-  var hudBtn = $('#btnHudInfo'), hudMini = $('#hudMini'), hudTimer = null;
-  function hudFill() {
-    var sp = $('#hudSpeed'), ln = $('#gaugeMini .num'), km = $('#hudMeta b');
-    $('#hmSpeed').textContent = sp ? sp.textContent : '—'; $('#hmLean').textContent = ln ? ln.textContent : '0°'; $('#hmKm').textContent = km ? km.textContent : '';
-  }
-  function hudApply() {
-    var on = !!A.settings.hudInfo; if (!hudBtn) return;
-    hudBtn.setAttribute('aria-pressed', String(on)); hudMini.hidden = !on;
-    if (on && !hudTimer) { hudFill(); hudTimer = setInterval(function () { if (!$('#hudCard').hidden) hudFill(); }, 400); }
-    if (!on && hudTimer) { clearInterval(hudTimer); hudTimer = null; }
-  }
-  if (hudBtn) {
-    hudBtn.addEventListener('click', function () { A.settings.hudInfo = !A.settings.hudInfo; A.saveSettings(); hudApply(); });
-    hudMini.addEventListener('click', function () { A.openLeanFull(); });
-    hudApply();
-  }
+  var hudBtn = $('#btnHudInfo');
+  // Se enseña el panel de siempre (inclinación en vivo, máxima y última de cada lado, velocidad) en tamaño reducido.
+  // Es el mismo que se actualiza en cada lectura del sensor, no una copia.
+  function hudApply() { var on = !!A.settings.hudInfo; hudBtn.setAttribute('aria-pressed', String(on)); document.body.classList.toggle('rg-hud', on); }
+  if (hudBtn) { hudBtn.addEventListener('click', function () { A.settings.hudInfo = !A.settings.hudInfo; A.saveSettings(); hudApply(); }); hudApply(); }
 
   /* ================= permisos ================= */
   // Android solo enseña su ventana de permiso una vez. Antes de cada ruta se comprueba; si falta, se explica y se pide.

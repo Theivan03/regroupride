@@ -263,8 +263,21 @@ th{letter-spacing:0;text-transform:none}
 #hudCard .hud-actions{margin-top:0;gap:8px}
 #hudCard .btn.big.stop{min-height:50px;font-size:17px;border-radius:14px}
 #hudCard .btn.icon{width:50px;min-height:50px;border-radius:14px}
-.hud-mini{appearance:none;border:0;background:none;color:var(--color-text);width:100%;display:flex;justify-content:space-around;align-items:baseline;gap:10px;padding:2px 6px 8px;font-family:var(--font-text);font-size:13px;font-weight:600;color:var(--color-text-2);white-space:nowrap}
-.hud-mini b{font-family:var(--font-display);font-weight:700;font-size:17px;color:var(--color-text);font-variant-numeric:tabular-nums}
+/* panel de datos reducido: inclinación en vivo en el centro, máxima y última de cada lado, velocidad y km */
+body.rg-hud #hudCard .hud{display:grid;grid-template-columns:1fr 78px 1fr auto;grid-template-rows:auto auto;gap:0 8px;align-items:center;padding:0 4px 6px;cursor:pointer}
+#hudCard .hud .gauge-wrap{grid-column:2;grid-row:1/3;width:78px}
+#hudCard .hud .maxes{display:contents}
+#hudCard .hud .maxes>div{grid-row:1/3;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:0 5px}
+#hudCard .hud .maxes>div:first-child{grid-column:1}
+#hudCard .hud .maxes>div:last-child{grid-column:3}
+#hudCard .hud .maxes .label{font-size:11.5px;margin:0}
+#hudCard .hud .maxes .val{font-size:22px}
+#hudCard .hud .maxes .last{font-size:13px;margin-top:1px;flex:0 0 100%;text-align:center}
+#hudCard .hud .maxes .last small{font-size:10.5px;margin-right:3px}
+#hudCard .hud .speed{grid-column:4;grid-row:1;display:flex;align-items:baseline;justify-content:flex-end;gap:3px;align-self:end}
+#hudCard .hud .speed .val{font-size:24px;line-height:1}
+#hudCard .hud .speed .unit{font-size:11px}
+#hudCard .hud .meta{grid-column:4;grid-row:2;text-align:right;font-size:11.5px;align-self:start}
 /* ruta seleccionada: una línea fina; durante la ruta se oculta (el cartel de arriba ya dice lo que queda) */
 body.rg-rec #followCard{display:none}
 .card.slim{padding:4px 4px 4px 14px;border-radius:14px;gap:4px;margin-bottom:6px}

@@ -185,25 +185,98 @@ var RGLib = (function () {
     return MOD[mod] || 'sigue';
   }
   // Convierte los pasos de OSRM en una lista corta: [{lat, lon, text, icon, name}]. Quita lo que no es un giro de verdad.
+  function stepOf(s, lastLeg) {
+    var m = s.maneuver || {}, type = m.type, mod = m.modifier;
+    if (!m.location) return null;
+    if (type === 'depart' || type === 'exit roundabout' || type === 'exit rotary' || type === 'notification') return null;
+    if (type === 'arrive' && !lastLeg) return null;      // puntos intermedios: no se anuncian
+    if ((type === 'new name' || type === 'continue') && (mod === 'straight' || !mod)) return null;
+    if (type === 'turn' && mod === 'straight') return null;
+    var icon = type === 'arrive' ? 'arrive' : ((type === 'roundabout' || type === 'rotary' || type === 'roundabout turn') ? 'roundabout' : (mod || 'straight'));
+    return { lat: m.location[1], lon: m.location[0], text: stepText(type, mod, m.exit), icon: icon, name: s.name || '' };
+  }
   function stepsFromOsrm(route) {
     var out = [];
     (route.legs || []).forEach(function (leg, li) {
-      (leg.steps || []).forEach(function (s) {
-        var m = s.maneuver || {}, type = m.type, mod = m.modifier;
-        if (type === 'depart' || type === 'exit roundabout' || type === 'exit rotary' || type === 'notification') return;
-        if (type === 'arrive' && li < route.legs.length - 1) return;      // puntos intermedios: no se anuncian
-        if ((type === 'new name' || type === 'continue') && (mod === 'straight' || !mod)) return;
-        if (type === 'turn' && mod === 'straight') return;
-        var icon = type === 'arrive' ? 'arrive' : ((type === 'roundabout' || type === 'rotary' || type === 'roundabout turn') ? 'roundabout' : (mod || 'straight'));
-        out.push({ lat: m.location[1], lon: m.location[0], text: stepText(type, mod, m.exit), icon: icon, name: s.name || '' });
-      });
+      (leg.steps || []).forEach(function (s) { var st = stepOf(s, li === route.legs.length - 1); if (st) out.push(st); });
     });
     return out;
+  }
+
+  /* ---------- GPX como ruta a seguir ---------- */
+  function xmlText(t) {
+    return String(t || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+      .replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(+n); }).replace(/&amp;/g, '&').trim();
+  }
+  function gpxPts(text, tag) {
+    var re = new RegExp('<' + tag + '\\b([^>]*?)(?:/>|>([\\s\\S]*?)</' + tag + '>)', 'g'), m, out = [];
+    while ((m = re.exec(text))) {
+      var la = /\blat\s*=\s*["']([^"']+)["']/.exec(m[1]), lo = /\blon\s*=\s*["']([^"']+)["']/.exec(m[1]);
+      if (!la || !lo) continue;
+      var lat = parseFloat(la[1]), lon = parseFloat(lo[1]);
+      if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
+      var body = m[2] || '', nm = /<name>([\s\S]*?)<\/name>/.exec(body);
+      out.push({ lat: lat, lon: lon, name: nm ? xmlText(nm[1]) : '', time: /<time>/.test(body) });
+    }
+    return out;
+  }
+  // Lee un GPX (de OsmAnd, Calimoto, Kurviger, un GPS…) y lo deja como ruta a seguir:
+  //   coords = el trazado tal cual viene (trk); wps = las paradas (rte, o wpt, o principio y final).
+  //   route = true si el archivo solo trae unos pocos puntos sueltos y hay que calcular la carretera entre ellos.
+  //   timed = true si es un recorrido grabado (lleva horas).
+  function gpxToPlan(text) {
+    text = String(text || '');
+    if (!/<gpx[\s>]/i.test(text)) throw new Error('No es un archivo GPX.');
+    var trk = gpxPts(text, 'trkpt'), rte = gpxPts(text, 'rtept'), wpt = gpxPts(text, 'wpt');
+    var nm = /<metadata>[\s\S]*?<name>([\s\S]*?)<\/name>[\s\S]*?<\/metadata>/.exec(text) || /<(?:trk|rte)>\s*<name>([\s\S]*?)<\/name>/.exec(text);
+    var name = nm ? xmlText(nm[1]) : '';
+    var asStop = function (p) { return [p.lat, p.lon, p.name || '']; };
+    var track = trk.length >= 2 ? trk : (rte.length >= 50 ? rte : null);
+    if (!track) {
+      if (rte.length < 2 && wpt.length < 2) throw new Error('El archivo no trae ninguna ruta.');
+      return { name: name, coords: [], wps: (rte.length >= 2 ? rte : wpt).map(asStop), timed: false, route: true };
+    }
+    var coords = [], prev = null;
+    track.forEach(function (p) { if (!prev || prev.lat !== p.lat || prev.lon !== p.lon) coords.push([p.lon, p.lat]); prev = p; });
+    if (coords.length < 2) throw new Error('El archivo no trae ninguna ruta.');
+    var stops;
+    if (track === trk && rte.length >= 2 && rte.length <= 60) stops = rte.map(asStop);
+    else if (wpt.length >= 2 && wpt.length <= 60) {
+      var line = makeLine(coords);
+      stops = wpt.map(function (p) { return { p: p, a: project(p, line, 0, 0).along }; }).sort(function (a, b) { return a.a - b.a; }).map(function (x) { return asStop(x.p); });
+    } else stops = [[coords[0][1], coords[0][0], 'Salida'], [coords[coords.length - 1][1], coords[coords.length - 1][0], 'Llegada']];
+    if (stops.every(function (w) { return /^\d\d /.test(w[2]); })) stops.forEach(function (w) { w[2] = w[2].slice(3); });   // «01 Nombre» de nuestro propio GPX
+    var timed = track.filter(function (p) { return p.time; }).length > track.length / 2;
+    return { name: name, coords: coords, wps: stops, timed: timed, route: false };
+  }
+  // Puntos de paso repartidos por el trazado (uno cada «every» metros), para pedir las indicaciones de giro.
+  function viaPoints(line, every) {
+    var out = [], n = Math.max(1, Math.round(line.total / (every || 1500)));
+    for (var i = 0; i <= n; i++) { var a = line.total * i / n, c = pointAt(line, a); out.push({ along: a, lat: c[1], lon: c[0] }); }
+    return out;
+  }
+  // Indicaciones de giro para un trazado ya hecho. «route» es la respuesta de OSRM pasando por vias[i0…]; cada tramo
+  // solo vale si mide lo mismo que el trazado en ese tramo (si no, OSRM ha ido por otra carretera y sus giros no sirven).
+  function trackSteps(route, vias, i0, line, isEnd) {
+    var out = [], ok = 0, bad = 0, dur = 0, legs = route.legs || [];
+    legs.forEach(function (leg, k) {
+      var a = vias[i0 + k], b = vias[i0 + k + 1]; if (!a || !b) return;
+      var seg = b.along - a.along;
+      if (Math.abs((leg.distance || 0) - seg) > Math.max(80, seg * 0.12)) { bad++; dur += seg / 15; return; }
+      ok++; dur += leg.duration || seg / 15;
+      (leg.steps || []).forEach(function (s) {
+        var st = stepOf(s, isEnd && k === legs.length - 1); if (!st || st.icon === 'uturn') return;
+        var pr = project(st, line, a.along, 60, b.along + 60); if (!pr || pr.d > 45) return;
+        st.along = Math.round(pr.along); out.push(st);
+      });
+    });
+    return { steps: out, ok: ok, bad: bad, dur: dur };
   }
   // Sitúa cada maniobra sobre la línea (metros desde el inicio), en orden.
   function placeSteps(steps, line) {
     var from = 0;
     return (steps || []).map(function (s) {
+      if (typeof s.along === 'number') { from = Math.max(from, s.along); return { along: s.along, text: s.text, icon: s.icon, name: s.name }; }   // ya situada (rutas de GPX)
       var pr = project({ lat: s.lat, lon: s.lon }, line, from, 0); from = Math.max(from, pr.along);
       return { along: pr.along, text: s.text, icon: s.icon, name: s.name };
     });
@@ -262,6 +335,6 @@ var RGLib = (function () {
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
   return { dist: dist, findMapsUrl: findMapsUrl, parseMapsUrl: parseMapsUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
-    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
+    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = RGLib;

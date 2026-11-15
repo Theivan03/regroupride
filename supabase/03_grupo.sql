@@ -31,6 +31,9 @@ create table if not exists public.ride_positions (
   primary key (session_id, user_id)
 );
 
+-- Momento en que quien creó el grupo inicia la ruta: a los demás se les inicia sola al verlo.
+alter table public.ride_sessions add column if not exists started_at timestamptz;
+
 alter table public.ride_sessions enable row level security;
 alter table public.ride_positions enable row level security;
 -- Sin reglas: nadie lee ni escribe estas tablas directamente.
@@ -89,7 +92,16 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object('user_id', user_id, 'name', name, 'lat', lat, 'lon', lon, 'speed', speed, 'along', along, 'off', off,
            'at', (extract(epoch from updated_at) * 1000)::bigint, 'owner', user_id = s.owner_id)), '[]'::jsonb)
     into rows from public.ride_positions where session_id = p_id;
-  return jsonb_build_object('ended', false, 'now', (extract(epoch from now()) * 1000)::bigint, 'positions', rows);
+  return jsonb_build_object('ended', false, 'now', (extract(epoch from now()) * 1000)::bigint,
+    'started', (extract(epoch from s.started_at) * 1000)::bigint, 'positions', rows);
+end; $$;
+
+-- Quien creó el grupo inicia la ruta: se apunta la hora y a los demás se les inicia al verla.
+create or replace function public.ride_start(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.ride_sessions set started_at = now() where id = p_id and owner_id = auth.uid() and ended_at is null;
+  if not found then raise exception 'Solo quien creó el grupo puede iniciar la ruta'; end if;
 end; $$;
 
 -- Salir del grupo: borra mi fila (y con ella mi posición).
@@ -111,5 +123,6 @@ revoke all on function public.ride_cleanup() from public, anon, authenticated;
 grant execute on function public.ride_create(text, jsonb) to authenticated;
 grant execute on function public.ride_join(text) to authenticated;
 grant execute on function public.ride_sync(uuid, double precision, double precision, real, real, boolean, boolean) to authenticated;
+grant execute on function public.ride_start(uuid) to authenticated;
 grant execute on function public.ride_leave(uuid) to authenticated;
 grant execute on function public.ride_end(uuid) to authenticated;

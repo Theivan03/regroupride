@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.4.2';
+  var APP_VERSION = '0.5.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -548,7 +548,7 @@
   $$('.tab').forEach(function (t) { t.addEventListener('click', function () { showView(t.dataset.view); }); });
   function openLeanFull() { $('#leanFull').hidden = false; startMotion(); if (!gpsMode && !rec) startGps('fg'); }
   function closeLeanFull() { $('#leanFull').hidden = true; }
-  $('#btnLeanFull').addEventListener('click', openLeanFull); $('#btnHudLean').addEventListener('click', openLeanFull); $('#btnLeanClose').addEventListener('click', closeLeanFull);
+  $('#btnLeanFull').addEventListener('click', openLeanFull); $('#btnHudLean').addEventListener('click', openLeanFull); $('#hudCard .hud').addEventListener('click', openLeanFull); $('#btnLeanClose').addEventListener('click', closeLeanFull);
 
   /* ---------- rutas: totales y lista ---------- */
   var ridesFilter = 'all', ridesQuery = '';
@@ -604,18 +604,25 @@
   $('#gpxFile').addEventListener('change', function (e) {
     var f = e.target.files && e.target.files[0]; if (!f) return;
     var reader = new FileReader();
+    reader.onerror = function () { toast('No se ha podido leer el archivo.', 'bad'); };
     reader.onload = function () {
+      if (window.RGNav && RGNav.gpxPicked) RGNav.gpxPicked(String(reader.result || ''), f.name); else importRecordedGpx(reader.result, f.name);
+    };
+    reader.readAsText(f);
+  });
+  function importRecordedGpx(text, fname) {
+    var f = { name: fname || 'ruta.gpx' };
+    (function () {
       try {
-        var g = Geo.fromGpx(reader.result), pts = g.points;
+        var g = Geo.fromGpx(text), pts = g.points;
         if (pts.length < 2) throw new Error('El archivo no tiene puntos de trazado.');
         var st = Geo.stats(pts), r = { id: pts[0][0] + Math.floor(Math.random() * 1000), start: pts[0][0], end: pts[pts.length - 1][0], name: g.name || f.name.replace(/\.gpx$/i, ''), maxL: 0, maxR: 0, vMax: Math.round(st.vMaxKmh), dist: Math.round(st.distKm * 100) / 100, movingS: Math.round(st.movingS), corners: [], vehicleId: null, favorite: false, stars: 0, note: '', hasTrack: true, hasLean: false, nPoints: pts.length, imported: true, altMax: st.altMax, climb: Math.round(st.climb), cells: Achievements.cellsOf(pts), thumb: Geo.simplify(pts, 25).slice(0, 400).map(function (p) { return [p[1], p[2]]; }) };
         pts.forEach(function (p) { if (p[6] != null) { r.hasLean = true; if (p[6] < -r.maxL) r.maxL = -p[6]; if (p[6] > r.maxR) r.maxR = p[6]; } });
         r.maxL = Math.round(r.maxL * 10) / 10; r.maxR = Math.round(r.maxR * 10) / 10;
         DB.putRide(r).then(function () { return DB.putTrack(r.id, pts); }).then(reloadRides).then(function () { toast('Ruta importada: ' + fmtKm(r.dist), 'ok'); openDetail(r.id); return setFlag('gpxImport'); });
       } catch (err) { toast('No se pudo importar: ' + err.message, 'bad'); }
-    };
-    reader.readAsText(f);
-  });
+    })();
+  }
 
   /* ---------- detalle ---------- */
   var detailId = null, detailRide = null, detailTrack = [], detailCum = null, cornerMarkers = [], replayMarker = null, rp = { playing: false, speed: 10, t: 0, raf: null, lastFrame: 0 };
@@ -1135,7 +1142,7 @@
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, activePlan: function () { return planMode ? null : activePlan; },
     isRec: function () { return !!rec; }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
-    startRide: function () { askAndStart(); }, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); },
+    startRide: function () { askAndStart(); }, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
     plans: function () { return plans.slice(); },
     usePlan: function (p) {   // guarda (o actualiza) una ruta planificada y la deja lista para «Iniciar ruta»
       var i = -1; plans.forEach(function (x, k) { if (x.id === p.id) i = k; });

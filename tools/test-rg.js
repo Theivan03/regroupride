@@ -143,4 +143,50 @@ t('pasos de OSRM a indicaciones', function () {
   assert.deepEqual(s.map(function (x) { return x.text; }), ['gira a la izquierda', 'en la rotonda, toma la segunda salida', 'has llegado al final de la ruta']);
   assert.equal(L.fmtDist(1234), '1,2 km'); assert.equal(L.fmtDist(340), '350 m'); assert.equal(L.spokenDist(320), '300 metros');
 });
+// GPX con la forma del que exporta OsmAnd: rte con extensiones y sin nombres, trk con altitud y sin horas.
+function osmandGpx() {
+  var h = seg(-0.5, -0.3, 38.6, 40); h.push([-0.3, 38.6]);
+  var pts = h.concat((function () { var o = []; for (var y = 38.60025; y <= 38.7; y += 0.00025) o.push([-0.3, y]); return o; })());
+  var rte = [pts[0], pts[h.length - 1], pts[pts.length - 1]];
+  return { pts: pts, corner: h.length - 1, text: "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<gpx version=\"1.1\" creator=\"OsmAndRouterV2\" xmlns=\"http://www.topografix.com/GPX/1/1\" xmlns:osmand=\"https://osmand.net\">\n  <metadata>\n    <name>2026-11-15 Motorcycle 28 km</name>\n  </metadata>\n  <rte>\n" +
+    rte.map(function (c, i) { return '    <rtept lat="' + c[1] + '" lon="' + c[0] + '">\n      <extensions>\n        <osmand:profile>motorcycle</osmand:profile>\n        <osmand:trkpt_idx>' + i + '</osmand:trkpt_idx>\n      </extensions>\n    </rtept>\n'; }).join('') +
+    '  </rte>\n  <trk>\n    <trkseg>\n' + pts.map(function (c) { return '      <trkpt lat="' + c[1] + '" lon="' + c[0] + '">\n        <ele>90.5</ele>\n      </trkpt>\n'; }).join('') + '    </trkseg>\n  </trk>\n</gpx>' };
+}
+t('GPX de OsmAnd: trazado completo, paradas del rte y sin horas', function () {
+  var o = osmandGpx(), g = L.gpxToPlan(o.text);
+  assert.equal(g.name, '2026-11-15 Motorcycle 28 km'); assert.equal(g.coords.length, o.pts.length); assert.equal(g.wps.length, 3);
+  assert.equal(g.timed, false); assert.equal(g.route, false);
+  assert.ok(Math.abs(g.wps[1][0] - 38.6) < 1e-6 && Math.abs(g.wps[1][1] + 0.3) < 1e-3, JSON.stringify(g.wps[1]));
+  assert.ok(Math.abs(L.makeLine(g.coords).total - 28500) < 600, String(L.makeLine(g.coords).total));
+});
+t('GPX: el nuestro vuelve igual, con horas es grabado, solo puntos sueltos hay que calcularlo, y lo que no es GPX se rechaza', function () {
+  var plan = { name: 'Prueba & cía', wps: [[38.1, -0.5, 'Salida <A>'], [38.2, -0.6, "L'Orxa"]], coords: [[-0.5, 38.1], [-0.55, 38.15], [-0.6, 38.2]] };
+  var g = L.gpxToPlan(L.planToGpx(plan));
+  assert.equal(g.name, 'Prueba & cía'); assert.deepEqual(g.wps, plan.wps); assert.deepEqual(g.coords, plan.coords);
+  var rec = '<gpx><trk><trkseg><trkpt lon="-0.5" lat="38.1"><time>2026-11-15T10:00:00Z</time></trkpt><trkpt lat="38.2" lon="-0.6"><time>2026-11-15T10:01:00Z</time></trkpt></trkseg></trk></gpx>';
+  var r = L.gpxToPlan(rec); assert.equal(r.timed, true); assert.deepEqual(r.coords, [[-0.5, 38.1], [-0.6, 38.2]]); assert.equal(r.wps[0][2], 'Salida');
+  var only = L.gpxToPlan('<gpx><rte><rtept lat="38.1" lon="-0.5"><name>Bar</name></rtept><rtept lat="38.2" lon="-0.6"/></rte></gpx>');
+  assert.equal(only.route, true); assert.deepEqual(only.wps, [[38.1, -0.5, 'Bar'], [38.2, -0.6, '']]);
+  assert.throws(function () { L.gpxToPlan('<html>hola</html>'); }, /No es un archivo GPX/);
+  assert.throws(function () { L.gpxToPlan('<gpx></gpx>'); }, /ninguna ruta/);
+});
+t('GPX: indicaciones de giro solo de los tramos donde OSRM va por la misma carretera', function () {
+  var o = osmandGpx(), line = L.makeLine(L.gpxToPlan(o.text).coords), vias = L.viaPoints(line, 1500);
+  assert.ok(vias.length >= 18 && vias[0].along === 0 && Math.abs(vias[vias.length - 1].along - line.total) < 1);
+  var corner = line.cum[o.corner], k = 0; while (vias[k + 1].along < corner) k++;      // tramo que contiene la esquina
+  var legs = vias.slice(0, -1).map(function (v, i) {
+    var seg = vias[i + 1].along - v.along, steps = [{ maneuver: { type: 'depart', location: [v.lon, v.lat] } }];
+    if (i === k) steps.push({ name: 'CV-70', maneuver: { type: 'turn', modifier: 'left', location: [-0.3, 38.6] } });
+    if (i === 2) steps.push({ name: 'Atajo', maneuver: { type: 'turn', modifier: 'right', location: [v.lon, v.lat] } });      // tramo por otra carretera
+    if (i === 4) steps.push({ name: '', maneuver: { type: 'turn', modifier: 'uturn', location: [v.lon, v.lat] } }, { name: 'Lejos', maneuver: { type: 'turn', modifier: 'right', location: [v.lon, v.lat + 0.01] } });
+    steps.push({ maneuver: { type: 'arrive', location: [vias[i + 1].lon, vias[i + 1].lat] } });
+    return { distance: i === 2 ? seg * 1.6 : seg * 1.02, duration: seg / 20, steps: steps };
+  });
+  var r = L.trackSteps({ legs: legs }, vias, 0, line, true);
+  assert.equal(r.bad, 1); assert.equal(r.ok, legs.length - 1);
+  assert.deepEqual(r.steps.map(function (s) { return s.text; }), ['gira a la izquierda', 'has llegado al final de la ruta']);
+  assert.ok(Math.abs(r.steps[0].along - corner) < 30, r.steps[0].along + ' vs ' + corner);
+  var tr = L.Tracker(line.c, r.steps); assert.ok(Math.abs(tr.steps[0].along - corner) < 30); assert.ok(Math.abs(tr.steps[1].along - line.total) < 30);
+  var mid = L.trackSteps({ legs: legs.slice(0, 3) }, vias, 0, line, false); assert.equal(mid.steps.filter(function (s) { return s.icon === 'arrive'; }).length, 0);
+});
 console.log('rg-lib: ' + n + ' pruebas correctas');

@@ -4,6 +4,12 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
+## Qué hay en la versión 0.5
+
+- **Importar GPX como ruta a seguir** (OsmAnd, Calimoto, Kurviger, un GPS…), desde el planificador o desde Rutas. Se sigue el trazado del archivo tal cual; las paradas salen del `rte` (o de los `wpt`). Las indicaciones de giro se piden a OSRM pasando por puntos del propio trazado y solo se usan en los tramos donde coincide la carretera. Un GPX con horas (recorrido grabado) se puede seguir o guardar como ruta grabada.
+- **Panel de datos en ruta**: el de siempre en pequeño (inclinación en vivo, máxima y última de cada lado, velocidad y km). Es el mismo elemento que se actualiza con cada lectura del sensor.
+- **Salida conjunta**: cuando quien creó el grupo inicia la ruta, a los demás se les inicia sola (con la app abierta). Función `ride_start` y columna `started_at` en `supabase/03_grupo.sql`, que hay que volver a ejecutar.
+
 ## Qué hay en la versión 0.4
 
 - **Todas las paradas en el mapa**, sin límite, al importar y al seguir la ruta. Los puntos con nombre del enlace de Google Maps salen con sus coordenadas exactas (bloque `data=`).

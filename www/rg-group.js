@@ -1,13 +1,14 @@
 /* ReGroupRide — grupo en vivo: unirse a una ruta con código o QR, ver a todos en el mapa y quién se queda atrás.
    Sin Realtime: cada 15 s una sola llamada (ride_sync) guarda mi posición y trae la del grupo.
-   Mi posición solo se envía mientras tengo la ruta en marcha y se borra al pararla, al salir o al terminar el grupo. */
+   Mi posición solo se envía mientras tengo la ruta en marcha y se borra al pararla, al salir o al terminar el grupo.
+   Cuando quien creó el grupo inicia la ruta, a los demás se les inicia sola (si tienen la app abierta). */
 (function () {
   'use strict';
   var A = window.RGApp, Cl = window.RGCloud, L = window.RGLib;
   if (!A || !Cl || !L) return;
   var sb = Cl.sb, esc = Cl.esc, $ = function (s, r) { return (r || document).querySelector(s); };
   var C = window.Capacitor, native = !!(C && C.isNativePlatform && C.isNativePlatform()), P = native ? (C.Plugins || {}) : {};
-  var EVERY = 15000;
+  var EVERY = 15000, WAIT = 5000;   // posiciones cada 15 s; esperando la salida se mira cada 5 s
   var G = { s: null, rows: [], rank: null, lastSync: 0, busy: false, wasRec: false, markers: {}, timer: null, sheetOpen: false, skew: 0 };
   try { G.s = JSON.parse(localStorage.getItem('rg.group') || 'null'); } catch (e) {}
   function save() { try { if (G.s) localStorage.setItem('rg.group', JSON.stringify(G.s)); else localStorage.removeItem('rg.group'); } catch (e) {} }
@@ -27,6 +28,7 @@
       G.skew = d.now ? d.now - Date.now() : 0;
       G.rows = d.positions || []; G.rank = L.rankGroup(G.rows, me(), Date.now() + G.skew);
       draw(); badge(); if (G.sheetOpen) renderSheet();
+      if (d.started) started(d.started, d.now || Date.now());
     }, function () { G.busy = false; });
   }
   // Con la ruta en marcha: cada posición que llega del GPS, como mucho una llamada cada 15 s (también con la pantalla apagada).
@@ -35,11 +37,29 @@
     if (Date.now() - G.lastSync < EVERY) return;
     call({ p_lat: fix.lat, p_lon: fix.lon, p_speed: fix.v == null ? null : Math.round(fix.v * 10) / 10, p_along: nav && nav.started ? Math.round(nav.along) : null, p_off: !!(nav && nav.offRoute) });
   }
-  // Sin ruta en marcha: solo leer, y solo con la app a la vista.
-  function tick() { if (G.s && !A.isRec() && document.visibilityState === 'visible' && Date.now() - G.lastSync >= EVERY - 500) call(); }
+  // Quien creó el grupo ha iniciado la ruta: se me inicia a mí también. Cada salida se atiende una sola vez, así que si
+  // luego paro yo a mano no se me vuelve a poner en marcha; si el organizador para y vuelve a salir, sí.
+  function started(at, now) {
+    if (!G.s || G.s.owner || at <= (G.s.seen || 0)) return;
+    G.s.seen = at; save();
+    if (A.isRec()) return;
+    var own = G.rows.filter(function (x) { return x.owner; })[0], riding = own && own.lat != null && now - own.at < 90000;
+    if (now - at > 10 * 60000 && !riding) return;      // salida antigua y el organizador ya no está en marcha
+    if (G.sheetOpen) close();
+    A.showView('map'); A.toast((own && own.name ? own.name : 'El organizador') + ' ha iniciado la ruta.', 'ok');
+    if (window.Platform && Platform.canSpeak && Platform.canSpeak() && A.settings.navVoice !== false) Platform.speak('Empieza la ruta.');
+    A.startRide();
+  }
+  // Sin ruta en marcha: solo leer, y solo con la app a la vista. Mientras se espera la salida, más a menudo.
+  function tick() {
+    if (!G.s || A.isRec() || document.visibilityState !== 'visible') return;
+    var gap = (!G.s.owner && !G.s.seen) ? WAIT : EVERY;
+    if (Date.now() - G.lastSync >= gap - 500) call();
+  }
   function sync() {
     var rec = A.isRec();
     if (G.s && G.wasRec && !rec) { G.busy = false; call({ p_clear: true }); }   // he parado la ruta: se borra mi posición
+    if (G.s && G.s.owner && !G.wasRec && rec && !A.isDemo() && sb) sb.rpc('ride_start', { p_id: G.s.id }).then(function (r) { if (r && r.error) console.warn('ride_start', r.error.message); }, function () {});
     G.wasRec = rec;
     if (G.s && !G.timer) G.timer = setInterval(tick, 5000);
     if (!G.s && G.timer) { clearInterval(G.timer); G.timer = null; }
@@ -85,7 +105,7 @@
         var gap = x.me ? 'tú' : (x.gap == null ? '' : (Math.abs(x.gap) < 150 ? 'contigo' : km(x.gap) + (x.gap > 0 ? ' por delante' : ' por detrás')));
         return '<div class="club-person"><span class="rg-ava' + (x.stale || x.off ? ' bad' : (x.behind ? ' warn' : '')) + '">' + esc(x.name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + ' ' + tag + '</b><span class="muted">' + gap + '</span></div></div>';
       }).join('') + (waiting.length ? '<p class="muted">Sin iniciar la ruta: ' + waiting.map(function (x) { return esc(x.name); }).join(', ') + '.</p>' : '') + '</div>' +
-      '<p class="muted rg-small" style="text-align:left">Tu posición solo se comparte con este grupo mientras tienes la ruta en marcha, y se borra al pararla.</p>' +
+      '<p class="muted rg-small" style="text-align:left">' + (G.s.owner ? 'Cuando pulses «Iniciar ruta», se les iniciará también a los demás que tengan la app abierta. ' : 'La ruta se te iniciará sola cuando la inicie quien creó el grupo: deja la app abierta en pantalla. ') + 'Tu posición solo se comparte con este grupo mientras tienes la ruta en marcha, y se borra al pararla.</p>' +
       (G.s.owner ? '<button class="btn danger" id="grEnd" type="button">Terminar el grupo para todos</button>' : '') + '<button class="btn" id="grLeave" type="button">Salir del grupo</button>');
     $('#grX').addEventListener('click', close);
     $('#grShare').addEventListener('click', function () { share('Únete al grupo de la ruta «' + G.s.name + '» en ReGroupRide: en el mapa pulsa el botón de grupo y escribe el código ' + G.s.code + '.'); });
@@ -106,7 +126,7 @@
         if (r.error) throw new Error(/no válido/i.test(r.error.message) ? 'Ese código no existe o el grupo ya ha terminado.' : r.error.message);
         var d = r.data; G.s = { id: d.id, code: d.code, name: d.name, owner: !!d.owner }; save(); sync();
         var rt = d.route;
-        if (rt && rt.coords && rt.coords.length > 1) { close(); return A.usePlan({ id: parseInt(d.id.replace(/-/g, '').slice(0, 12), 16), name: rt.name || d.name, wps: rt.wps || [], coords: rt.coords, dist: rt.dist || 0, dur: rt.dur || 0, routed: true, steps: rt.steps || [], created: Date.now(), groupId: d.id }).then(function () { A.toast('Estás en el grupo. Pulsa «Iniciar ruta» cuando salgáis.', 'ok'); call(); }); }
+        if (rt && rt.coords && rt.coords.length > 1) { close(); return A.usePlan({ id: parseInt(d.id.replace(/-/g, '').slice(0, 12), 16), name: rt.name || d.name, wps: rt.wps || [], coords: rt.coords, dist: rt.dist || 0, dur: rt.dur || 0, routed: true, steps: rt.steps || [], created: Date.now(), groupId: d.id }).then(function () { A.toast('Estás en el grupo. La ruta se iniciará sola cuando salga el organizador.', 'ok'); call(); }); }
         A.toast('Estás en el grupo.', 'ok'); renderSheet(); call();
       }); });
     };
