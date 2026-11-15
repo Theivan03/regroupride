@@ -54,9 +54,9 @@
     list.forEach(function (r) {
       if (r.me) return; seen[r.user_id] = 1;
       var mk = G.markers[r.user_id];
-      if (!mk) { var el = document.createElement('div'); el.addEventListener('click', function (e) { e.stopPropagation(); open(); }); mk = G.markers[r.user_id] = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([r.lon, r.lat]).addTo(m); }
+      if (!mk) { var el = document.createElement('div'); el.className = 'rider-marker'; el.addEventListener('click', function (e) { e.stopPropagation(); open(); }); mk = G.markers[r.user_id] = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([r.lon, r.lat]).addTo(m); }
       mk.setLngLat([r.lon, r.lat]);
-      var e2 = mk.getElement(); e2.className = 'rider-marker' + (r.stale ? ' stale' : (r.off ? ' off' : (r.behind ? ' behind' : ''))); e2.textContent = (r.name || '?').charAt(0).toUpperCase(); e2.title = r.name;
+      var e2 = mk.getElement(); e2.classList.toggle('stale', r.stale); e2.classList.toggle('off', !r.stale && r.off); e2.classList.toggle('behind', !r.stale && !r.off && r.behind); e2.textContent = (r.name || '?').charAt(0).toUpperCase(); e2.title = r.name;
     });
     Object.keys(G.markers).forEach(function (id) { if (!seen[id]) { G.markers[id].remove(); delete G.markers[id]; } });
   }

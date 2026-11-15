@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.4.0';
+  var APP_VERSION = '0.4.1';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -321,7 +321,7 @@
     mk.on('dragend', function () { var ll = mk.getLngLat(), i = pl.markers.indexOf(mk); if (i >= 0) pl.wps[i] = [ll.lat, ll.lng, pl.wps[i][2] || '']; scheduleRoute(); });
     pl.wps.push([lat, lon, name || '']); if (name) el.title = name; pl.markers.push(mk); relabelWps(); scheduleRoute();
   }
-  function relabelWps() { pl.markers.forEach(function (m, i) { var el = m.getElement(); el.textContent = String(i + 1); el.className = 'wp-marker' + (i > 0 && i === pl.markers.length - 1 ? ' end' : ''); }); }
+  function relabelWps() { pl.markers.forEach(function (m, i) { var el = m.getElement(); el.textContent = String(i + 1); el.classList.toggle('end', i > 0 && i === pl.markers.length - 1); }); }
   function clearPlan() { pl.markers.forEach(function (m) { m.remove(); }); pl = { wps: [], markers: [], coords: [], dist: 0, dur: 0, routed: false, pending: false }; routeSeq++; drawPlan(); renderPlanInfo(); }
   function scheduleRoute() { pl.pending = pl.wps.length >= 2; if (routeTimer) clearTimeout(routeTimer); routeTimer = setTimeout(computeRoute, 350); renderPlanInfo(); }
   function computeRoute() {
