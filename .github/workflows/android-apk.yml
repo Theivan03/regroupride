@@ -36,13 +36,10 @@ jobs:
       - name: Dependencias
         run: npm ci
 
-      - name: Tests de la lógica de rutas
+      - name: Tests (inclinación, enlaces de Maps y seguimiento de ruta)
         run: npm test
 
-      - name: Compilar la web
-        run: npm run build
-
-      - name: Copiar a Android
+      - name: Copiar la app a Android
         run: npx cap sync android
 
       - name: Firma fija de pruebas (para poder actualizar sin desinstalar)

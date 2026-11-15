@@ -1,25 +1,25 @@
 # Decisiones técnicas y pendientes
 
-## Tomadas en la fase 1
+## Tomadas
 
-- **App:** web con Vite y JavaScript sin framework, empaquetada con Capacitor 8. Un solo código para Android y, más adelante, iPhone.
-- **Servidor:** Supabase (autenticación, base de datos Postgres con RLS y almacenamiento de archivos). La seguridad depende de las reglas de `supabase/schema.sql`, no de la clave pública.
-- **Mapa:** Leaflet con teselas de OpenStreetMap. Vale para pruebas; su política de uso no permite mucho tráfico.
-- **Trazado:** servidor público de OSRM (`router.project-osrm.org`), sin clave y para uso moderado. Si falla, la ruta se guarda en línea recta entre puntos y Google Maps hace el resto.
-- **Navegación:** se usan los enlaces oficiales de Google Maps (`api=1`), con un máximo de 9 puntos intermedios por enlace. Las rutas con más puntos se parten en tramos.
-- **Enlaces de Maps:** se leen las coordenadas del enlace. Los puntos con nombre (sin coordenadas) se sacan de la parte `data=` del enlace. Si alguno no se puede situar, la app avisa y deja marcarlo en el mapa.
-- **Firma del APK:** clave de pruebas fija dentro del repositorio, para poder actualizar sin desinstalar. **No vale para Google Play**: allí hará falta una clave de publicación aparte, guardada como secreto.
+- **Base:** el código de Inclina 2.1.1 (web estática + Capacitor 8, sin compilación). ReGroupRide se añade en archivos `rg-*` y se engancha a `app.js` con un puente pequeño (`window.RGApp`) y unas pocas llamadas a `RGNav`.
+- **Servidor:** Supabase (cuentas, perfiles, rutas compartidas y sugerencias). La seguridad depende de las reglas RLS de `supabase/schema.sql`; la clave que va en la app es la pública.
+- **Mapa:** MapLibre con OpenFreeMap. **Trazado e indicaciones:** servidor público de OSRM (`router.project-osrm.org`), válido para pruebas con uso moderado.
+- **Seguir la ruta:** la navegación está activa mientras se graba una ruta y hay una ruta planificada seleccionada. El GPS sigue con la pantalla apagada gracias al servicio en primer plano del plugin de ubicación.
+- **Fuera de ruta:** salta al alejarse más de 60 m (más la precisión del GPS) durante 8 s, en movimiento y solo después de haber entrado en la ruta. Parado no salta (gasolinera). Valores por ajustar en pruebas reales.
+- **Volver a la ruta:** se calcula un trazado hasta un punto por delante, más lejos cuanto más te hayas alejado, para no dar media vuelta.
+- **Firma del APK:** clave de pruebas fija en el repositorio para actualizar sin desinstalar. No vale para Google Play.
 
 ## Pendiente antes de abrir la app a más gente
 
-- Cambiar las teselas del mapa y el trazado a un proveedor con cuenta propia (MapTiler, Stadia, OpenRouteService o un OSRM propio).
-- Comprobar en el móvil el límite real de puntos intermedios en la app de Google Maps. Si es menor de 9, bajar `MAX_WAYPOINTS`.
-- Recibir rutas con «Compartir» desde Google Maps directamente en la app (intent de Android). Ahora hay que copiar y pegar.
+- Trazado y teselas con un proveedor propio o de pago.
+- Recibir rutas con «Compartir» desde Google Maps directamente en la app.
 - Borrar la cuenta desde la app (RGPD) y política de privacidad.
+- Inclinación: medir solo el alabeo de la moto (hoy el cabeceo del móvil al girar el manillar o frenar puede colarse si el soporte no está recto).
+- Sincronizar con la cuenta el perfil, el garaje y las rutas planificadas (ahora se guardan en el teléfono).
 
 ## Siguientes fases (ver documento del proyecto)
 
-2. Rodar en grupo: código de grupo, ubicación en vivo, servicio en primer plano con botones en la pantalla de bloqueo, SOS y aviso de fuera de ruta.
-3. Gasolineras: datos del Ministerio, la más cercana frente a la que mejor cuadra, y aviso por autonomía.
-4. Comunidades y eventos: página estilo Luma, inscripciones con opciones y acompañantes, plazas, lista de espera, confirmación, chat de cada ruta y pasar lista con QR.
-5. Apertura al público, moderación, iPhone, y la inclinación y velocidad (con la corrección del cabeceo del móvil: medir solo el alabeo de la moto).
+1. Rodar en grupo: unirse con código o QR, ubicación en vivo, botones en la pantalla de bloqueo, SOS, aviso al organizador y grupos automáticos por ritmo.
+2. Comunidades y eventos: eventos importados de Luma, «¿Vienes a la ruta?», tablón, calendario, páginas de normas y descuentos, pasar lista.
+3. Gasolineras: la más cercana o la que mejor cuadra, con precios y aviso por autonomía.

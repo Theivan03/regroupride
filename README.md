@@ -1,40 +1,35 @@
 # ReGroupRide
 
-App para rodar en grupo: rutas desde Google Maps, «Iniciar ruta», «Reengancharme» y, en próximas fases, ubicación del grupo en vivo, avisos desde la pantalla de bloqueo, gasolineras y eventos de la comunidad.
+App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabación de rutas con inclinación, rutas guardadas, exportación GPX/CSV, estadísticas, garaje y logros) y le añade lo propio de ReGroupRide.
 
-El documento completo del proyecto (funciones y fases) está en Claude: «App para moteros — Documento de proyecto».
+El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
-## Fase 1 (esta versión)
+## Qué hay en la versión 0.2
 
-- Registro con correo y contraseña. Perfil con la moto, la autonomía y un contacto de emergencia privado.
-- Crear rutas pegando un enlace de Google Maps (también los cortos `maps.app.goo.gl`) o tocando puntos en el mapa. Los puntos se pueden arrastrar, reordenar, renombrar o convertir en puntos de paso.
-- Trazado por carretera, con distancia y duración.
-- Rutas privadas o públicas. Pestaña de rutas públicas de otros.
-- **Iniciar ruta:** abre Google Maps con el recorrido. Si hay más de 10 puntos, va por tramos.
-- **Reengancharme:** mira dónde estás y te manda a un punto de la ruta por delante, más adelante cuanto más lejos estés, para no hacerte dar media vuelta. Mientras la ruta está en curso y la app abierta, guarda por dónde vas, así no te devuelve al principio en rutas de ida y vuelta.
-- Sugerencias y fallos con captura opcional. La app añade sola el modelo de móvil y la versión. Panel de administración para cambiar el estado y responder.
+- Todo lo de Inclina 2.1.1, con estética nueva (`www/rg-theme.css`).
+- **Seguir una ruta dentro de la app**, sin Google Maps: siguiente giro con distancia, voz, kilómetros que quedan, aviso de «fuera de ruta» (voz, vibración y notificación) y trazado para volver a la ruta. Si empiezas lejos de la ruta o te unes a mitad, te lleva al punto más cercano por delante.
+- **Importar una ruta desde un enlace de Google Maps** en el planificador (también enlaces cortos `maps.app.goo.gl`, solo en el móvil).
+- **Cuenta** con correo y contraseña (Supabase) y **sugerencias y fallos** desde Ajustes.
+- «Ruta simulada» (Ajustes) recorre la ruta que estés siguiendo, para ver la navegación sin moverte.
 
-## Puesta en marcha
+## Estructura
 
-1. **Supabase:** en el SQL Editor, ejecuta `supabase/schema.sql` entero. Se puede ejecutar más de una vez.
-2. Pon la URL y la clave *anon/publishable* en `src/config.js`.
-3. Regístrate en la app y hazte administrador con la última línea de `supabase/schema.sql`.
-4. **APK:** cada `git push` a `main` compila en GitHub Actions y publica `regroupride.apk` en *Releases → latest*. Se firma siempre con la misma clave de pruebas (`android/debug.keystore`), así que se instala encima de la versión anterior sin desinstalar.
+- `www/`: la app (sin compilación: archivos estáticos).
+  - `app.js`, `lean-core.js`, `geo.js`, `db.js`, `achievements.js`, `platform.js`: base de Inclina.
+  - `rg-lib.js`: lógica pura de ReGroupRide (enlaces de Maps, seguimiento, indicaciones). Probada en `tools/test-rg.js`.
+  - `rg-app.js`: navegación, importación de enlaces, cuenta y sugerencias. Habla con `app.js` a través de `window.RGApp`.
+  - `rg-theme.css`: tema visual.
+- `android/`: proyecto Capacitor (`com.regroupride.app`), con el plugin nativo de sensores `MotionPlugin`.
+- `supabase/schema.sql`: tablas y reglas de seguridad. Se ejecuta entero en el SQL Editor de Supabase.
+- `.github/workflows/android-apk.yml`: cada `git push` a `main` pasa los tests, compila el APK y lo publica en *Releases → latest*, firmado siempre con `android/debug.keystore` (se instala encima de la versión anterior).
 
 ## Desarrollo
 
 ```
 npm install
-npm run dev      # en el navegador (el enlace corto de Maps solo funciona en el móvil)
-npm test         # tests de la lógica de rutas
-npm run build && npx cap sync android
+npm test          # inclinación, enlaces de Maps y seguimiento de ruta
+npm run serve     # http://localhost:8080 (los enlaces cortos de Maps solo funcionan en el móvil)
+npx cap sync android
 ```
 
-Estructura:
-
-- `src/lib/`: lógica pura y probada (`gmaps.js` lee los enlaces de Google Maps, `geo.js` hace los cálculos y el reenganche, `mapsLaunch.js` crea los enlaces de navegación, `routing.js` calcula el trazado).
-- `src/screens/`: pantallas.
-- `src/services.js`: Supabase y funciones del móvil.
-- `src/ride.js`: la ruta en curso.
-
-Las decisiones técnicas y lo que queda pendiente están en `docs/DECISIONES.md`.
+Decisiones técnicas y pendientes: `docs/DECISIONES.md`.

@@ -1,7 +1,32 @@
 {
   "appId": "com.regroupride.app",
   "appName": "ReGroupRide",
-  "webDir": "dist",
-  "android": { "allowMixedContent": false },
-  "plugins": { "CapacitorHttp": { "enabled": false } }
+  "webDir": "www",
+  "backgroundColor": "#0B0F14",
+  "loggingBehavior": "production",
+  "android": {
+    "allowMixedContent": false,
+    "zoomEnabled": false,
+    "useLegacyBridge": true
+  },
+  "ios": {
+    "contentInset": "never",
+    "allowsLinkPreview": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover",
+      "style": "DARK"
+    },
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 0,
+      "backgroundColor": "#0B0F14",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": false,
+      "splashImmersive": false
+    }
+  }
 }
