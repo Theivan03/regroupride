@@ -4,6 +4,13 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
+## Qué hay en la versión 0.6
+
+- **Avisos del grupo: SOS, avería y gasolina.** Se envían desde el botón del triángulo (junto a «Parar») o, en Android, desde la **pantalla de bloqueo**: mientras ruedas en grupo hay un aviso fijo con los tres botones (`RideAlertsPlugin.java`). Al organizador le salta a pantalla completa con el nombre y la distancia; SOS y avería suenan como una alarma (canal de alarmas, en bucle, con vibración, encendiendo la pantalla por encima del bloqueo) hasta que pulsa «Entendido». Quien avisa se entera de que lo han visto y puede cancelarlo. Si no hay cobertura, el aviso se reintenta solo.
+- **Sin Realtime ni push**: los avisos viajan en la misma llamada `ride_sync`. El organizador la hace cada 5 s (los demás, cada 15 s), así que le llega en unos segundos mientras tiene la ruta en marcha o la app abierta.
+- **Salida conjunta más robusta**: además de `ride_start`, a los demás se les inicia la ruta al ver que el organizador empieza a mandar posición, así que funciona aunque el servidor tenga el `03_grupo.sql` anterior.
+- `supabase/03_grupo.sql` añade `ride_alert` y `ride_alert_seen`: hay que volver a ejecutarlo para que funcionen los avisos.
+
 ## Qué hay en la versión 0.5
 
 - **Importar GPX como ruta a seguir** (OsmAnd, Calimoto, Kurviger, un GPS…), desde el planificador o desde Rutas. Se sigue el trazado del archivo tal cual; las paradas salen del `rte` (o de los `wpt`). Las indicaciones de giro se piden a OSRM pasando por puntos del propio trazado y solo se usan en los tramos donde coincide la carretera. Un GPX con horas (recorrido grabado) se puede seguir o guardar como ruta grabada.

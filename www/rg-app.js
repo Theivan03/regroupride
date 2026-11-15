@@ -431,12 +431,16 @@
   function renderPerms() {
     var box = $('#rgPerms'); if (!box) return;
     if (!native) { box.hidden = true; return; }
-    Promise.all([locState(), notifState()]).then(function (r) {
+    var RA = P.RideAlerts, full = RA ? RA.status().then(function (x) { return x && x.fullScreen === false ? 'denied' : 'granted'; }, function () { return 'unknown'; }) : Promise.resolve(null);
+    Promise.all([locState(), notifState(), full]).then(function (r) {
       var row = function (name, why, st) { var t = PERM_TXT[st] || PERM_TXT.unknown; return '<div class="perm"><div><b>' + name + '</b><span class="muted">' + why + '</span></div><span class="mstatus ' + t[1] + '">' + t[0] + '</span></div>'; };
       box.hidden = false;
       box.innerHTML = '<span class="label">Permisos</span>' + row('Ubicación', 'Para seguir y grabar la ruta.', r[0]) + row('Notificaciones', 'Aviso de «fuera de ruta» y aviso fijo durante la ruta.', r[1]) +
+        (r[2] ? row('Alarma sobre la pantalla de bloqueo', 'Para que un SOS o una avería del grupo se abra en grande, como una llamada.', r[2]) : '') +
+        (r[2] === 'denied' ? '<div class="rg-row"><button class="btn small" id="pmFull" type="button">Permitir la alarma a pantalla completa</button></div>' : '') +
         '<div class="perm"><div><b>Sensores de inclinación</b><span class="muted">Android no pide permiso para usarlos.</span></div><span class="mstatus ok">Disponible</span></div>' +
         ((r[0] !== 'granted' || r[1] !== 'granted') ? '<div class="rg-row"><button class="btn small primary" id="pmFix" type="button">Revisar permisos</button></div>' : '');
+      if ($('#pmFull')) $('#pmFull').addEventListener('click', function () { RA.openFullScreenSettings(); });
       if ($('#pmFix')) $('#pmFix').addEventListener('click', function () {
         if (r[0] !== 'granted') ensure().then(renderPerms);
         else askNotifNow().then(function (n) { if (n !== 'granted' && window.Platform) Platform.openLocationSettings(); renderPerms(); });

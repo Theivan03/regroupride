@@ -20,6 +20,9 @@
             </intent-filter>
         </activity>
 
+        <!-- Botones de los avisos del grupo (SOS, avería, gasolina), también con el teléfono bloqueado. -->
+        <receiver android:name=".RideAlertsReceiver" android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -35,6 +38,8 @@
     <!-- Aviso de «fuera de ruta»: vibración y notificación. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Alarma de SOS o avería de alguien del grupo: se abre por encima de la pantalla de bloqueo, como una llamada. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Ubicación: para seguir y grabar la ruta. En segundo plano solo mientras hay una ruta en marcha (servicio con aviso). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
