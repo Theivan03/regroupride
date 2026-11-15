@@ -15,15 +15,18 @@ var RGLib = (function () {
   function coordText(s) { var m = String(s || '').match(COORD); if (!m) return null; var lat = parseFloat(m[1]), lon = parseFloat(m[2]); return okLL(lat, lon) ? { lat: lat, lon: lon } : null; }
   function decodeSeg(s) { try { return decodeURIComponent(s.replace(/\+/g, ' ')).trim(); } catch (e) { return s.replace(/\+/g, ' ').trim(); } }
   function isShortLink(u) { return /^(https?:\/\/)?(maps\.app\.goo\.gl|goo\.gl\/maps)\//i.test(String(u).trim()); }
-  function extractUrl(t) { var m = String(t || '').match(/https?:\/\/[^\s<>"']+/i); return m ? m[0] : null; }
+  function extractUrl(t) { var m = String(t || '').match(/https?:\/\/[^\s<>"]+/i); return m ? m[0].replace(/[)\].,;'»]+$/, '') : null; }
   // Busca una dirección de Google Maps dentro de un texto: una URL, una cabecera de redirección o una página.
   // Google a veces la manda dentro de otra (pantalla de cookies: ...?continue=<url>), escapada o como enlace de app.
   function findMapsUrl(text) {
-    var t = String(text || ''), RE = /https?:\/\/(?:www\.|maps\.)?google\.[a-z.]+\/maps[^\s"'<>\\]*/i, i, m, v;
+    var t0 = String(text || '').trim();
+    var WHOLE = /^https?:\/\/(?:www\.|maps\.)?google\.[a-z.]+\/maps\/[^\s<>"]+$/i;
+    if (WHOLE.test(t0)) return t0;   // ya es la dirección (puede llevar apóstrofos)
+    var t = t0, RE = /https?:\/\/(?:www\.|maps\.)?google\.[a-z.]+\/maps[^\s"'<>\\]*/i, i, m, v;
     var forms = [t, t.replace(/\\u003d/gi, '=').replace(/\\u0026/gi, '&').replace(/\\\//g, '/').replace(/&amp;/g, '&')];
     for (i = 0; i < forms.length; i++) {
-      m = forms[i].match(/[?&](?:continue|link|url|q)=(https?(?::|%3A)[^&\s"'<>]+)/i);
-      if (m) { try { v = decodeURIComponent(m[1]); } catch (e) { v = m[1]; } if (RE.test(v) && /\/maps\/(dir|place|@|search)|[?&]q=/.test(v)) return v.match(RE)[0]; }
+      m = forms[i].match(/[?&](?:continue|link|url|q)=(https?(?::|%3A)[^&\s"<>]+)/i);
+      if (m) { try { v = decodeURIComponent(m[1]); } catch (e) { v = m[1]; } if (RE.test(v) && /\/maps\/(dir|place|@|search)|[?&]q=/.test(v)) return WHOLE.test(v) ? v : v.match(RE)[0]; }
       m = forms[i].match(RE); if (m && !/\/maps\/(api|vt|preview|rpc|_)/.test(m[0])) return m[0];
       m = forms[i].match(/intent:\/\/((?:www\.|maps\.)?google\.[a-z.]+\/maps[^\s"'<>#]*)/i); if (m) return 'https://' + m[1];
       m = forms[i].match(/https?%3A%2F%2F(?:www\.|maps\.)?google\.[a-z.]+%2Fmaps[^\s"'<>&]*/i); if (m) { try { return decodeURIComponent(m[0]); } catch (e) {} }
@@ -80,6 +83,50 @@ var RGLib = (function () {
     var at = path.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
     if (at) { var nm = (path.match(/\/place\/([^/]+)/) || [])[1]; return { points: [{ lat: parseFloat(at[1]), lon: parseFloat(at[2]), name: nm ? decodeSeg(nm) : '' }], unresolved: [] }; }
     return { points: [], unresolved: [], error: 'No he encontrado puntos en el enlace.' };
+  }
+
+  /* ================= abrir en Google Maps por tramos ================= */
+  // La app de Maps solo admite unas 9 paradas por enlace: la ruta se parte en tramos y cada uno empieza donde acabó el anterior.
+  // wps: [[lat, lon, nombre?], ...]. Devuelve [{url, from, to}] (índices desde 1).
+  function mapsLegs(wps, max) {
+    max = max || 9; var legs = [], f = function (w) { return w[0].toFixed(6) + ',' + w[1].toFixed(6); };
+    if (!wps || wps.length < 2) return legs;
+    for (var i = 0; i < wps.length - 1; i += max) {
+      var end = Math.min(wps.length - 1, i + max), mid = wps.slice(i + 1, end);
+      legs.push({ from: i + 1, to: end + 1, url: 'https://www.google.com/maps/dir/?api=1&origin=' + f(wps[i]) + '&destination=' + f(wps[end]) + (mid.length ? '&waypoints=' + mid.map(f).join('%7C') : '') + '&travelmode=driving' });
+    }
+    return legs;
+  }
+
+  /* ================= exportar a GPX ================= */
+  function xml(s) { return String(s == null ? '' : s).replace(/[<>&'"]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]; }); }
+  // Paradas con nombre (wpt y rte) y trazado completo por carretera (trk). plan: {name, wps: [[lat, lon, nombre]], coords: [[lon, lat]]}
+  function planToGpx(plan, when) {
+    var n = function (x) { return (+x).toFixed(6); }, name = xml(plan.name || 'Ruta'), wps = plan.wps || [], out = [];
+    var label = function (w, i) { return xml(String(i + 1).padStart(2, '0') + ' ' + ((w[2] || '').split(',')[0] || (i === 0 ? 'Salida' : (i === wps.length - 1 ? 'Llegada' : 'Punto ' + (i + 1))))); };
+    out.push('<?xml version="1.0" encoding="UTF-8"?>', '<gpx version="1.1" creator="ReGroupRide" xmlns="http://www.topografix.com/GPX/1/1">',
+      '<metadata><name>' + name + '</name><time>' + new Date(when || Date.now()).toISOString() + '</time></metadata>');
+    wps.forEach(function (w, i) { out.push('<wpt lat="' + n(w[0]) + '" lon="' + n(w[1]) + '"><name>' + label(w, i) + '</name>' + (w[2] ? '<desc>' + xml(w[2]) + '</desc>' : '') + '</wpt>'); });
+    out.push('<rte><name>' + name + '</name>'); wps.forEach(function (w, i) { out.push('<rtept lat="' + n(w[0]) + '" lon="' + n(w[1]) + '"><name>' + label(w, i) + '</name></rtept>'); }); out.push('</rte>');
+    out.push('<trk><name>' + name + '</name><trkseg>'); (plan.coords || []).forEach(function (c) { out.push('<trkpt lat="' + n(c[1]) + '" lon="' + n(c[0]) + '"/>'); }); out.push('</trkseg></trk>', '</gpx>');
+    return out.join('\n');
+  }
+
+  /* ================= grupo en vivo ================= */
+  // Ordena al grupo por dónde va cada uno en la ruta y marca a quien se ha quedado atrás, se ha salido o no da señal.
+  // rows: [{user_id, name, lat, lon, along, off, at (ms)}]. along = metros recorridos de la ruta (null si no se sabe).
+  function rankGroup(rows, myId, now, opts) {
+    opts = opts || {}; var STALE = opts.stale || 90000, BEHIND = opts.behind || 2000;
+    var live = rows.filter(function (r) { return r.lat != null && r.lon != null; }), me = null, al = [];
+    live.forEach(function (r) { if (r.user_id === myId) me = r; if (r.along != null && now - r.at < STALE) al.push(r.along); });
+    al.sort(function (a, b) { return a - b; });
+    var med = al.length ? al[Math.floor(al.length / 2)] : null;
+    var list = live.map(function (r) {
+      var stale = now - r.at >= STALE, behind = !stale && med != null && r.along != null && r.along < med - BEHIND;
+      return { user_id: r.user_id, name: r.name || 'Motero', lat: r.lat, lon: r.lon, along: r.along, me: r.user_id === myId, off: !!r.off && !stale, stale: stale, behind: behind,
+        gap: (me && me.along != null && r.along != null) ? r.along - me.along : null, age: now - r.at };
+    }).sort(function (a, b) { return (b.along == null ? -1 : b.along) - (a.along == null ? -1 : a.along); });
+    return { list: list, total: list.length, behind: list.filter(function (x) { return x.behind || x.off || x.stale; }).length, waiting: rows.length - live.length };
   }
 
   /* ================= seguir una ruta ================= */
@@ -215,6 +262,6 @@ var RGLib = (function () {
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
   return { dist: dist, findMapsUrl: findMapsUrl, parseMapsUrl: parseMapsUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
-    rejoinTarget: rejoinTarget, stepsFromOsrm: stepsFromOsrm, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
+    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = RGLib;

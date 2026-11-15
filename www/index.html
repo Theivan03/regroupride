@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.webmanifest?v=0.3.1">
+<link rel="manifest" href="manifest.webmanifest?v=0.4.0">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
@@ -416,7 +416,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
-<link rel="stylesheet" href="rg-theme.css?v=0.3.1">
+<link rel="stylesheet" href="rg-theme.css?v=0.4.0">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -478,6 +478,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
     <button type="button" id="btnLayers" aria-pressed="false" title="Ver mis rutas en el mapa"><svg><use href="#i-layers"/></svg></button>
     <button type="button" id="btnPark" aria-pressed="false" title="Aparcamiento"><svg><use href="#i-park"/></svg></button>
     <button type="button" id="btnPlan" aria-pressed="false" title="Planificar una ruta"><svg><use href="#i-route"/></svg></button>
+    <button type="button" id="btnGroup" aria-pressed="false" title="Rodar en grupo"><svg><use href="#i-people"/></svg><span class="grp-badge" id="groupCount" hidden>0</span></button>
   </div>
   <div class="map-bottom">
     <div class="card slim" id="followCard" hidden>
@@ -704,6 +705,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
     <span class="label">Cómo funciona</span>
     <p>El inclinómetro se calibra solo: toma la vertical con el móvil quieto en el soporte y la afina rodando recto. No hay que pulsar nada ni esperar a nada.</p>
     <p>Al grabar una ruta, el trazado se colorea por inclinación y cada curva se guarda con su ángulo máximo y su velocidad. El GPS sigue grabando con la pantalla apagada.</p>
+    <p>Para rodar en grupo, pulsa el botón de las dos personas en el mapa: crea un grupo para tu ruta o únete con el código o el QR de otro. Tu posición solo se comparte con ese grupo mientras tienes la ruta en marcha.</p>
     <p>Para seguir una ruta, créala en el mapa (pegando un enlace de Google Maps o tocando puntos), guárdala y pulsa «Iniciar ruta». La app te dice los giros, te avisa si te sales del trazado y te marca cómo volver.</p>
     <p>Las rutas que grabas quedan en este teléfono. Exporta en GPX o CSV cuando quieras.</p>
   </div>
@@ -766,15 +768,17 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 <div class="lightbox" id="lightbox" hidden><img id="lightboxImg" alt=""></div>
 
 <script data-cfasync="false" src="vendor/maplibre-gl.js"></script>
-<script data-cfasync="false" src="lean-core.js?v=0.3.1"></script>
-<script data-cfasync="false" src="geo.js?v=0.3.1"></script>
-<script data-cfasync="false" src="db.js?v=0.3.1"></script>
-<script data-cfasync="false" src="achievements.js?v=0.3.1"></script>
-<script data-cfasync="false" src="platform.js?v=0.3.1"></script>
-<script data-cfasync="false" src="rg-lib.js?v=0.3.1"></script>
+<script data-cfasync="false" src="lean-core.js?v=0.4.0"></script>
+<script data-cfasync="false" src="geo.js?v=0.4.0"></script>
+<script data-cfasync="false" src="db.js?v=0.4.0"></script>
+<script data-cfasync="false" src="achievements.js?v=0.4.0"></script>
+<script data-cfasync="false" src="platform.js?v=0.4.0"></script>
+<script data-cfasync="false" src="rg-lib.js?v=0.4.0"></script>
 <script data-cfasync="false" src="vendor/supabase.js"></script>
-<script data-cfasync="false" src="app.js?v=0.3.1"></script>
-<script data-cfasync="false" src="rg-app.js?v=0.3.1"></script>
-<script data-cfasync="false" src="rg-club.js?v=0.3.1"></script>
+<script data-cfasync="false" src="app.js?v=0.4.0"></script>
+<script data-cfasync="false" src="rg-app.js?v=0.4.0"></script>
+<script data-cfasync="false" src="rg-club.js?v=0.4.0"></script>
+<script data-cfasync="false" src="vendor/qrcode.js"></script>
+<script data-cfasync="false" src="rg-group.js?v=0.4.0"></script>
 </body>
 </html>

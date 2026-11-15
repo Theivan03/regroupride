@@ -41,9 +41,11 @@
       nav.active = false; nav.planId = null; nav.tr = null; nav.rejoin = null; nav.last = null; drawRejoin(); renderBanner(null);
     }
     if (!on) renderBanner(null);
+    drawStops();
+    if (window.RGGroup) RGGroup.sync();
   }
   function onFix(fix) {
-    if (!nav.active || !nav.tr) return;
+    if (!nav.active || !nav.tr) { if (window.RGGroup) RGGroup.onFix(fix, null); return; }
     var now = Date.now(), r = nav.tr.update(fix, now), i;
     nav.last = r;
     for (i = 0; i < r.events.length; i++) {
@@ -62,6 +64,7 @@
       if ((rr.offRoute || (rr.started && rr.off > 150)) && now - nav.rejoinAt > 20000) makeRejoin(fix, false);
     }
     renderBanner(r);
+    if (window.RGGroup) RGGroup.onFix(fix, r);
   }
   function offAlert(d) {
     buzz([500, 200, 500, 200, 500]);
@@ -125,7 +128,39 @@
     b.className = 'nav-banner ' + cls; b.hidden = false;
     $('#navIco').innerHTML = icon(ico); $('#navDist').textContent = dist; $('#navText').textContent = text; $('#navSub').textContent = sub;
   }
-  window.RGNav = { onFix: onFix, sync: sync, redraw: drawRejoin, state: nav };
+  /* ---- paradas de la ruta en el mapa (todas, sin límite) ---- */
+  var stopMk = [], stopKey = '';
+  function drawStops() {
+    var m = A.map(), p = plan(), key = p ? p.id + ':' + (p.wps || []).length : '';
+    if (!m || typeof maplibregl === 'undefined') return;
+    if (key === stopKey) return; stopKey = key;
+    stopMk.forEach(function (x) { x.remove(); }); stopMk = [];
+    if (!p) return;
+    (p.wps || []).forEach(function (w, i) {
+      var el = document.createElement('div'), last = i === p.wps.length - 1;
+      el.className = 'stop-marker' + (i === 0 ? ' start' : (last ? ' end' : '')); el.textContent = String(i + 1);
+      el.addEventListener('click', function (e) { e.stopPropagation(); A.toast((i + 1) + '. ' + ((w[2] || '').split(',')[0] || (i === 0 ? 'Salida' : (last ? 'Llegada' : 'Punto ' + (i + 1)))), 'ok'); });
+      stopMk.push(new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([w[1], w[0]]).addTo(m));
+    });
+  }
+  /* ---- Google Maps como opción secundaria, por tramos de 9 paradas ---- */
+  function openMaps(wps) {
+    var legs = L.mapsLegs(wps || []);
+    if (!legs.length) return;
+    if (legs.length === 1) { Platform.openExternal(legs[0].url); return; }
+    var s = sheet('<div class="head"><h1>Abrir en Google Maps</h1><button class="btn small icon" id="rgClose" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      '<p class="muted">Google Maps solo admite unas 9 paradas por enlace, así que esta ruta de ' + wps.length + ' puntos va en ' + legs.length + ' tramos. Al acabar uno, vuelve aquí y abre el siguiente. Para llevarla entera, usa «Iniciar ruta» en la app.</p>' +
+      legs.map(function (l, i) { return '<button class="btn big" type="button" data-leg="' + i + '">Tramo ' + (i + 1) + ': puntos ' + l.from + ' a ' + l.to + '</button>'; }).join(''));
+    $('#rgClose').addEventListener('click', closeSheet);
+    s.querySelectorAll('[data-leg]').forEach(function (b) { b.addEventListener('click', function () { Platform.openExternal(legs[+b.dataset.leg].url); }); });
+  }
+  /* ---- exportar a GPX ---- */
+  function exportGpx(p) {
+    if (!p || !p.coords || p.coords.length < 2) { A.toast('Esta ruta no tiene trazado.', 'warn'); return; }
+    var file = (p.name || 'ruta').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50) || 'ruta';
+    Platform.downloadCsv(file + '.gpx', L.planToGpx(p), 'Ruta ' + (p.name || '')).then(function () { if (!native) A.toast('GPX descargado.', 'ok'); }, function (e) { if (!/cancel/i.test(String(e && e.message))) A.toast('No se ha podido compartir el GPX.', 'bad'); });
+  }
+  window.RGNav = { onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx };
 
   /* ================= importar enlace de Google Maps ================= */
   function readClipboard() {

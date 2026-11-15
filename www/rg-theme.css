@@ -229,3 +229,24 @@ th{letter-spacing:0;text-transform:none}
 .tab{flex:1 1 0}
 .tab[data-view="club"]{flex:1.45 1 0}
 .tabs{padding:6px 4px;gap:0}
+
+/* ---------- paradas de la ruta y grupo en vivo ---------- */
+.stop-marker{width:24px;height:24px;border-radius:50%;background:#fff;color:#0E141B;border:2.5px solid #2F7CF6;box-shadow:0 1px 4px rgba(0,0,0,.45);font-family:var(--font-display);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.stop-marker.start{background:#2F7CF6;color:#fff;border-color:#fff}
+.stop-marker.end{background:#0E141B;color:#fff;border-color:#fff}
+.rider-marker{width:32px;height:32px;border-radius:50%;background:var(--color-accent);color:var(--color-on-fill);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);font-family:var(--font-display);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.rider-marker.behind{background:#FFC857;color:#3a2a00}
+.rider-marker.off{background:#E5484D;color:#fff}
+.rider-marker.stale{background:#8793A3;color:#fff;opacity:.85}
+.map-ctrls button{position:relative}
+.map-ctrls button.alert{color:#fff;background:#E5484D}
+.grp-badge{position:absolute;top:-5px;right:-5px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--color-accent);color:var(--color-on-fill);font-family:var(--font-display);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+.map-ctrls button.alert .grp-badge{background:#fff;color:#C62828}
+.grp-code{display:flex;gap:16px;align-items:center;background:var(--color-surface);border-radius:20px;padding:14px}
+.grp-qr{width:132px;height:132px;flex:none;background:#fff;border-radius:12px;padding:4px}
+.grp-qr svg{width:100%;height:100%;display:block}
+.grp-code>div:last-child{display:flex;flex-direction:column;gap:6px;min-width:0}
+.grp-code b{font-family:var(--font-display);font-weight:700;font-size:38px;letter-spacing:.1em;line-height:1;-webkit-user-select:text;user-select:text}
+.rg-ava.warn{background:rgba(255,200,87,.2);color:#B7791F}
+.rg-ava.bad{background:rgba(229,72,77,.18);color:#E5484D}
+.plan-actions .btn svg{width:18px;height:18px}

@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.3.1';
+  var APP_VERSION = '0.4.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -315,11 +315,11 @@
     if (map && map.getZoom() < 9 && lastFix) map.easeTo({ center: [lastFix.lon, lastFix.lat], zoom: 12 });
   }
   function exitPlanMode() { planMode = false; $('#planCard').hidden = true; $('#btnPlan').setAttribute('aria-pressed', 'false'); clearPlan(); if (map) map.getCanvas().style.cursor = ''; drawPlan(); renderFollow(); render(); }
-  function addWaypoint(lat, lon) {
+  function addWaypoint(lat, lon, name) {
     var el = document.createElement('div'); el.className = 'wp-marker'; el.addEventListener('click', function (e) { e.stopPropagation(); });
     var mk = new maplibregl.Marker({ element: el, draggable: true, anchor: 'center' }).setLngLat([lon, lat]).addTo(map);
-    mk.on('dragend', function () { var ll = mk.getLngLat(), i = pl.markers.indexOf(mk); if (i >= 0) pl.wps[i] = [ll.lat, ll.lng]; scheduleRoute(); });
-    pl.wps.push([lat, lon]); pl.markers.push(mk); relabelWps(); scheduleRoute();
+    mk.on('dragend', function () { var ll = mk.getLngLat(), i = pl.markers.indexOf(mk); if (i >= 0) pl.wps[i] = [ll.lat, ll.lng, pl.wps[i][2] || '']; scheduleRoute(); });
+    pl.wps.push([lat, lon, name || '']); if (name) el.title = name; pl.markers.push(mk); relabelWps(); scheduleRoute();
   }
   function relabelWps() { pl.markers.forEach(function (m, i) { var el = m.getElement(); el.textContent = String(i + 1); el.className = 'wp-marker' + (i > 0 && i === pl.markers.length - 1 ? ' end' : ''); }); }
   function clearPlan() { pl.markers.forEach(function (m) { m.remove(); }); pl = { wps: [], markers: [], coords: [], dist: 0, dur: 0, routed: false, pending: false }; routeSeq++; drawPlan(); renderPlanInfo(); }
@@ -346,6 +346,7 @@
     $('#planUndo').disabled = !n; $('#planClear').disabled = !n; $('#planSave').disabled = n < 2 || pl.pending; $('#planGmaps').disabled = n < 2;
     $('#planInfo').innerHTML = n === 0 ? 'Pega el enlace de la ruta o toca el mapa para añadir puntos.' : (n === 1 ? '1 punto · toca el mapa para añadir el destino.' : (pl.pending ? n + ' puntos · calculando…' : n + ' puntos · <b>' + fmtKm(pl.dist) + '</b> · ' + fmtDur(pl.dur * 1000) + (pl.routed ? ' por carretera' : ' <span class="muted">(en línea recta: sin conexión al enrutador)</span>')));
   }
+  function openInMaps(wps) { if (window.RGNav && RGNav.openMaps) RGNav.openMaps(wps); else Platform.openExternal(gmapsDirUrl(wps)); }
   function gmapsDirUrl(wps) {
     var o = wps[0], d = wps[wps.length - 1], mid = wps.slice(1, -1).slice(0, 9);
     return 'https://www.google.com/maps/dir/?api=1&origin=' + o[0].toFixed(6) + ',' + o[1].toFixed(6) + '&destination=' + d[0].toFixed(6) + ',' + d[1].toFixed(6) + (mid.length ? '&waypoints=' + mid.map(function (w) { return w[0].toFixed(6) + ',' + w[1].toFixed(6); }).join('|') : '') + '&travelmode=driving';
@@ -360,7 +361,7 @@
   $('#planClose').addEventListener('click', exitPlanMode);
   $('#planUndo').addEventListener('click', function () { var m = pl.markers.pop(); if (m) m.remove(); pl.wps.pop(); relabelWps(); scheduleRoute(); });
   $('#planClear').addEventListener('click', clearPlan);
-  $('#planGmaps').addEventListener('click', function () { if (pl.wps.length >= 2) Platform.openExternal(gmapsDirUrl(pl.wps)); });
+  $('#planGmaps').addEventListener('click', function () { if (pl.wps.length >= 2) openInMaps(pl.wps); });
   $('#planSave').addEventListener('click', function () {
     if (pl.wps.length < 2 || pl.pending) return;
     var coords = Geo.simplify(pl.coords.map(function (c) { return [0, c[1], c[0]]; }), 8).map(function (p) { return [p[2], p[1]]; });
@@ -369,7 +370,7 @@
     savePlans().then(function () { exitPlanMode(); followPlan(p, false); toast('Ruta guardada. Pulsa «Iniciar ruta» cuando salgas.', 'ok'); return setFlag('plan'); });
   });
   $('#followStop').addEventListener('click', function () { followPlan(null, false); });
-  $('#followGmaps').addEventListener('click', function () { if (activePlan) Platform.openExternal(gmapsDirUrl(activePlan.wps)); });
+  $('#followGmaps').addEventListener('click', function () { if (activePlan) openInMaps(activePlan.wps); });
   function renderPlans(list) {
     var top = document.createElement('div'); top.className = 'actions'; top.style.gridTemplateColumns = '1fr';
     top.innerHTML = '<button class="btn primary wide" type="button" id="btnNewPlan"><svg><use href="#i-route"/></svg>Planificar una ruta nueva</button>';
@@ -379,10 +380,11 @@
     plans.forEach(function (p) {
       var d = document.createElement('div'); d.className = 'plan';
       d.innerHTML = '<div class="thumb">' + planThumb(p) + '</div><div><div class="name">' + esc(p.name) + '</div><div class="muted">' + fmtKm(p.dist) + ' · ' + fmtDur(p.dur * 1000) + (p.routed ? ' por carretera' : ' en línea recta') + ' · ' + p.wps.length + ' puntos · ' + fmtDate(p.created) + '</div></div>' +
-        '<div class="plan-actions"><button class="btn small primary" type="button" data-act="follow">' + (activePlan && activePlan.id === p.id ? 'Siguiéndola' : 'Seguir en el mapa') + '</button><button class="btn small" type="button" data-act="gmaps"><svg><use href="#i-gmaps"/></svg>Google Maps</button><button class="btn small danger" type="button" data-act="del">Borrar</button></div>';
+        '<div class="plan-actions"><button class="btn small primary" type="button" data-act="follow">' + (activePlan && activePlan.id === p.id ? 'Seleccionada' : 'Seguir esta ruta') + '</button><button class="btn small" type="button" data-act="gpx"><svg><use href="#i-download"/></svg>Descargar GPX</button><button class="btn small" type="button" data-act="gmaps"><svg><use href="#i-gmaps"/></svg>Google Maps</button><button class="btn small danger" type="button" data-act="del">Borrar</button></div>';
       d.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () {
         if (b.dataset.act === 'follow') { followPlan(p, true); showView('map'); }
-        if (b.dataset.act === 'gmaps') Platform.openExternal(gmapsDirUrl(p.wps));
+        if (b.dataset.act === 'gmaps') openInMaps(p.wps);
+        if (b.dataset.act === 'gpx' && window.RGNav) RGNav.exportGpx(p);
         if (b.dataset.act === 'del') armOrRun(b, 'Borrar', 'Toca otra vez', function () { plans = plans.filter(function (x) { return x.id !== p.id; }); if (activePlan && activePlan.id === p.id) followPlan(null, false); savePlans().then(renderRides); });
       }); });
       list.appendChild(d);
@@ -1141,7 +1143,7 @@
     },
     setWaypoints: function (pts, name) {
       if (!planMode) enterPlanMode(); if (!planMode) return false;
-      clearPlan(); pts.forEach(function (p) { addWaypoint(p.lat, p.lon); });
+      clearPlan(); pts.forEach(function (p) { addWaypoint(p.lat, p.lon, p.name); });
       if (name && !$('#planName').value) $('#planName').value = name;
       if (map && pts.length > 1) { var b = Geo.bounds(pts.map(function (p) { return [0, p.lat, p.lon]; })); if (b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: 120, bottom: 300, left: 40, right: 70 }, duration: 500 }); }
       else if (map && pts.length === 1) map.easeTo({ center: [pts[0].lon, pts[0].lat], zoom: 13 });

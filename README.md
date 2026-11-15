@@ -4,7 +4,15 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
-## Qué hay en la versión 0.3
+## Qué hay en la versión 0.4
+
+- **Todas las paradas en el mapa**, sin límite, al importar y al seguir la ruta. Los puntos con nombre del enlace de Google Maps salen con sus coordenadas exactas (bloque `data=`).
+- **Enlaces de Maps**: se leen también cuando llevan apóstrofos sin codificar (L'Orxa, d'Alcoi), que es como los devuelve el enlace corto `maps.app.goo.gl`.
+- **Google Maps como opción secundaria**, por tramos de 9 paradas como máximo.
+- **Descargar GPX** de cada ruta planificada: paradas con nombre (`wpt` y `rte`) y trazado por carretera (`trk`).
+- **Grupo en vivo** (`www/rg-group.js`, `supabase/03_grupo.sql`): crear un grupo para una ruta o unirse con código o QR, ver a todos en el mapa y quién se queda atrás, se sale o pierde la señal. Sin Realtime: una llamada cada 15 s guarda la posición propia (una fila por usuario y grupo) y trae la del grupo. La posición se borra al parar la ruta, al salir o al terminar el grupo.
+
+## Qué había en la versión 0.3
 
 - **Comunidad** (pestaña nueva, `www/rg-club.js`): crear una comunidad o unirse con código, eventos y rutas con «Voy», acompañante, lista de quién viene, ruta adjunta que se carga en el mapa y enlace a Luma; tablón de avisos; páginas con enlaces y códigos de descuento; miembros y administradores. Necesita ejecutar `supabase/02_comunidades.sql`.
 - Arreglado: los interruptores de Ajustes no respondían al tocarlos.

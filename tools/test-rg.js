@@ -43,6 +43,45 @@ t('encontrar la dirección de Maps en redirecciones y páginas', function () {
   assert.equal(L.parseMapsUrl(L.findMapsUrl('https://consent.google.com/ml?continue=' + encodeURIComponent(full))).points.length, 2);
 });
 
+var REAL = "https://www.google.com/maps/dir/Estaci%C3%B3n+de+Servicio+Repsol,+Av.+Universitat,+S.N,+03009+Alicante/38.4432762,-0.638148/38.573175,-0.5898003/38.6277134,-0.5664904/38.7074659,-0.6522081/38.7834206,-0.5171418/38.7818667,-0.4275188/38.7853859,-0.3364889/38.8149182,-0.3561771/Restaurante%2FAlbergue+del+Serpis,+Les+Fontetes,+s%2Fn,+03860+L'Orxa,+Alicante/38.827928,-0.2751228/38.7689865,-0.2721261/38.741984,-0.3154749/GASOLINERA+BENILLOBA+LEYBL,+Avinguda+d'Alcoi,+03810+Benilloba,+Alicante/38.5624587,-0.4702267/Estaci%C3%B3n+de+Servicio+Repsol,+Av.+Universitat,+S.N,+03009+Alicante/@38.5852972,-0.5436066,68396m/data=!3m1!1e3!4m38!4m37!1m5!1m1!1s0xd62369501ec889f:0x8d1c38cd99db3471!2m2!1d-0.508851!2d38.3762127!1m0!1m0!1m0!1m0!1m0!1m0!1m0!1m0!1m5!1m1!1s0xd6192c4384d3cc7:0xf5574a55a858502e!2m2!1d-0.312078!2d38.8473991!1m0!1m0!1m0!1m5!1m1!1s0xd618944f4108b7d:0xba3391eabc4d9b8!2m2!1d-0.3865755!2d38.6988919!1m0!1m5!1m1!1s0xd62369501ec889f:0x8d1c38cd99db3471!2m2!1d-0.508851!2d38.3762127!3e0?entry=ttu";
+var EXPECT = [[38.3762127, -0.508851], [38.4432762, -0.638148], [38.573175, -0.5898003], [38.6277134, -0.5664904], [38.7074659, -0.6522081], [38.7834206, -0.5171418], [38.7818667, -0.4275188], [38.7853859, -0.3364889], [38.8149182, -0.3561771], [38.8473991, -0.312078], [38.827928, -0.2751228], [38.7689865, -0.2721261], [38.741984, -0.3154749], [38.6988919, -0.3865755], [38.5624587, -0.4702267], [38.3762127, -0.508851]];
+t('enlace real tal cual se copia (con apóstrofos sin codificar): 16 puntos en orden', function () {
+  [REAL, 'Ruta del domingo: ' + REAL + ' nos vemos', L.findMapsUrl(REAL), L.findMapsUrl('https://consent.google.com/ml?continue=' + encodeURIComponent(REAL) + '&gl=ES')].forEach(function (input, k) {
+    var r = L.parseMapsUrl(input); assert.equal(r.points.length, 16, 'caso ' + k + ': ' + r.points.length + ' ' + (r.error || '')); assert.equal(r.unresolved.length, 0);
+    assert.deepEqual(r.points.map(function (p) { return [p.lat, p.lon]; }), EXPECT);
+    assert.equal(r.points[9].name, "Restaurante/Albergue del Serpis, Les Fontetes, s/n, 03860 L'Orxa, Alicante"); assert.equal(r.points[13].name.indexOf('GASOLINERA BENILLOBA'), 0);
+  });
+});
+t('enlace corto: la redirección real de maps.app.goo.gl (cabecera Location con apóstrofos)', function () {
+  var LOC = REAL.replace('@38.5852972,-0.5436066,68396m/data=!3m1!1e3!4m38', '@38.4999052,-0.519574,11.75z/data=!4m38').replace('?entry=ttu', '?entry=tts&g_ep=EgoyMDI2MTExMS4wIPu8ASoASAFQAw%3D%3D&skid=abc');
+  var found = L.findMapsUrl(LOC); assert.equal(found, LOC);
+  var r = L.parseMapsUrl(found); assert.equal(r.points.length, 16); assert.deepEqual(r.points.map(function (p) { return [p.lat, p.lon]; }), EXPECT);
+});
+t('Google Maps por tramos de 9 paradas como máximo', function () {
+  var wps = EXPECT.map(function (p, i) { return [p[0], p[1], 'P' + i]; }), legs = L.mapsLegs(wps);
+  assert.equal(legs.length, 2); assert.deepEqual([legs[0].from, legs[0].to, legs[1].from, legs[1].to], [1, 10, 10, 16]);
+  legs.forEach(function (l) { var q = new URL(l.url).searchParams; assert.ok((q.get('waypoints') || '').split('|').filter(Boolean).length + 1 <= 9); });
+  assert.equal(new URL(legs[1].url).searchParams.get('origin'), new URL(legs[0].url).searchParams.get('destination'));
+  assert.equal(new URL(legs[1].url).searchParams.get('destination'), '38.376213,-0.508851');
+  assert.equal(L.mapsLegs(wps.slice(0, 10)).length, 1); assert.equal(L.mapsLegs(wps.slice(0, 11)).length, 2); assert.equal(L.mapsLegs(wps.slice(0, 1)).length, 0);
+});
+t('GPX con paradas con nombre (wpt y rte) y trazado (trk)', function () {
+  var g = L.planToGpx({ name: 'Serpis & vuelta', wps: [[38.3762127, -0.508851, 'Estación de Servicio Repsol, Av. Universitat'], [38.44, -0.63, ''], [38.8473991, -0.312078, "Restaurante/Albergue del Serpis, L'Orxa"]], coords: [[-0.508851, 38.3762127], [-0.6, 38.4], [-0.312078, 38.8473991]] }, 0);
+  assert.ok(g.indexOf('<gpx version="1.1"') > 0 && g.indexOf('xmlns="http://www.topografix.com/GPX/1/1"') > 0);
+  assert.equal((g.match(/<wpt /g) || []).length, 3); assert.equal((g.match(/<rtept /g) || []).length, 3); assert.equal((g.match(/<trkpt /g) || []).length, 3);
+  assert.ok(g.indexOf('<name>01 Estación de Servicio Repsol</name>') > 0); assert.ok(g.indexOf('<name>02 Punto 2</name>') > 0); assert.ok(g.indexOf('<name>03 Restaurante/Albergue del Serpis</name>') > 0);
+  assert.ok(g.indexOf('<name>Serpis &amp; vuelta</name>') > 0); assert.ok(g.indexOf('L&apos;Orxa') > 0); assert.ok(g.indexOf('<trkpt lat="38.376213" lon="-0.508851"/>') > 0);
+  assert.ok(g.indexOf('<wpt') < g.indexOf('<rte>') && g.indexOf('<rte>') < g.indexOf('<trk>'));
+});
+t('grupo: orden, quién se queda atrás, fuera de ruta y sin señal', function () {
+  var now = 1e9, row = function (id, along, extra) { return Object.assign({ user_id: id, name: id, lat: 38, lon: 0, along: along, off: false, at: now - 5000 }, extra || {}); };
+  var g = L.rankGroup([row('a', 12000), row('yo', 11500), row('b', 11000), row('lento', 6000), row('fuera', 11800, { off: true }), row('mudo', 9000, { at: now - 200000 }), { user_id: 'espera', name: 'x', lat: null, lon: null, along: null, at: now }], 'yo', now);
+  assert.deepEqual(g.list.map(function (x) { return x.user_id; }), ['a', 'fuera', 'yo', 'b', 'mudo', 'lento']);
+  var by = {}; g.list.forEach(function (x) { by[x.user_id] = x; });
+  assert.ok(by.lento.behind && !by.b.behind && by.fuera.off && by.mudo.stale && !by.mudo.behind && by.yo.me);
+  assert.equal(by.a.gap, 500); assert.equal(by.lento.gap, -5500); assert.equal(g.behind, 3); assert.equal(g.waiting, 1); assert.equal(g.total, 6);
+});
+
 // Ruta recta hacia el este por el paralelo 38.6 (unos 35 km), con un giro a mitad.
 var coords = []; for (var i = 0; i <= 40; i++) coords.push([-0.5 + i * 0.01, 38.6]);
 var steps = [{ lat: 38.6, lon: -0.3, text: 'gira a la derecha', icon: 'right', name: 'CV-70' }, { lat: 38.6, lon: -0.1, text: 'has llegado al final de la ruta', icon: 'arrive', name: '' }];
