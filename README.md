@@ -4,6 +4,16 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
+## Qué hay en la versión 0.9.1
+
+- **El inclinómetro marca desde que se abre la app.** Antes los sensores no se encendían hasta abrir el inclinómetro o empezar la ruta, y sin referencia guardada había que tener el móvil 1,5 s completamente quieto (en la mano o con el motor en marcha no llegaba nunca). Ahora:
+  - Los sensores se encienden al cargar la app, antes incluso de leer la base de datos.
+  - Sin referencia, bastan 0,3 s de sensor para una **referencia provisional** (`auto-quick`). Se afina sola con el móvil quieto 1,5 s y, como siempre, rodando recto.
+  - Con referencia guardada, la primera lectura sale ya del acelerómetro (antes subía desde 0°), también al volver de segundo plano.
+  - Si la referencia guardada es de otra postura del móvil (más de 20° de diferencia con la moto parada 3 s), se corrige sola sin esperar a rodar.
+  - Corregido de paso: un cambio de referencia podía enseñarle al giróscopo una unidad equivocada.
+- Pruebas nuevas: `tools/test-arranque.js` (dentro de `npm test`).
+
 ## Qué hay en la versión 0.9
 
 - **Copia de las rutas en la cuenta** (`www/rg-sync.js`, `supabase/05_copia_en_la_cuenta.sql`): las rutas planificadas y las grabadas se guardan también en la cuenta, no solo en el teléfono. Al iniciar sesión en un móvil nuevo se recuperan.

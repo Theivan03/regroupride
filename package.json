@@ -1,11 +1,11 @@
 {
   "name": "regroupride",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "ReGroupRide: rutas en grupo para moteros (Android + iOS con Capacitor)",
   "scripts": {
     "sync": "cap sync",
     "serve": "python3 -m http.server 8080 --directory www",
-    "test": "node tools/test-core.js && node tools/test-latency.js && node tools/test-autocal.js && node tools/test-rg.js"
+    "test": "node tools/test-core.js && node tools/test-latency.js && node tools/test-autocal.js && node tools/test-arranque.js && node tools/test-rg.js"
   },
   "author": "Ivan Cabrera",
   "license": "UNLICENSED",

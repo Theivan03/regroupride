@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.9.0';
+  var APP_VERSION = '0.9.1';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -95,7 +95,7 @@
   var det = LeanCore.createCornerDetector({ minPeak: settings.minPeak });
   if (calib && calib.up) est.setFrame(LeanCore.buildFrame(calib.up), calib.bias, calib.kind || 'manual');
   est.setOnGain(function (g) { settings.gyroGain = g; settings.gyroGainSrc = MOTION_SRC; saveSettings(); });
-  est.setOnFrame(function (f) { var first = !calib; calib = { up: f.up, bias: f.bias, at: Date.now(), kind: f.kind }; LS.set('inclina.calib', calib); if (first) { hideNotice(); toast(f.kind === 'auto-ride' ? 'Inclinómetro calibrado rodando recto.' : 'Inclinómetro calibrado en reposo. Se afinará solo al rodar recto.', 'ok'); } });
+  est.setOnFrame(function (f) { if (sens.demo) return; var first = !calib; calib = { up: f.up, bias: f.bias, at: Date.now(), kind: f.kind }; LS.set('inclina.calib', calib); if (first) hideNotice(); });
   var sens = { gyro: false, lastMotion: 0, lastGps: 0, speedKmh: null, speedMs: null, heading: null, gpsAcc: null, listening: false, nativeStop: null, gpsError: null, demo: false, rate: 0, src: MOTION_SRC, fix: null };
   var lastMotionT = null, rateCount = 0, rateT0 = 0, lastNativeTs = null;
   var live = { phi: 0, source: 'gyro', leanMaxSinceFix: 0, lastL: 0, lastR: 0, curSide: 0, curPeak: 0 };
@@ -121,12 +121,14 @@
     if (rec) recFeed(s.phi, now);
   }
   function onMotion(e) {
+    if (sens.demo) return;
     var a = e.accelerationIncludingGravity, g = e.rotationRate, acc = null, rot = null;
     if (a && a.x != null) acc = IOS ? [-a.x, -a.y, -a.z] : [a.x, a.y, a.z];
     if (g && g.beta != null) rot = [g.beta, g.gamma, g.alpha];
     handleSample(acc, rot, performance.now());
   }
   function onNativeBatch(data) {
+    if (sens.demo) return;
     var now = performance.now(), ss = data.samples, n = ss.length;
     for (var i = 0; i < n; i++) {
       var q = ss[i], ts = q[6], dt = lastNativeTs == null ? 0 : (ts - lastNativeTs) / 1000; lastNativeTs = ts;
@@ -145,6 +147,9 @@
       else attach();
     });
   }
+  // Los sensores se encienden al abrir la app, sin esperar a pulsar nada ni a que cargue el resto: cuando se
+  // abre el inclinómetro o empieza la ruta ya hay referencia y ángulo. (En iPhone el navegador exige un toque.)
+  if (Platform.hasNativeMotion() || (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function')) startMotion();
 
   /* ---------- GPS ---------- */
   var gpsStop = null, gpsMode = null, lastFix = null, autoStartSince = null;
@@ -517,11 +522,11 @@
       gaugeFull(phi, mL, mR, live.lastL, live.lastR);
       setText('#lfNum', ready ? ar + '°' : '—');
       setText('#lfLastL', live.lastL ? Math.round(live.lastL) + '°' : '—'); setText('#lfLastR', live.lastR ? Math.round(live.lastR) + '°' : '—');
-      if (!ready) { setText('#lfSide', sens.listening && motionFresh ? 'Calibrando: quieto un momento' : 'Calibrando'); setClass('#lfSide', 'side'); }
+      if (!ready) { setText('#lfSide', 'Leyendo sensores'); setClass('#lfSide', 'side'); }
       else if (ar >= 3) { setText('#lfSide', phi < 0 ? 'Izquierda' : 'Derecha'); setClass('#lfSide', 'side ' + (phi < 0 ? 'l' : 'r')); } else { setText('#lfSide', 'Vertical'); setClass('#lfSide', 'side'); }
       setText('#lfMaxL', Math.round(mL) + '°'); setText('#lfMaxR', Math.round(mR) + '°');
       setHTML('#lfSpeed', speedTxt + '<span class="unit">km/h</span>');
-      setText('#lfMinor', rec ? rec.corners.length + ' curvas · ' + fmtKm(rec.dist) : (ready ? 'Sin grabar · pulsa Grabar ruta en el mapa' : 'Se calibra sola: móvil quieto en el soporte o rodando recto'));
+      setText('#lfMinor', rec ? rec.corners.length + ' curvas · ' + fmtKm(rec.dist) : (ready ? 'Sin grabar · pulsa Grabar ruta en el mapa' : 'Esperando a los sensores del móvil'));
       setText('#lfTimer', rec ? fmtTime(Date.now() - rec.start) : '00:00:00'); setClass('#lfTimer', 'timer cifra' + (rec ? ' on' : ''));
       setClass('#lfSens', 'chip ' + (motionFresh ? (sens.gyro ? 'ok' : 'warn') : (sens.listening ? 'bad' : ''))); setText('#lfSens', motionFresh ? (sens.gyro ? 'Sensores' : 'Sin giróscopo') : 'Sensores');
       setClass('#lfGps', 'chip ' + (gpsFresh ? 'ok' : (sens.gpsError ? 'bad' : (gpsMode ? 'warn' : '')))); setText('#lfGps', gpsFresh ? 'GPS' : (sens.gpsError ? 'GPS ' + sens.gpsError : (gpsMode ? 'GPS…' : 'GPS')));
@@ -1138,7 +1143,7 @@
     setText('#dgRate', (motionFresh ? Math.round(sens.rate) + ' muestras/s' : (sens.listening ? 'sin datos' : 'no iniciado')) + (sens.src === 'native' ? ' · sensores nativos' : ' · navegador'));
     setText('#dgGyro', motionFresh ? (sens.gyro ? 'sí' : 'no (solo acelerómetro)') : '—');
     setText('#dgGain', (Math.abs(s.gain) > 10 ? 'rad/s' : '°/s') + (s.gain < 0 ? ', invertido' : ', normal') + (s.gainConf ? ' · conf ' + Math.round(s.gainConf * 100) + '%' : ' · por defecto'));
-    setText('#dgPhi', s.ready ? f1(s.phi) + ' · ref. ' + ({ 'manual': 'manual', 'auto-still': 'automática (reposo)', 'auto-ride': 'automática (rodando)' }[s.frameKind] || s.frameKind) : 'sin referencia aún'); setText('#dgAcc', calib && motionFresh ? f1(s.phiAcc) : '—'); setText('#dgPhys', f1(s.phiPhys));
+    setText('#dgPhi', s.ready ? f1(s.phi) + ' · ref. ' + ({ 'manual': 'manual', 'auto-quick': 'provisional (al abrir)', 'auto-still': 'automática (reposo)', 'auto-ride': 'automática (rodando)' }[s.frameKind] || s.frameKind) : 'sin referencia aún'); setText('#dgAcc', calib && motionFresh ? f1(s.phiAcc) : '—'); setText('#dgPhys', f1(s.phiPhys));
     setText('#dgSrc', { gyro: 'giróscopo', phys: 'giróscopo + física', acc: 'giróscopo + acelerómetro', 'acc-still': 'acelerómetro (parado)', 'acc-only': 'solo acelerómetro' }[s.source] || s.source);
     var gpsFresh = sens.lastGps && (now - sens.lastGps) < 5000;
     setText('#dgGps', gpsFresh ? Math.round(sens.speedKmh || 0) + ' km/h · ±' + Math.round(sens.gpsAcc || 0) + ' m' + (gpsMode === 'bg' ? ' · segundo plano' : '') : (sens.gpsError || (gpsMode ? 'buscando' : 'parado')));
@@ -1233,7 +1238,7 @@
   });
   DB.open().then(function () { return DB.migrateFromLocalStorage(); }).then(function (n) { if (n) toast(n + ' salidas antiguas importadas al historial.', 'ok'); return recoverRide(); })
     .then(reloadVehicles).then(reloadRides).then(loadProfile).then(loadParking).then(loadPlans).then(checkAchievements).then(function () {
-      if (!calib) showNotice('El inclinómetro se calibra solo: deja el móvil quieto en el soporte un par de segundos o rueda recto.', 'warn');
+      setTimeout(function () { if (!calib && !sens.demo) showNotice('Aún no llegan datos de los sensores de movimiento: el inclinómetro marcará en cuanto lleguen.', 'warn'); }, 2500);
       initMap(); startGps('fg'); render(); Platform.ready(); maintStartupNotice();
     }).catch(function (e) { toast('Error al iniciar la base de datos: ' + (e && e.message ? e.message : e), 'bad'); initMap(); Platform.ready(); });
   if (!Platform.native && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
