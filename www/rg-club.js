@@ -2,7 +2,7 @@
    Usa la sesión de rg-app.js (window.RGCloud) y las rutas guardadas de app.js (window.RGApp). */
 (function () {
   'use strict';
-  var A = window.RGApp, Cl = window.RGCloud;
+  var A = window.RGApp, Cl = window.RGCloud, DB = window.DB;
   if (!A || !Cl) return;
   var sb = Cl.sb, esc = Cl.esc, $ = function (s, r) { return (r || document).querySelector(s); }, $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var C = window.Capacitor, native = !!(C && C.isNativePlatform && C.isNativePlatform()), P = native ? (C.Plugins || {}) : {};
@@ -24,10 +24,31 @@
   function share(text) { if (P.Share) P.Share.share({ text: text }).catch(function () {}); else if (navigator.share) navigator.share({ text: text }).catch(function () {}); else copy(text, 'Invitación copiada'); }
   function openUrl(u) { if (!/^https?:\/\//i.test(u)) u = 'https://' + u; if (window.Platform) Platform.openExternal(u); else window.open(u, '_blank', 'noopener'); }
   function armed(btn, label, run) { if (btn.dataset.armed) { run(); return; } btn.dataset.armed = '1'; var old = btn.textContent; btn.textContent = label; setTimeout(function () { delete btn.dataset.armed; btn.textContent = old; }, 3500); }
+  // Los nombres se recuerdan entre sesiones: solo se piden los que no se conocen (y, sin esperar, los que tienen más de un día).
+  var NAMES_AT = {};
+  try { var nm0 = JSON.parse(localStorage.getItem('rg.club.names') || '{}'); S.names = nm0.n || {}; NAMES_AT = nm0.t || {}; } catch (e) {}
+  function saveNames() { try { var ids = Object.keys(S.names).slice(-400), n = {}, t = {}; ids.forEach(function (id) { n[id] = S.names[id]; t[id] = NAMES_AT[id] || 0; }); localStorage.setItem('rg.club.names', JSON.stringify({ n: n, t: t })); } catch (e) {} }
+  function fetchNames(ids) {
+    return sb.from('profiles').select('id,name,bike_brand,bike_model').in('id', ids).then(function (r) { (r.data || []).forEach(function (p) { S.names[p.id] = p; NAMES_AT[p.id] = Date.now(); }); saveNames(); });
+  }
   function names(ids) {
-    var need = ids.filter(function (id, i) { return id && !S.names[id] && ids.indexOf(id) === i; });
-    if (!need.length) return Promise.resolve();
-    return sb.from('profiles').select('id,name,bike_brand,bike_model').in('id', need).then(function (r) { (r.data || []).forEach(function (p) { S.names[p.id] = p; }); });
+    var uniq = ids.filter(function (id, i) { return id && ids.indexOf(id) === i; }), need = uniq.filter(function (id) { return !S.names[id]; });
+    var old = uniq.filter(function (id) { return S.names[id] && Date.now() - (NAMES_AT[id] || 0) > 864e5; });
+    if (old.length) fetchNames(old).catch(function () {});
+    return need.length ? fetchNames(need) : Promise.resolve();
+  }
+  // Lo último que se vio de cada pantalla se guarda en el teléfono: al entrar se enseña al instante y se refresca por detrás.
+  var MEM = {}, FLY = {};
+  function swr(key, fetch, draw, useCache) {
+    var k = 'club:' + S.user.id + ':' + key, shown = null, noop = function () {};
+    var paint = function (d) { var j = JSON.stringify(d); if (j === shown) return; shown = j; draw(d); };
+    // Dos entradas seguidas a la misma pantalla (doble toque) comparten la misma petición.
+    // Tras un cambio (sin memoria) siempre se pide de nuevo.
+    var fl = FLY[k]; if (!useCache || !fl || Date.now() - fl.t > 1500) { fl = FLY[k] = { t: Date.now(), p: fetch() }; fl.p.then(function () { if (FLY[k] === fl) delete FLY[k]; }, function () { if (FLY[k] === fl) delete FLY[k]; }); }
+    var fresh = fl.p.then(function (d) { MEM[k] = d; try { DB.set(k, d).catch(noop); } catch (e) {} return d; });
+    if (!useCache) return fresh.then(paint);
+    fresh.catch(noop);
+    return Promise.resolve(MEM[k] || (window.DB ? DB.get(k, null) : null)).then(function (d) { if (d) paint(d); }, noop).then(function () { return fresh; }).then(paint);
   }
   function who(id) { var p = S.names[id]; return (p && p.name) || 'Motero'; }
   function bike(id) { var p = S.names[id]; return p ? [p.bike_brand, p.bike_model].filter(Boolean).join(' ') : ''; }
@@ -39,10 +60,23 @@
       if (r.error) { S.missing = /relation|schema cache|does not exist|not find/i.test(r.error.message || ''); if (!S.missing) throw r.error; S.list = []; }
       else { S.missing = false; S.list = (r.data || []).filter(function (m) { return m.communities; }).map(function (m) { var c = m.communities; return { id: c.id, name: c.name, description: c.description, code: c.join_code, role: m.role }; }); }
       S.loaded = true; if (!cur()) S.cid = null; else S.cid = cur().id;
+      if (!r.error) { try { localStorage.setItem('rg.club.list:' + S.user.id, JSON.stringify(S.list)); } catch (e) {} }
     });
   }
   function setCid(id) { S.cid = id; try { localStorage.setItem('rg.club', id); } catch (e) {} }
-  function show() { render(); load().then(render, function (e) { S.loaded = true; render(); fail(e); }); }
+  // La lista de comunidades se enseña de memoria y se comprueba por detrás; solo se repinta si ha cambiado.
+  var listAt = 0;
+  function show() {
+    var key = S.user ? 'rg.club.list:' + S.user.id : null, had = S.loaded;
+    if (key && !S.loaded) { try { var c0 = JSON.parse(localStorage.getItem(key) || 'null'); if (c0 && c0.length) { S.list = c0; S.loaded = true; S.missing = false; S.cid = cur() ? cur().id : null; had = true; } } catch (e) {} }
+    render();
+    if (had && Date.now() - listAt < 60000) return;
+    var before = JSON.stringify(S.list);
+    load().then(function () {
+      listAt = Date.now();
+      if (!had || JSON.stringify(S.list) !== before) render();
+    }, function (e) { if (!S.loaded) { S.loaded = true; render(); } fail(e); });
+  }
 
   /* ---------- pantalla ---------- */
   function render() {
@@ -60,7 +94,7 @@
     $('#clOther').addEventListener('click', renderJoin);
     $$('[data-cid]', box).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); render(); }); });
     $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.t; render(); }); });
-    ({ events: paneEvents, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
+    ({ events: paneEvents, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
   }
   function renderJoin() {
     box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Unirme a ' + (S.list.length ? 'otra' : 'una') + ' comunidad</b><p class="muted">Escribe el código que te ha pasado el organizador.</p><div class="plan-link"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="clJoin" type="button">Unirme</button></div></div>' +
@@ -104,19 +138,38 @@
       : sb.from('event_attendees').insert({ event_id: e.id, user_id: S.user.id, status: status, companion: !!companion }).select('status');
     return q.then(function (r) { var d = ok(r); return d && d[0] ? d[0].status : status; });
   }
-  function paneEvents(c) {
+  // Una sola petición para la pestaña: los eventos con sus apuntados y sus administradores. La ruta completa de cada
+  // evento (decenas de KB) no se baja aquí: solo su nombre, sus km y dónde empieza; el resto, al pulsar «Cargar ruta».
+  var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon',
+    EV_ROUTE = ',route_name:route->>name,route_dist:route->dist,route_start:route->coords->0,route_wp0:route->wps->0', EV_EMBED = ',event_attendees(*),event_admins(user_id)';
+  function fetchEvents(c) {
     var since = new Date(Date.now() - 12 * 3600e3).toISOString();
-    return sb.from('events').select('*').eq('community_id', c.id).gte('starts_at', since).order('starts_at').limit(40).then(function (r) {
-      var evs = ok(r), ids = evs.map(function (e) { return e.id; });
-      if (evs.length) S.v6 = ('capacity' in evs[0]);
-      return (ids.length ? sb.from('event_attendees').select('*').in('event_id', ids) : Promise.resolve({ data: [] })).then(function (a) {
-        var att = ok(a);
-        return (ids.length ? sb.from('event_admins').select('event_id,user_id').in('event_id', ids) : Promise.resolve({ data: [] })).then(function (ad) {
-          S.evAdmins = {}; (ad.data || []).forEach(function (x) { (S.evAdmins[x.event_id] = S.evAdmins[x.event_id] || []).push(x.user_id); });
-          return names(att.map(function (x) { return x.user_id; })).then(function () { drawEvents(c, evs, att); });
-        }, function () { S.evAdmins = {}; return names(att.map(function (x) { return x.user_id; })).then(function () { drawEvents(c, evs, att); }); });
+    var q = function (v6) { return sb.from('events').select(EV_COLS + (v6 ? EV_V6 : '') + EV_ROUTE + EV_EMBED).eq('community_id', c.id).gte('starts_at', since).order('starts_at').limit(40); };
+    return q(S.v6 !== false).then(function (r) {
+      if (r.error && S.v6 !== false && /capacity|meet_(url|lat|lon)/i.test(r.error.message || '')) { S.v6 = false; return q(false); }
+      if (!r.error && S.v6 !== false) S.v6 = true;
+      return r;
+    }).then(function (r) {
+      // Si el servidor no acepta la consulta combinada (le falta algún archivo SQL), se hace como antes: todo y por separado.
+      return r.error ? sb.from('events').select('*').eq('community_id', c.id).gte('starts_at', since).order('starts_at').limit(40) : r;
+    }).then(function (r) {
+      var rows = ok(r), ids = rows.map(function (e) { return e.id; }), att = [], adm = {}, embedded = rows.length && rows[0].event_attendees !== undefined;
+      if (rows.length && rows[0].route !== undefined && !('capacity' in rows[0])) S.v6 = false;
+      var evs = rows.map(function (e) {
+        var o = {}, k; for (k in e) if (!/^(event_attendees|event_admins|route_name|route_dist|route_start|route_wp0)$/.test(k)) o[k] = e[k];
+        if (e.route === undefined) o.route = (e.route_name != null || e.route_start) ? { name: e.route_name || '', dist: e.route_dist || 0, coords: e.route_start ? [e.route_start] : [], wps: e.route_wp0 ? [e.route_wp0] : [], lite: true } : null;
+        (e.event_attendees || []).forEach(function (a) { att.push(a); });
+        (e.event_admins || []).forEach(function (a) { (adm[e.id] = adm[e.id] || []).push(a.user_id); });
+        return o;
       });
+      var rest = embedded || !ids.length ? Promise.resolve() : Promise.all([sb.from('event_attendees').select('*').in('event_id', ids), sb.from('event_admins').select('event_id,user_id').in('event_id', ids)]).then(function (x) {
+        att = ok(x[0]); (x[1].data || []).forEach(function (a) { (adm[a.event_id] = adm[a.event_id] || []).push(a.user_id); });
+      });
+      return rest.then(function () { return names(att.map(function (x) { return x.user_id; })); }).then(function () { return { evs: evs, att: att, adm: adm }; });
     });
+  }
+  function paneEvents(c, useCache) {
+    return swr('ev:' + c.id, function () { return fetchEvents(c); }, function (d) { var now = cur(); if (!now || now.id !== c.id) return; S.evAdmins = d.adm || {}; drawEvents(c, d.evs, d.att); }, useCache);
   }
   function drawEvents(c, evs, att) {
     var pane = $('#clPane'); if (!pane || S.tab !== 'events') return;
@@ -224,7 +277,12 @@
     }).catch(fail);
   }
   function loadRoute(e) {
-    var r = e.route; if (!r || !r.coords || r.coords.length < 2) { A.toast('Este evento no tiene ruta.', 'warn'); return; }
+    var r = e.route;
+    if (r && r.lite) {      // en la lista solo viene el resumen: la ruta entera se pide ahora
+      A.toast('Cargando la ruta…', 'ok');
+      return sb.from('events').select('route').eq('id', e.id).single().then(function (q) { e.route = ok(q).route; if (e.route) loadRoute(e); else A.toast('Este evento no tiene ruta.', 'warn'); }).catch(fail);
+    }
+    if (!r || !r.coords || r.coords.length < 2) { A.toast('Este evento no tiene ruta.', 'warn'); return; }
     var p = { id: parseInt(e.id.replace(/-/g, '').slice(0, 12), 16), name: r.name || e.title, wps: r.wps || [], pois: r.pois || [], coords: r.coords, dist: r.dist || 0, dur: r.dur || 0, routed: true, steps: r.steps || [], created: Date.now(), eventId: e.id };
     A.usePlan(p).then(function () { A.toast('Ruta cargada. Pulsa «Iniciar ruta» cuando salgáis.', 'ok'); });
   }
@@ -289,27 +347,28 @@
   }
 
   /* ---------- tablón ---------- */
-  function paneBoard(c) {
-    return sb.from('community_posts').select('id,body,created_at,author_id').eq('community_id', c.id).order('created_at', { ascending: false }).limit(40).then(function (r) {
-      var posts = ok(r); return names(posts.map(function (p) { return p.author_id; })).then(function () {
-        var pane = $('#clPane'); if (!pane || S.tab !== 'board') return;
+  function paneBoard(c, useCache) {
+    return swr('board:' + c.id, function () {
+      return sb.from('community_posts').select('id,body,created_at,author_id').eq('community_id', c.id).order('created_at', { ascending: false }).limit(40).then(function (r) {
+        var posts = ok(r); return names(posts.map(function (p) { return p.author_id; })).then(function () { return posts; }); });
+    }, function (posts) { (function () {
+        var pane = $('#clPane'); if (!pane || S.tab !== 'board' || !cur() || cur().id !== c.id) return;
         pane.innerHTML = (isAdmin() ? '<div class="club-card"><textarea class="note" id="poBody" maxlength="4000" placeholder="Escribe un aviso para la comunidad"></textarea><button class="btn primary" id="poSend" type="button" style="width:100%;margin-top:10px">Publicar aviso</button></div>' : '') +
           (posts.length ? posts.map(function (p) { return '<div class="club-card" data-po="' + p.id + '"><span class="muted">' + esc(who(p.author_id)) + ' · ' + fmtWhen(p.created_at) + '</span><p>' + esc(p.body) + '</p>' + (isAdmin() ? '<button class="link danger" type="button">Borrar</button>' : '') + '</div>'; }).join('') : '<div class="empty">Aún no hay avisos.</div>');
         if ($('#poSend')) $('#poSend').addEventListener('click', function (ev) { var t = $('#poBody').value.trim(); if (!t) return; Cl.busy(ev.currentTarget, function () { return sb.from('community_posts').insert({ community_id: c.id, body: t }).then(function (r) { ok(r); return paneBoard(c); }); }); });
         $$('[data-po] .link', pane).forEach(function (b) { b.addEventListener('click', function () { armed(b, '¿Seguro? Toca otra vez', function () { sb.from('community_posts').delete().eq('id', b.parentNode.dataset.po).then(function (r) { ok(r); return paneBoard(c); }).catch(fail); }); }); });
-      });
-    });
+      })(); }, useCache);
   }
 
   /* ---------- páginas: normas, descuentos, enlaces ---------- */
-  function panePages(c) {
-    return sb.from('community_pages').select('*').eq('community_id', c.id).order('position').order('title').then(function (r) {
-      var pages = ok(r), pane = $('#clPane'); if (!pane || S.tab !== 'pages') return;
+  function panePages(c, useCache) {
+    return swr('pages:' + c.id, function () { return sb.from('community_pages').select('*').eq('community_id', c.id).order('position').order('title').then(ok); }, function (pages) {
+      var pane = $('#clPane'); if (!pane || S.tab !== 'pages' || !cur() || cur().id !== c.id) return;
       pane.innerHTML = (isAdmin() ? '<button class="btn primary club-add" id="pgNew" type="button">+ Nueva página</button>' : '') +
         (pages.length ? pages.map(function (p) { return '<button class="club-card club-page" type="button" data-pg="' + p.id + '"><b>' + esc(p.title) + '</b><span class="muted">' + esc((p.body || '').slice(0, 90)) + ((p.links || []).length ? ' · ' + p.links.length + (p.links.length === 1 ? ' enlace' : ' enlaces') : '') + '</span></button>'; }).join('') : '<div class="empty">Aquí irán las normas, los descuentos y los enlaces de la comunidad.</div>');
       if ($('#pgNew')) $('#pgNew').addEventListener('click', function () { pageForm(c, null); });
       $$('[data-pg]', pane).forEach(function (b) { b.addEventListener('click', function () { pageView(c, pages.filter(function (p) { return p.id === b.dataset.pg; })[0]); }); });
-    });
+    }, useCache);
   }
   function pageView(c, p) {
     Cl.sheet('<div class="head"><h1>' + esc(p.title) + '</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div>' + (p.body ? '<p class="club-body">' + esc(p.body) + '</p>' : '') +
@@ -339,10 +398,12 @@
   }
 
   /* ---------- miembros ---------- */
-  function paneMembers(c) {
-    return sb.from('community_members').select('user_id,role,joined_at').eq('community_id', c.id).order('joined_at').then(function (r) {
-      var ms = ok(r); return names(ms.map(function (m) { return m.user_id; })).then(function () {
-        var pane = $('#clPane'); if (!pane || S.tab !== 'members') return;
+  function paneMembers(c, useCache) {
+    return swr('members:' + c.id, function () {
+      return sb.from('community_members').select('user_id,role,joined_at').eq('community_id', c.id).order('joined_at').then(function (r) {
+        var ms = ok(r); return names(ms.map(function (m) { return m.user_id; })).then(function () { return ms; }); });
+    }, function (ms) { (function () {
+        var pane = $('#clPane'); if (!pane || S.tab !== 'members' || !cur() || cur().id !== c.id) return;
         pane.innerHTML = '<span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span>' + ms.map(function (m) {
           var me = m.user_id === S.user.id;
           return '<div class="club-person" data-u="' + m.user_id + '"><span class="rg-ava">' + esc(who(m.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok">Admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
@@ -355,19 +416,22 @@
         }); });
         $('#clLeave').addEventListener('click', function (ev) {
           if (isAdmin() && ms.filter(function (x) { return x.role === 'admin'; }).length === 1 && ms.length > 1) { A.toast('Eres el único administrador: nombra a otro antes de salir.', 'warn'); return; }
-          armed(ev.currentTarget, '¿Seguro? Toca otra vez para salir', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; return load().then(render); }).catch(fail); });
+          armed(ev.currentTarget, '¿Seguro? Toca otra vez para salir', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; listAt = 0; return load().then(render); }).catch(fail); });
         });
-      });
-    });
+      })(); }, useCache);
   }
 
   /* ---------- mis eventos: recordatorios y plazas ofrecidas ----------
      event_inbox() devuelve mis eventos próximos (apuntado, en espera o con plaza ofrecida). Con eso:
      - se programan en el móvil dos recordatorios por evento (un día antes y una hora antes), con el botón «No puedo ir»;
        son notificaciones del propio teléfono, así que saltan aunque la app esté cerrada;
+     - en Android los pone el plugin propio (RideAlerts → EventNotices.java): sus botones contestan al servidor por
+       detrás, SIN abrir la app, con la clave de cada evento (supabase/07). Sin esa clave, o fuera de Android, se usan
+       las notificaciones normales de Capacitor, cuyos botones sí abren la app;
      - si me han ofrecido una plaza, se me pregunta si voy (en pantalla, o con una notificación si la app está en segundo plano).
      Lo que NO puede hacer sin notificaciones push: avisar de una plaza ofrecida con la app cerrada. */
   var LN = P.LocalNotifications || null, IN = { events: [], at: 0, busy: false, pending: [] };
+  var RA = native && P.RideAlerts && P.RideAlerts.eventSync ? P.RideAlerts : null, raReady = false;
   function jget(k) { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } }
   function jset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function nid(evId, k) { return (parseInt(String(evId).replace(/-/g, '').slice(0, 7), 16) || 1) * 4 + k; }   // cabe en un entero de 32 bits
@@ -385,23 +449,40 @@
   }
   // Deja programados exactamente los recordatorios que tocan: quita los de eventos que ya no voy o que han cambiado de hora.
   function remind() {
-    if (!LN) return;
+    if (!LN && !RA) return;
     var want = {}, now = Date.now(), had = jget('rg.remind'), drop = [], add = [];
+    var going = IN.events.filter(function (e) { return e.status === 'going'; });
+    // Android con la clave de cada evento: recordatorios del plugin propio, cuyos botones no abren la app.
+    var nativeMode = !!RA && going.every(function (e) { return !!e.key; }), mode = nativeMode ? 'native' : 'ln';
+    if (jget('rg.remind.mode').m !== mode) {      // cambio de sistema: se quita lo programado con el otro
+      var old = Object.keys(had).map(function (id) { return { id: +id }; });
+      if (LN && old.length) { try { LN.cancel({ notifications: old }).catch(function () {}); } catch (x) {} }
+      if (RA && mode === 'ln') { try { RA.eventSync({ items: [] }).catch(function () {}); } catch (x) {} }
+      had = {}; jset('rg.remind', {}); jset('rg.remind.mode', { m: mode });
+    }
+    if (nativeMode && !raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
     IN.events.forEach(function (e) {
       if (e.status !== 'going') return;
       var key = e.starts_at + '|' + e.title + '|' + (e.meet_name || '');
       [[24 * 3600e3, 0, 'Mañana: ' + e.title, fmtWhen(e.starts_at) + (e.meet_name ? ' · Salida: ' + e.meet_name : '') + '. Si no puedes ir, desapúntate y tu plaza pasa a otro.'],
        [3600e3, 1, 'En 1 hora: ' + e.title, 'Sales a las ' + hhmm(e.starts_at) + (e.meet_name ? ' desde ' + e.meet_name : '') + '. ¿No llegas? Desapúntate.']].forEach(function (x) {
         var at = e.starts_at - x[0]; if (at < now + 30000) return;
-        want[nid(e.id, x[1])] = { key: key, n: { id: nid(e.id, x[1]), title: x[2], body: x[3], schedule: { at: new Date(at), allowWhileIdle: true }, actionTypeId: 'RG_EVENT', extra: { eventId: e.id, title: e.title, kind: 'remind' } } };
+        want[nid(e.id, x[1])] = { key: key, n: { id: nid(e.id, x[1]), title: x[2], body: x[3], schedule: { at: new Date(at), allowWhileIdle: true }, actionTypeId: 'RG_EVENT', extra: { eventId: e.id, title: e.title, kind: 'remind' } },
+          nat: { id: nid(e.id, x[1]), at: at, title: x[2], body: x[3], kind: 'remind', key: e.key, eventId: e.id, eventTitle: e.title } };
       });
     });
+    if (nativeMode) {      // se manda siempre la lista entera: el teléfono quita lo que sobra y repone lo que falte
+      var items = Object.keys(want).map(function (id) { return want[id].nat; }), nx = {}; Object.keys(want).forEach(function (id) { nx[id] = want[id].key; });
+      try { RA.eventSync({ items: items }).then(function () { jset('rg.remind', nx); }, function () {}); } catch (x) {}
+      return;
+    }
+    if (!LN) return;
     Object.keys(had).forEach(function (id) { if (!want[id] || want[id].key !== had[id]) drop.push({ id: +id }); });
     Object.keys(want).forEach(function (id) { if (had[id] !== want[id].key) add.push(want[id].n); });
     var next = {}; Object.keys(want).forEach(function (id) { next[id] = want[id].key; });
     Promise.resolve(drop.length ? LN.cancel({ notifications: drop }) : null).catch(function () {}).then(function () { return add.length ? LN.schedule({ notifications: add }) : null; }).then(function () { jset('rg.remind', next); }, function () {});
   }
-  function forgetReminders() { var had = jget('rg.remind'), ids = Object.keys(had).map(function (id) { return { id: +id }; }); if (LN && ids.length) { try { LN.cancel({ notifications: ids }).catch(function () {}); } catch (e) {} } jset('rg.remind', {}); }
+  function forgetReminders() { var had = jget('rg.remind'), ids = Object.keys(had).map(function (id) { return { id: +id }; }); if (LN && ids.length) { try { LN.cancel({ notifications: ids }).catch(function () {}); } catch (e) {} } if (RA) { try { RA.eventClear().catch(function () {}); } catch (e) {} } jset('rg.remind', {}); }
   // Plaza ofrecida: una vez por oferta. En pantalla, pregunta; en segundo plano, notificación con «Sí, voy» / «No puedo».
   function offers() {
     var seen = jget('rg.offers'), now = Date.now(), ch = false;
@@ -412,6 +493,10 @@
       if (document.visibilityState === 'visible') {
         if (sn.asked || A.isRec() || !$('#rgSheet').hidden) return;
         sn.asked = 1; ch = true; offerSheet(e);
+      } else if (RA && e.key && !sn.notified) {
+        sn.notified = 1; ch = true;
+        if (!raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
+        try { RA.eventShow({ item: { id: nid(e.id, 2), at: 0, title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y eres el siguiente. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', kind: 'offer', key: e.key, eventId: e.id, eventTitle: e.title } }).catch(function () {}); } catch (x) {}
       } else if (LN && !sn.notified) {
         sn.notified = 1; ch = true;
         try { LN.schedule({ notifications: [{ id: nid(e.id, 2), title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y eres el siguiente. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', actionTypeId: 'RG_OFFER', extra: { eventId: e.id, title: e.title, kind: 'offer' } }] }).catch(function () {}); } catch (x) {}
@@ -459,12 +544,23 @@
       });
     } catch (e) {}
   }
+  if (RA) {
+    try {
+      // Un botón pulsado en el aviso ya ha contestado al servidor: aquí solo se pone la pantalla al día.
+      RA.addListener('eventAction', function (x) { if (x && x.ok) { refresh(); inbox(true); } else nativePending(); });
+    } catch (e) {}
+  }
+  // Respuestas que el teléfono no pudo enviar (sin conexión): se envían al abrir la app.
+  function nativePending() {
+    if (!RA || !RA.eventPending) return;
+    try { RA.eventPending().then(function (r) { ((r && r.list) || []).forEach(function (p) { IN.pending.push({ act: p.act, ev: p.eventId, title: p.title }); }); drain(); }, function () {}); } catch (e) {}
+  }
   setInterval(function () { inbox(false); }, 60000);
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(function () { inbox(false); }, 1500); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(function () { nativePending(); inbox(true); refresh(); }, 1200); });
 
   Cl.onChange(function (u) {
     var changed = (S.user && S.user.id) !== (u && u.id); S.user = u;
-    if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) forgetReminders(); else setTimeout(function () { inbox(true); }, 2000); if (!$('#view-club').hidden) show(); }
+    if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) forgetReminders(); else setTimeout(function () { nativePending(); inbox(true); }, 2000); if (!$('#view-club').hidden) show(); }
   });
   window.RGClub = { show: show, inbox: inbox, state: S, mine: function () { return IN.events.slice(); } };
 })();

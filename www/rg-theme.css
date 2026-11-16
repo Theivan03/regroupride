@@ -394,3 +394,11 @@ body.rg-rec #followCard{display:none}
 .rg-advice span{font-size:13.500px;line-height:1.4}
 .rg-advice .btn{align-self:flex-start}
 #rgSyncBox .perm b{font-size:15px}
+
+/* desplegables (curvas de una ruta) */
+.fold{background:var(--color-surface);border-radius:18px;margin:10px 0}
+.fold>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:56px;padding:0 16px;font-family:var(--font-display);font-weight:650;font-size:17px;cursor:pointer}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary svg{width:22px;height:22px;flex:none;color:var(--color-text-2);transform:rotate(90deg);transition:transform .15s}
+.fold[open]>summary svg{transform:rotate(-90deg)}
+.fold .tablewrap{margin:0;padding:0 10px 10px}

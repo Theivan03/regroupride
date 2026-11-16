@@ -4,6 +4,15 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
+## Qué hay en la versión 0.11
+
+Necesita ejecutar **`supabase/07_avisos_y_garaje.sql`** (después del 06). Sin él, los avisos y la copia de rutas siguen como en la 0.10.
+
+- **Los botones de los avisos ya no abren la app** (Android). Los recordatorios de evento y el aviso de plaza libre los pone ahora el plugin propio (`EventNotices.java`, `EventNoticeReceiver.java`): al pulsar «No puedo ir», «Sí, voy» o «No puedo», el teléfono contesta al servidor por detrás y el aviso cambia a «Te has desapuntado…». Funciona sin sesión gracias a una clave secreta por evento y persona (`event_keys`, `event_action`). Si no hay conexión, la respuesta se guarda y la app la envía al abrirse. Los recordatorios se reponen al reiniciar el teléfono.
+- **Comunidad más rápida.** La pestaña de eventos hacía 4 peticiones seguidas y bajaba la ruta entera de cada evento (decenas de KB por evento). Ahora es **una** petición, sin las rutas (solo nombre, km y dónde empieza; la ruta completa se pide al pulsar «Cargar ruta»). Además cada pantalla de Comunidad se enseña al instante con lo último que se vio y se refresca por detrás; los nombres de la gente se recuerdan.
+- **Copia siempre automática.** Cualquier cambio (guardar, editar la nota, renombrar, borrar) dispara la copia solo; si falla, se reintenta sola (30 s, 1 min, 2 min… hasta 15 min), y también al recuperar la conexión, al salir de la app y cada 10 min con la app abierta. Ya no hay botón «Sincronizar ahora» (solo «Reintentar» si hay un fallo). **El garaje** (vehículos y mantenimiento) entra en la copia (`user_backup`). Siguen sin copiarse las fotos de las rutas.
+- **Curvas en desplegable** en el detalle de una ruta: se ve «12 curvas · máxima 26°» y la tabla solo al abrirlo.
+
 ## Qué hay en la versión 0.10
 
 Necesita ejecutar **`supabase/06_plazas_y_salida.sql`** en Supabase (después de los anteriores). Sin él la app funciona como la 0.9.

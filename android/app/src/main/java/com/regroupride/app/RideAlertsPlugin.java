@@ -24,6 +24,7 @@ import android.widget.RemoteViews;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -463,6 +464,52 @@ public class RideAlertsPlugin extends Plugin {
     }
 
     /** Se ha pulsado un botón de un aviso (también con el teléfono bloqueado). */
+    /* ---------- avisos de eventos con botones que no abren la app (ver EventNotices) ---------- */
+
+    @PluginMethod
+    public void eventConfig(PluginCall call) {
+        EventNotices.configure(getContext(), call.getString("url", ""), call.getString("apikey", ""));
+        call.resolve();
+    }
+
+    /** Recordatorios que tienen que quedar programados; los demás se quitan. */
+    @PluginMethod
+    public void eventSync(PluginCall call) {
+        JSArray items = call.getArray("items");
+        EventNotices.sync(getContext(), items == null ? new JSArray() : items);
+        call.resolve();
+    }
+
+    /** Un aviso suelto, ahora o a su hora (plaza ofrecida). */
+    @PluginMethod
+    public void eventShow(PluginCall call) {
+        JSObject item = call.getObject("item");
+        if (item != null) EventNotices.put(getContext(), item);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void eventClear(PluginCall call) {
+        EventNotices.clear(getContext());
+        call.resolve();
+    }
+
+    /** Respuestas pulsadas en un aviso que no llegaron al servidor: la app las envía. */
+    @PluginMethod
+    public void eventPending(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("list", EventNotices.takePending(getContext()));
+        call.resolve(r);
+    }
+
+    static void eventDone(org.json.JSONObject o) {
+        RideAlertsPlugin p = instance;
+        if (p == null) return;
+        try {
+            p.notifyListeners("eventAction", JSObject.fromJSONObject(o), true);
+        } catch (Exception ignored) { }
+    }
+
     static void onAction(Context c, String kind) {
         if ("ack".equals(kind)) {
             stopSound(c);

@@ -22,6 +22,13 @@
 
         <!-- Botones de los avisos del grupo (SOS, avería, gasolina), también con el teléfono bloqueado. -->
         <receiver android:name=".RideAlertsReceiver" android:exported="false" />
+        <!-- Recordatorios de eventos y plazas libres: sus botones actúan sin abrir la app. Se reponen al reiniciar el teléfono. -->
+        <receiver android:name=".EventNoticeReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -38,6 +45,8 @@
     <!-- Aviso de «fuera de ruta»: vibración y notificación. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Recordatorios de eventos: volver a programarlos al encender el teléfono. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Cámara: solo para leer el QR de un grupo. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Alarma de SOS o avería de alguien del grupo: se abre por encima de la pantalla de bloqueo, como una llamada. -->

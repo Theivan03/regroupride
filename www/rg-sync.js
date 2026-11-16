@@ -3,6 +3,8 @@
    (o tras reinstalar), se recuperan al iniciar sesión.
      · Planificadas → tabla routes (privadas, salvo las que se publiquen).
      · Grabadas → tabla rides (la ficha: km, tiempos, inclinaciones, curvas…) + su trazado comprimido en el almacén «rides».
+     · Garaje (vehículos y mantenimiento) → una ficha por cuenta en user_backup (supabase/07).
+   Es automática: cada cambio (guardar, editar, borrar) dispara la copia sola, y si falla se reintenta. No hay nada que pulsar.
    Es una unión: lo que hay en el móvil sube, lo que solo está en la cuenta baja. Lo que se borra en el móvil se borra
    de la cuenta. Nunca se borra nada del móvil por su cuenta. */
 (function () {
@@ -10,7 +12,9 @@
   var A = window.RGApp, Cl = window.RGCloud, DB = window.DB;
   if (!A || !Cl || !Cl.sb || !DB) return;
   var sb = Cl.sb, $ = function (s) { return document.querySelector(s); }, esc = Cl.esc;
-  var S = { busy: false, at: 0, timer: null, step: '' };
+  var S = { busy: false, at: 0, timer: null, step: '', again: false, fail: 0, noGarage: false };
+  // Las escrituras de la propia copia usan estas; las de DB.* (de la app) avisan de que hay algo nuevo que copiar.
+  var rawPutRide = DB.putRide, rawPutVehicle = DB.putVehicle, rawDelVehicle = DB.deleteVehicle;
   var LOCAL_ONLY = { cloudHash: 1, cloudTrack: 1, inProgress: 1 };
 
   function ls(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
@@ -107,7 +111,7 @@
           });
           return up.then(function (path) {
             return sb.from('rides').upsert({ owner_id: me, local_id: r.id, started_at: r.start ? new Date(r.start).toISOString() : null, km: Math.round((r.dist || 0) * 100) / 100, meta: meta, track: path || null }, { onConflict: 'owner_id,local_id' }).then(function (q) {
-              must(q); r.cloudHash = h; r.cloudTrack = path || ''; return DB.putRide(r);
+              must(q); r.cloudHash = h; r.cloudTrack = path || ''; return rawPutRide(r);
             });
           });
         });
@@ -124,7 +128,7 @@
             return pts.then(function (points) {
               r.hasTrack = !!(points && points.length > 1); r.cloudHash = hash(clean(r)); r.cloudTrack = x.track || ''; delete r.inProgress;
               counted[r.id] = 1;      // sus medias ya se sumaron en su día: no se cuentan otra vez
-              return DB.putRide(r).then(function () { if (r.hasTrack) return DB.putTrack(r.id, points); });
+              return rawPutRide(r).then(function () { if (r.hasTrack) return DB.putTrack(r.id, points); });
             });
           });
         });
@@ -132,6 +136,35 @@
       return chain.then(function () { lset('rg.statsSent', counted); if (got) return A.reloadRides(); }).then(function () { return { up: sent, down: got, total: n + got }; });
     });
   }
+
+  /* ---- garaje: vehículos con su mantenimiento ----
+     Por vehículo gana el cambio más reciente (mod). Un vehículo borrado deja una marca con su fecha; si alguien lo
+     había cambiado después en otro móvil, se conserva. Sin la tabla (falta el 07) no se hace nada y no es un error. */
+  function byId(a) { return a.slice().sort(function (x, y) { return x.id - y.id; }); }
+  function syncGarage() {
+    var me = uid(); if (S.noGarage) return Promise.resolve(null);
+    return Promise.all([sb.from('user_backup').select('garage').eq('owner_id', me).maybeSingle(), DB.allVehicles()]).then(function (res) {
+      if (res[0].error) { if (/user_backup|schema cache|does not exist|not find/i.test(res[0].error.message || '')) { S.noGarage = true; return null; } throw res[0].error; }
+      var cloud = (res[0].data && res[0].data.garage) || {}, cv = cloud.vehicles || [], cdel = cloud.deleted || {}, local = res[1] || [], ldel = ls('rg.sync.vdel', {});
+      var del = {}, k, now = Date.now(), map = {}, merged = [], jobs = [], touched = false;
+      for (k in cdel) if (now - cdel[k] < 180 * 864e5) del[k] = cdel[k];
+      for (k in ldel) if (!(del[k] >= ldel[k])) del[k] = ldel[k];
+      cv.forEach(function (v) { map[v.id] = { c: v }; }); local.forEach(function (v) { (map[v.id] = map[v.id] || {}).l = v; });
+      Object.keys(map).forEach(function (id) {
+        var l = map[id].l, c = map[id].c, lm = l ? (l.mod || 0) : -1, cm = c ? (c.mod || 0) : -1, best = lm >= cm ? l : c;
+        if (del[id] && del[id] >= Math.max(lm, cm)) { if (l) { jobs.push(rawDelVehicle(l.id)); touched = true; } return; }
+        merged.push(best);
+        if (best !== l) { jobs.push(rawPutVehicle(best)); touched = true; }
+      });
+      var same = JSON.stringify(byId(cv)) === JSON.stringify(byId(merged)) && JSON.stringify(cdel) === JSON.stringify(del);
+      return Promise.all(jobs).then(function () {
+        if (!same) return sb.from('user_backup').upsert({ owner_id: me, garage: { vehicles: merged, deleted: del }, updated_at: new Date().toISOString() }, { onConflict: 'owner_id' }).then(must);
+      }).then(function () { lset('rg.sync.vdel', {}); if (touched && A.reloadVehicles) return A.reloadVehicles(); }).then(function () { return merged.length; });
+    });
+  }
+  DB.putRide = function (r) { var p = rawPutRide(r); if (r && !r.inProgress && !r.demo) soon(6000); return p; };
+  DB.putVehicle = function (v) { if (v) v.mod = Date.now(); soon(5000); return rawPutVehicle(v); };
+  DB.deleteVehicle = function (id) { var d = ls('rg.sync.vdel', {}); d[id] = Date.now(); lset('rg.sync.vdel', d); soon(3000); return rawDelVehicle(id); };
 
   /* ---- lo borrado en el móvil se borra de la cuenta ---- */
   function flushDeleted() {
@@ -159,18 +192,29 @@
   }
   function sync(manual) {
     var me = uid();
-    if (!me || S.busy) return Promise.resolve();
+    if (!me) return Promise.resolve();
+    if (S.busy) { S.again = true; return Promise.resolve(); }                    // ha cambiado algo a mitad de copia: otra pasada al acabar
     var st = state();
     if (st.owner && st.owner !== me) { paint(); return Promise.resolve(); }      // las rutas de este móvil son de otra cuenta: se pregunta antes
-    if (A.isRec() && !manual) return Promise.resolve();                         // en ruta no se gasta batería ni datos en esto
-    if (navigator.onLine === false) { st.err = 'Sin conexión: se copiará cuando vuelva.'; lset('rg.sync', st); paint(); return Promise.resolve(); }
-    S.busy = true; S.step = 'Sincronizando…'; paint();
-    var t;
+    if (A.isRec() && !manual) { S.again = false; soon(60000); return Promise.resolve(); }   // en ruta no se gasta batería ni datos: se deja para después
+    if (navigator.onLine === false) { st.err = 'Sin conexión: se copiará sola en cuanto vuelva.'; lset('rg.sync', st); paint(); return Promise.resolve(); }
+    S.busy = true; S.again = false; S.step = 'Copiando…'; paint();
+    var t, missing = false;
     return flushDeleted().then(function () { t = tombs(); return syncPlans(t); }).then(function (p) {
-      return syncRides(t).then(function (r) { lset('rg.sync', { owner: me, at: Date.now(), plans: p.total, rides: r.total, err: '' }); if (manual) A.toast('Copia al día: ' + r.total + ' grabadas y ' + p.total + ' planificadas en tu cuenta.', 'ok'); });
+      return syncRides(t).then(function (r) {
+        return syncGarage().then(function (g) {
+          lset('rg.sync', { owner: me, at: Date.now(), plans: p.total, rides: r.total, vehicles: g, err: '' }); S.fail = 0;
+          if (manual) A.toast('Copia al día: ' + r.total + ' grabadas y ' + p.total + ' planificadas en tu cuenta.', 'ok');
+        });
+      });
     }).catch(function (e) {
-      var s2 = state(); s2.owner = s2.owner || me; s2.err = friendly(e); lset('rg.sync', s2); if (manual) A.toast(s2.err, 'bad');
-    }).then(function () { S.busy = false; S.step = ''; S.at = Date.now(); paint(); });
+      var s2 = state(); s2.owner = s2.owner || me; s2.err = friendly(e); lset('rg.sync', s2); S.fail++; missing = /no está activada/.test(s2.err);
+      if (manual) A.toast(s2.err, 'bad');
+    }).then(function () {
+      S.busy = false; S.step = ''; S.at = Date.now(); paint();
+      if (S.fail) soon(missing ? 15 * 60000 : Math.min(15 * 60000, 30000 * Math.pow(2, S.fail - 1)));   // reintento solo: 30 s, 1 min, 2 min… hasta 15 min
+      else if (S.again) soon(3000);
+    });
   }
   function soon(ms) { clearTimeout(S.timer); S.timer = setTimeout(function () { sync(false); }, ms || 4000); }
 
@@ -188,15 +232,16 @@
       });
       return;
     }
-    var line = S.busy ? esc(S.step || 'Sincronizando…') : (st.err ? esc(st.err) : (st.at ? (st.rides || 0) + (st.rides === 1 ? ' ruta grabada' : ' rutas grabadas') + ' y ' + (st.plans || 0) + (st.plans === 1 ? ' planificada' : ' planificadas') + ' a salvo en tu cuenta · ' + ago(st.at) : 'Aún no se ha hecho la primera copia.'));
-    box.innerHTML = '<span class="label">Copia en tu cuenta</span><div class="perm"><div><b>Tus rutas, también fuera del teléfono</b><span class="muted">' + line + '</span></div><span class="mstatus ' + (S.busy ? 'soon">Copiando' : (st.err ? 'due">Pendiente' : (st.at ? 'ok">Al día' : 'soon">Pendiente'))) + '</span></div>' +
-      '<div class="rg-row"><button class="btn small" id="syNow" type="button"' + (S.busy ? ' disabled' : '') + '>Sincronizar ahora</button></div>';
-    $('#syNow').addEventListener('click', function () { sync(true); });
+    var veh = st.vehicles != null ? ', ' + st.vehicles + (st.vehicles === 1 ? ' vehículo' : ' vehículos') : '';
+    var line = S.busy ? esc(S.step || 'Copiando…') : (st.err ? esc(st.err) : (st.at ? (st.rides || 0) + (st.rides === 1 ? ' ruta grabada' : ' rutas grabadas') + ', ' + (st.plans || 0) + (st.plans === 1 ? ' planificada' : ' planificadas') + veh + ' a salvo en tu cuenta · ' + ago(st.at) : 'La primera copia se hace sola en unos segundos.'));
+    box.innerHTML = '<span class="label">Copia en tu cuenta</span><div class="perm"><div><b>Tus rutas y tu garaje, también fuera del teléfono</b><span class="muted">' + line + '</span></div><span class="mstatus ' + (S.busy ? 'soon">Copiando' : (st.err ? 'due">Pendiente' : (st.at ? 'ok">Al día' : 'soon">Pendiente'))) + '</span></div>' +
+      (st.err && !S.busy ? '<div class="rg-row"><button class="btn small" id="syNow" type="button">Reintentar ahora</button></div>' : '<p class="muted rg-small" style="text-align:left;margin:8px 0 0">Es automática: se copia sola cada vez que guardas, cambias o borras algo. No hay que pulsar nada.</p>');
+    if ($('#syNow')) $('#syNow').addEventListener('click', function () { sync(true); });
   }
   // Otra persona inicia sesión en este móvil y quiere quedarse también con las rutas que hay en él.
   function adopt() {
     return DB.allRides().then(function (all) {
-      return Promise.all(all.filter(function (r) { return r.cloudHash || r.cloudTrack; }).map(function (r) { delete r.cloudHash; delete r.cloudTrack; return DB.putRide(r); }));
+      return Promise.all(all.filter(function (r) { return r.cloudHash || r.cloudTrack; }).map(function (r) { delete r.cloudHash; delete r.cloudTrack; return rawPutRide(r); }));
     }).then(function () {
       var ps = A.plans(); ps.forEach(function (p) { delete p.cloudId; p.pub = false; });
       lset('rg.sync', { owner: uid() }); lset('rg.sync.del', {});
@@ -204,9 +249,15 @@
     });
   }
 
-  // Cuándo: al entrar, al guardar una ruta, al volver a la app (como mucho cada 5 min) y con el botón.
+  // Cuándo: al entrar, con cada cambio (guardar, editar, borrar), al volver a la app, al recuperar la conexión,
+  // cada 10 minutos con la app abierta y, si algo falla, reintentando sola.
   Cl.onChange(function (u) { paint(); if (u) soon(6000); });
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && uid() && Date.now() - S.at > 5 * 60000) soon(3000); });
+  document.addEventListener('visibilitychange', function () {
+    if (!uid()) return;
+    if (document.visibilityState === 'visible') { if (Date.now() - S.at > 60000) soon(2500); }
+    else if (!A.isRec()) sync(false);                                            // al salir de la app: lo que quede pendiente, ahora
+  });
+  setInterval(function () { if (uid() && document.visibilityState === 'visible' && Date.now() - S.at > 9 * 60000) sync(false); }, 60000);
   window.addEventListener('online', function () { if (uid()) soon(2000); });
   var tab = document.querySelector('.tab[data-view="settings"]'); if (tab) tab.addEventListener('click', paint);
   paint(); if (uid()) soon(6000);
