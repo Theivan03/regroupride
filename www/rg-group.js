@@ -95,7 +95,7 @@
     G.wasRec = rec;
     if (G.s && !G.timer) G.timer = setInterval(tick, 5000);
     if (!G.s && G.timer) { clearInterval(G.timer); G.timer = null; }
-    var ab = $('#btnAlert'); if (ab) { ab.hidden = !G.s; ab.classList.toggle('on', !!(G.s && G.s.myAlert)); }
+    var ab = $('#btnAlert'); if (ab) { ab.hidden = !G.s; ab.classList.toggle('on', !!(G.s && G.s.myAlert)); var abt = ab.querySelector('span'); if (abt) abt.textContent = (G.s && G.s.myAlert) ? 'Aviso enviado' : 'Avisar'; }
     if (!G.s && G.alarm) dismiss(false);
     badge(); banner();
   }
@@ -309,7 +309,7 @@
       var mk = G.markers[r.user_id];
       if (!mk) { var el = document.createElement('div'); el.className = 'rider-marker'; el.addEventListener('click', function (e) { e.stopPropagation(); open(); }); mk = G.markers[r.user_id] = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([r.lon, r.lat]).addTo(m); }
       mk.setLngLat([r.lon, r.lat]);
-      var e2 = mk.getElement(), al = alertOf(r.user_id); e2.classList.toggle('alert', !!al); e2.classList.toggle('stale', r.stale); e2.classList.toggle('off', !r.stale && r.off); e2.classList.toggle('behind', !r.stale && !r.off && r.behind); e2.textContent = (r.name || '?').charAt(0).toUpperCase(); e2.title = r.name;
+      var e2 = mk.getElement(), al = alertOf(r.user_id); var rw = row(r.user_id); e2.classList.toggle('admin', !!(rw && (rw.admin || rw.owner))); e2.classList.toggle('alert', !!al); e2.classList.toggle('stale', r.stale); e2.classList.toggle('off', !r.stale && r.off); e2.classList.toggle('behind', !r.stale && !r.off && r.behind); e2.textContent = (r.name || '?').charAt(0).toUpperCase(); e2.title = r.name;
     });
     Object.keys(G.markers).forEach(function (id) { if (!seen[id]) { G.markers[id].remove(); delete G.markers[id]; } });
   }

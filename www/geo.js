@@ -156,10 +156,10 @@ var Geo = (function () {
     return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=' + a[1].toFixed(5) + ',' + a[2].toFixed(5) + '&destination=' + b[1].toFixed(5) + ',' + b[2].toFixed(5) + (wps.length ? '&waypoints=' + wps.join('|') : '');
   }
   /* Color por inclinación (0-50°) y por velocidad (0-140 km/h) para el trazado. */
+  // Con signo: a la izquierda (negativo) tira a azul, a la derecha a naranja; recta, gris. Mismo código que el resto de la app.
   function leanColor(deg) {
-    var a = Math.min(1, Math.abs(deg || 0) / 50);
-    var stops = [[0, [120, 118, 110]], [0.35, [255, 174, 26]], [0.7, [230, 70, 40]], [1, [180, 20, 90]]];
-    return ramp(a, stops);
+    var d = deg || 0, a = Math.min(1, Math.abs(d) / 45), N = [132, 140, 150];
+    return d < 0 ? ramp(a, [[0, N], [0.1, N], [0.4, [59, 130, 246]], [1, [21, 82, 184]]]) : ramp(a, [[0, N], [0.1, N], [0.4, [249, 115, 22]], [1, [154, 50, 9]]]);
   }
   function speedColor(kmh) {
     var a = Math.min(1, Math.max(0, (kmh || 0) / 140));
@@ -178,7 +178,7 @@ var Geo = (function () {
     for (var i = 1; i < s.length; i++) {
       var a = s[i - 1], b = s[i];
       if (dist(a[1], a[2], b[1], b[2]) > 2000) continue;
-      var val = mode === 'lean' ? Math.max(Math.abs(a[6] || 0), Math.abs(b[6] || 0)) : ((a[4] || 0) + (b[4] || 0)) / 2 * 3.6;
+      var val = mode === 'lean' ? (Math.abs(a[6] || 0) >= Math.abs(b[6] || 0) ? (a[6] || 0) : (b[6] || 0)) : ((a[4] || 0) + (b[4] || 0)) / 2 * 3.6;
       feats.push({ type: 'Feature', properties: { color: mode === 'lean' ? leanColor(val) : speedColor(val) }, geometry: { type: 'LineString', coordinates: [[a[2], a[1]], [b[2], b[1]]] } });
     }
     return { type: 'FeatureCollection', features: feats };

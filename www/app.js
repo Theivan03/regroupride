@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.11.0';
+  var APP_VERSION = '0.12.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -209,7 +209,7 @@
       map.on('dragstart', function () { setFollow(false); });
       map.on('error', function () {});
       var pe = document.createElement('div'); pe.className = 'pos-marker';
-      pe.innerHTML = '<svg viewBox="0 0 34 34"><circle cx="17" cy="17" r="15" fill="rgba(29,95,204,.25)"/><path d="M17 5l8 20-8-5-8 5z" fill="#1D5FCC" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/></svg>';
+      pe.innerHTML = '<svg viewBox="0 0 34 34"><circle class="halo" cx="17" cy="17" r="15"/><path class="arrow" d="M17 5l8 20-8-5-8 5z" stroke-width="2.2" stroke-linejoin="round"/></svg>';
       posMarker = new maplibregl.Marker({ element: pe, rotationAlignment: 'map' });
     });
   }
@@ -251,12 +251,13 @@
     }
     if (!m.getSource('plan')) {
       m.addSource('plan', { type: 'geojson', data: EMPTY_FC });
-      m.addLayer({ id: 'plan-casing', type: 'line', source: 'plan', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.6 } }, 'live-track-casing');
-      m.addLayer({ id: 'plan-line', type: 'line', source: 'plan', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#2F7CF6', 'line-width': 5 } }, 'live-track-casing');
+      var ink = isDark() ? '#E8EDF2' : '#0E141B', fillet = isDark() ? '#0B0F14' : '#FFFFFF';
+      m.addLayer({ id: 'plan-casing', type: 'line', source: 'plan', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': fillet, 'line-width': 10, 'line-opacity': 0.92 } }, 'live-track-casing');
+      m.addLayer({ id: 'plan-line', type: 'line', source: 'plan', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': ink, 'line-width': 5 } }, 'live-track-casing');
     }
     if (!m.getSource('rejoin')) {
       m.addSource('rejoin', { type: 'geojson', data: EMPTY_FC });
-      m.addLayer({ id: 'rejoin-line', type: 'line', source: 'rejoin', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#FF7A45', 'line-width': 5, 'line-dasharray': [1.4, 1.2] } }, 'live-track-casing');
+      m.addLayer({ id: 'rejoin-line', type: 'line', source: 'rejoin', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': isDark() ? '#E8EDF2' : '#0E141B', 'line-width': 4.5, 'line-dasharray': [1.2, 1.3] } }, 'live-track-casing');
     }
     if (window.RGNav) RGNav.redraw();
   }
@@ -534,7 +535,8 @@
       setText('#hudSpeed', speedTxt); setText('#hudMaxL', Math.round(mL) + '°'); setText('#hudMaxR', Math.round(mR) + '°');
       setText('#hudLastL', live.lastL ? Math.round(live.lastL) + '°' : '—'); setText('#hudLastR', live.lastR ? Math.round(live.lastR) + '°' : '—');
       setHTML('#hudMeta', '<b>' + fmtKm(rec.dist) + '</b> · ' + rec.corners.length + (rec.corners.length === 1 ? ' curva' : ' curvas') + (rec.paused ? ' · <span class="pause">en pausa</span>' : ''));
-      setText('#rideTimer', fmtTime(Date.now() - rec.start));
+      setText('#rideTimer', fmtTime(Date.now() - rec.start)); setText('#hudTime', fmtTime(Date.now() - rec.start));
+      setHTML('#hudLine', fmtKm(rec.dist) + ' · ' + rec.corners.length + (rec.corners.length === 1 ? ' curva' : ' curvas') + (rec.paused ? ' · <span class="pause">en pausa</span>' : ''));
     }
     $('#rideTimer').hidden = !rec; $('#rideTimer').className = 'timer cifra' + (rec ? ' on' : '');
     $('#hudCard').hidden = !rec; $('#idleCard').hidden = !!rec || planMode || parkOpen;
@@ -871,7 +873,7 @@
         g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 14; g.strokeStyle = dark ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.9)';
         g.beginPath(); s.forEach(function (p, i) { var x = ox + (p[2] - b[0]) * cosLat * k, y = oy + (b[3] - p[1]) * k; if (i) g.lineTo(x, y); else g.moveTo(x, y); }); g.stroke();
         g.lineWidth = 8;
-        for (var i = 1; i < s.length; i++) { var a = s[i - 1], q = s[i]; g.strokeStyle = Geo.leanColor(Math.max(Math.abs(a[6] || 0), Math.abs(q[6] || 0))); g.beginPath(); g.moveTo(ox + (a[2] - b[0]) * cosLat * k, oy + (b[3] - a[1]) * k); g.lineTo(ox + (q[2] - b[0]) * cosLat * k, oy + (b[3] - q[1]) * k); g.stroke(); }
+        for (var i = 1; i < s.length; i++) { var a = s[i - 1], q = s[i]; g.strokeStyle = Geo.leanColor(Math.abs(a[6] || 0) >= Math.abs(q[6] || 0) ? (a[6] || 0) : (q[6] || 0)); g.beginPath(); g.moveTo(ox + (a[2] - b[0]) * cosLat * k, oy + (b[3] - a[1]) * k); g.lineTo(ox + (q[2] - b[0]) * cosLat * k, oy + (b[3] - q[1]) * k); g.stroke(); }
       } else { g.fillStyle = fg2; g.font = '600 32px "Barlow", sans-serif'; g.textAlign = 'center'; g.fillText('Sin trazado', box.x + box.w / 2, box.y + box.h / 2); g.textAlign = 'left'; }
       // cifras
       var y0 = 930, cols = [[72, 'MÁX IZQ', Math.round(r.maxL) + '°', left], [W / 2 - 100, 'MÁX DCHA', Math.round(r.maxR) + '°', right], [W - 330, 'VEL. MÁX', (r.vMax || 0) + ' km/h', fg]];

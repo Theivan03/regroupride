@@ -4,6 +4,18 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
+## Qué hay en la versión 0.12
+
+Identidad visual **Dirección A · «Quedada»**, elegida del documento «Tres direcciones visuales» (16 nov 2026). Está al final de `www/rg-theme.css`.
+
+- **Colores** (día / noche): marca `#086236` / `#3DDC84`, texto `#0E141B` / `#E8EDF2`, texto secundario `#4A5563` / `#9AA6B2`, izquierda `#1552B8` / `#5AA9FF`, derecha `#9A3209` / `#FF8A5B`, aviso `#FFB300` / `#FFC24A` con texto `#1A1300`, error `#A31919` / `#FF7A7A`. Todo lo que se lee en marcha cumple 7:1.
+- **Cartel de navegación** a todo el ancho con el giro en una ficha, en tres casos: en ruta (marca), hacia la ruta o la salida (superficie neutra) y fuera de la ruta (ámbar con texto oscuro). El rojo ya no se usa en el cartel.
+- **«Avisar» y «Parar» separados**: «Avisar» flota aparte, a la izquierda y 12 px por encima, en ámbar y con triángulo; «Parar» va dentro del marcador, a la derecha, en rojo y con cuadrado. El marcador lleva km y curvas, el cronómetro y el botón de ampliar. Todo a 60 px.
+- **La ruta por delante se pinta en tinta con filete** (clara con filete oscuro de noche) para no confundirse con las carreteras del mapa. **Lo recorrido** va en azul a la izquierda y naranja a la derecha, según el lado de la inclinación.
+- **El color nunca va solo**: administrador = marcador cuadrado, compañero = redondo; rezagado o fuera de ruta = anillo discontinuo ámbar con «!»; indicadores de estado con forma (círculo bien, rombo a medias, cuadrado mal).
+- Botones redondos del mapa de 56 px (60 en ruta), fila de estado en píldoras con icono, pestaña activa con punto.
+- No aplicado, como en el documento: ocultar la barra de pestañas mientras se rueda.
+
 ## Qué hay en la versión 0.11
 
 Necesita ejecutar **`supabase/07_avisos_y_garaje.sql`** (después del 06). Sin él, los avisos y la copia de rutas siguen como en la 0.10.
