@@ -374,7 +374,7 @@
     return gpxAsPlan({ name: name || 'Ruta grabada', title: 'Ruta para seguir', coords: coords, wps: [[a[1], a[0], 'Salida'], [b[1], b[0], 'Llegada']], pois: [] });
   }
 
-  window.RGNav = { togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx };
+  window.RGNav = { togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx, resolvePoint: function (t) { return resolvePoint(t); } };
 
   /* ================= importar enlace de Google Maps ================= */
   function readClipboard() {
@@ -403,6 +403,16 @@
       if (found) return found;
       throw new Error('No he podido abrir el enlace corto (' + seen + '). Abre el enlace en el navegador y copia la dirección completa.');
     });
+  }
+  // Punto de salida de un evento a partir de lo que pegue el organizador: { url, lat, lon, name }.
+  // El enlace se guarda siempre; las coordenadas, cuando el enlace las lleva o se pueden sacar abriéndolo.
+  function resolvePoint(text) {
+    var url = L.extractUrl(text), p = L.parseMapsPoint(text);
+    if (p) return Promise.resolve({ url: url || L.mapsPointUrl(p.lat, p.lon), lat: p.lat, lon: p.lon, name: p.name || '' });
+    if (!url) return Promise.reject(new Error('Eso no es un enlace. En Google Maps: toca el sitio → Compartir → Copiar enlace.'));
+    if (!L.isShortLink(url)) return Promise.resolve({ url: url, lat: null, lon: null, name: '' });
+    return expandShort(url).then(function (full) { var q = L.parseMapsPoint(full); return q ? { url: url, lat: q.lat, lon: q.lon, name: q.name || '' } : { url: url, lat: null, lon: null, name: '' }; },
+      function () { return { url: url, lat: null, lon: null, name: '' }; });
   }
   function importLink(text) {
     var url = L.extractUrl(text);

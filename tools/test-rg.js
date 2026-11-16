@@ -283,4 +283,26 @@ t('Consejo de nivel: solo con datos de sobra y cuando la diferencia es de un niv
   var set = L.levelAdvice(null, st(8, 10, 60, 300, 27)); assert.equal(set.dir, 'set'); assert.equal(set.suggest, 3);
   assert.equal(L.levelAdvice(3, null), null);
 });
+t('Punto de salida: coordenadas de un enlace de mapa a un sitio', function () {
+  var P = function (u) { var r = L.parseMapsPoint(u); return r ? r.lat.toFixed(4) + ',' + r.lon.toFixed(4) + (r.name ? ' ' + r.name : '') : null; };
+  assert.equal(P('https://www.google.com/maps/place/Repsol/@38.3790,-0.5120,17z/data=!3m1!4b1!4m6!3m5!1s0xd62:0x1!8m2!3d38.3762!4d-0.5088!16s%2Fg%2F1'), '38.3762,-0.5088 Repsol', 'el sitio, no el centro de la pantalla');
+  assert.equal(P('https://www.google.com/maps?q=38.3762,-0.5088'), '38.3762,-0.5088');
+  assert.equal(P('https://maps.google.com/?q=loc:38.3762,-0.5088&z=16'), '38.3762,-0.5088');
+  assert.equal(P('https://www.google.com/maps/search/?api=1&query=38.3762%2C-0.5088'), '38.3762,-0.5088');
+  assert.equal(P('https://www.google.es/maps/@38.3762,-0.5088,15z'), '38.3762,-0.5088');
+  assert.equal(P('https://www.google.com/maps/place/38.3762,-0.5088'), '38.3762,-0.5088');
+  assert.equal(P('https://www.google.com/maps/dir/?api=1&destination=38.3762,-0.5088'), '38.3762,-0.5088');
+  assert.equal(P('Quedamos aquí: https://www.google.com/maps/place/Bar+Pepe,+Ibi/@38.62,-0.57,17z/data=!4m2!3m1!1s0x0:0x0.'), '38.6200,-0.5700 Bar Pepe');
+  assert.equal(P('https://maps.apple.com/?ll=38.3762,-0.5088&q=Salida'), '38.3762,-0.5088');
+  assert.equal(P('geo:38.3762,-0.5088?z=17'), '38.3762,-0.5088');
+  assert.equal(P('38.3762, -0.5088'), '38.3762,-0.5088');
+  assert.equal(P('https://maps.app.goo.gl/AbCdEf123'), null, 'el enlace corto no lleva coordenadas: hay que abrirlo');
+  assert.equal(P('https://www.google.com/maps/place/Bar+Pepe'), null);
+  assert.equal(P('https://www.google.com/maps?q=Gasolinera+Repsol+Ibi'), null);
+  assert.equal(P('Gasolinera de la rotonda'), null);
+  assert.equal(P('https://www.google.com/maps?q=138.3,-0.5'), null, 'latitud imposible');
+  assert.equal(L.mapsPointUrl(38.3762, -0.5088, 'Repsol'), 'https://www.google.com/maps/search/?api=1&query=38.376200,-0.508800');
+  assert.equal(L.mapsPointUrl(null, null, 'Bar Pepe, Ibi'), 'https://www.google.com/maps/search/?api=1&query=Bar%20Pepe%2C%20Ibi');
+  assert.equal(L.mapsPointUrl(null, null, ''), null);
+});
 console.log('rg-lib: ' + n + ' pruebas correctas');

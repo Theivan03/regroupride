@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.9.1';
+  var APP_VERSION = '0.10.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -116,7 +116,7 @@
     rateCount++; if (now - rateT0 > 1000) { sens.rate = rateCount * 1000 / (now - rateT0); rateCount = 0; rateT0 = now; }
     var s = est.update(acc, rot, dt, now);
     live.phi = s.phi; live.source = s.source;
-    if (s.ready) trackLast(s.phi);
+    if (s.ready) trackLast(!rec || leanCounts(now) ? s.phi : 0);
     if (Math.abs(s.phi) > live.leanMaxSinceFix) live.leanMaxSinceFix = Math.abs(s.phi);
     if (rec) recFeed(s.phi, now);
   }
@@ -168,12 +168,15 @@
       if (sens.speedKmh != null && sens.speedKmh > 20) { if (autoStartSince == null) autoStartSince = now; else if (now - autoStartSince > 5000) { autoStartSince = null; startRide(true); } }
       else autoStartSince = null;
     }
-    lastFix = fix;
+    lastFix = fix; rememberFix(fix);
     updatePosition(fix);
     if (window.RGNav) RGNav.onFix(fix);
     if (!sens.demo) maybeFetchWeather(fix);
     if (parkOpen && (now - (prev.parkT || 0)) > 3000) { prev.parkT = now; renderParkCard(); }
   }
+  // Última posición conocida: se guarda para abrir el mapa donde estabas, sin esperar al GPS.
+  var savedFix = LS.get('rg.lastFix', null), savedFixAt = 0;
+  function rememberFix(fix) { var t = Date.now(); if (t - savedFixAt < 15000) return; savedFixAt = t; LS.set('rg.lastFix', { lat: Math.round(fix.lat * 1e5) / 1e5, lon: Math.round(fix.lon * 1e5) / 1e5, t: t }); }
   function onFixError(err) { sens.gpsError = err && err.code === 1 ? 'denegado' : (err && err.code === 0 ? 'no disponible' : 'sin señal'); }
   function startGps(mode) {
     if (gpsMode === mode) return;
@@ -198,8 +201,9 @@
   function initMap() {
     if (!HAS_MAP || map) return;
     loadStyle().then(function (st) {
-      map = new maplibregl.Map({ container: 'map', style: st, center: [-3.7, 40.4], zoom: 5, attributionControl: { compact: true }, pitchWithRotate: false, touchPitch: false });
-      map.on('load', function () { mapReady = true; addTrackLayers(map, 'live'); addExtraLayers(map); drawLiveTrack(true); refreshMine(); drawPlan(); drawParking(); if (lastFix) { map.jumpTo({ center: [lastFix.lon, lastFix.lat], zoom: 15 }); updatePosition(lastFix); } });
+      var c0 = lastFix || quickFix || savedFix;
+      map = new maplibregl.Map({ container: 'map', style: st, center: c0 ? [c0.lon, c0.lat] : [-3.7, 40.4], zoom: lastFix ? 15 : (c0 ? 13 : 5), attributionControl: { compact: true }, pitchWithRotate: false, touchPitch: false });
+      map.on('load', function () { mapReady = true; addTrackLayers(map, 'live'); addExtraLayers(map); drawLiveTrack(true); refreshMine(); drawPlan(); drawParking(); if (lastFix) { map.jumpTo({ center: [lastFix.lon, lastFix.lat], zoom: 15 }); updatePosition(lastFix); } else if (quickFix) showQuick(); });
       map.on('style.load', function () { if (mapReady) { addTrackLayers(map, 'live'); addExtraLayers(map); refreshMine(); drawPlan(); } });
       map.on('click', function (e) { if (planMode) addWaypoint(e.lngLat.lat, e.lngLat.lng); });
       map.on('dragstart', function () { setFollow(false); });
@@ -209,6 +213,14 @@
       posMarker = new maplibregl.Marker({ element: pe, rotationAlignment: 'map' });
     });
   }
+  // Posición rápida (la última que conoce el teléfono, aunque sea aproximada): centra el mapa mientras llega el GPS bueno.
+  var quickFix = null;
+  function showQuick() {
+    if (!quickFix || lastFix || !map || !mapReady) return;
+    map.jumpTo({ center: [quickFix.lon, quickFix.lat], zoom: quickFix.acc && quickFix.acc > 300 ? 12 : 14 });
+    if (posMarker) { posMarker.setLngLat([quickFix.lon, quickFix.lat]); if (!posMarker._added) { posMarker.addTo(map); posMarker._added = true; } }
+  }
+  Platform.quickPosition(function (pos) { if (lastFix || !pos || !pos.coords) return; quickFix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy }; showQuick(); });
   function setFollow(on) { mapFollow = on; settings.follow = on; saveSettings(); $('#btnFollow').setAttribute('aria-pressed', String(on)); if (on && lastFix) updatePosition(lastFix, true); }
   $('#btnFollow').addEventListener('click', function () { setFollow(!mapFollow); });
   $('#btnHeading').addEventListener('click', function () { settings.headingUp = !settings.headingUp; saveSettings(); $('#btnHeading').setAttribute('aria-pressed', String(settings.headingUp)); if (map && !settings.headingUp) map.easeTo({ bearing: 0 }); });
@@ -411,7 +423,16 @@
   /* ---------- grabación ---------- */
   var rec = null, recTick = null, lastSave = 0, demoTimer = null, pausedSince = null;
   function newRec() { var principal = vehicles.filter(function (v) { return v.principal; })[0]; return { id: Date.now(), start: Date.now(), end: null, name: '', maxL: 0, maxR: 0, vMax: 0, dist: 0, movingS: 0, corners: [], points: [], vehicleId: principal ? principal.id : null, favorite: false, stars: 0, note: '' }; }
+  // En una ruta, la inclinación solo cuenta (máximas, «última», curvas) cuando la moto rueda y su vertical ya se ha
+  // medido en marcha. Así no se cuela lo de parado: levantarla de la pata de cabra, colocar el móvil en el soporte,
+  // o un cero provisional tomado en cuesta. Sin GPS (denegado o no disponible) no se puede saber: cuenta todo, como antes.
+  function leanCounts(now) {
+    if (sens.demo || (!sens.lastGps && sens.gpsError)) return true;
+    var v = (sens.lastGps && (now - sens.lastGps) < 30000) ? sens.speedKmh : null;
+    return v != null && v >= settings.vMin && (est.state.confirmed || est.state.frameKind === 'manual');
+  }
   function recFeed(phi, now) {
+    if (!leanCounts(now)) phi = 0;
     if (phi < -2 && -phi > rec.maxL) rec.maxL = -phi;
     if (phi > 2 && phi > rec.maxR) rec.maxR = phi;
     var v = (sens.speedKmh != null && (now - sens.lastGps) < 5000) ? Math.round(sens.speedKmh) : null;
@@ -526,7 +547,7 @@
       else if (ar >= 3) { setText('#lfSide', phi < 0 ? 'Izquierda' : 'Derecha'); setClass('#lfSide', 'side ' + (phi < 0 ? 'l' : 'r')); } else { setText('#lfSide', 'Vertical'); setClass('#lfSide', 'side'); }
       setText('#lfMaxL', Math.round(mL) + '°'); setText('#lfMaxR', Math.round(mR) + '°');
       setHTML('#lfSpeed', speedTxt + '<span class="unit">km/h</span>');
-      setText('#lfMinor', rec ? rec.corners.length + ' curvas · ' + fmtKm(rec.dist) : (ready ? 'Sin grabar · pulsa Grabar ruta en el mapa' : 'Esperando a los sensores del móvil'));
+      setText('#lfMinor', rec ? rec.corners.length + ' curvas · ' + fmtKm(rec.dist) + (est.state.confirmed || sens.demo ? '' : ' · vertical provisional') : (ready ? (est.state.confirmed ? 'Sin grabar · pulsa Grabar ruta en el mapa' : 'Vertical provisional: se mide sola al empezar a rodar') : 'Esperando a los sensores del móvil'));
       setText('#lfTimer', rec ? fmtTime(Date.now() - rec.start) : '00:00:00'); setClass('#lfTimer', 'timer cifra' + (rec ? ' on' : ''));
       setClass('#lfSens', 'chip ' + (motionFresh ? (sens.gyro ? 'ok' : 'warn') : (sens.listening ? 'bad' : ''))); setText('#lfSens', motionFresh ? (sens.gyro ? 'Sensores' : 'Sin giróscopo') : 'Sensores');
       setClass('#lfGps', 'chip ' + (gpsFresh ? 'ok' : (sens.gpsError ? 'bad' : (gpsMode ? 'warn' : '')))); setText('#lfGps', gpsFresh ? 'GPS' : (sens.gpsError ? 'GPS ' + sens.gpsError : (gpsMode ? 'GPS…' : 'GPS')));
@@ -1143,7 +1164,7 @@
     setText('#dgRate', (motionFresh ? Math.round(sens.rate) + ' muestras/s' : (sens.listening ? 'sin datos' : 'no iniciado')) + (sens.src === 'native' ? ' · sensores nativos' : ' · navegador'));
     setText('#dgGyro', motionFresh ? (sens.gyro ? 'sí' : 'no (solo acelerómetro)') : '—');
     setText('#dgGain', (Math.abs(s.gain) > 10 ? 'rad/s' : '°/s') + (s.gain < 0 ? ', invertido' : ', normal') + (s.gainConf ? ' · conf ' + Math.round(s.gainConf * 100) + '%' : ' · por defecto'));
-    setText('#dgPhi', s.ready ? f1(s.phi) + ' · ref. ' + ({ 'manual': 'manual', 'auto-quick': 'provisional (al abrir)', 'auto-still': 'automática (reposo)', 'auto-ride': 'automática (rodando)' }[s.frameKind] || s.frameKind) : 'sin referencia aún'); setText('#dgAcc', calib && motionFresh ? f1(s.phiAcc) : '—'); setText('#dgPhys', f1(s.phiPhys));
+    setText('#dgPhi', s.ready ? f1(s.phi) + ' · ref. ' + ({ 'manual': 'manual', 'auto-quick': 'provisional (al abrir)', 'auto-still': 'automática (reposo)', 'auto-ride': 'rodando' }[s.frameKind] || s.frameKind) + (s.confirmed ? ' · medida rodando' : ' · sin confirmar') : 'sin referencia aún'); setText('#dgAcc', calib && motionFresh ? f1(s.phiAcc) : '—'); setText('#dgPhys', f1(s.phiPhys));
     setText('#dgSrc', { gyro: 'giróscopo', phys: 'giróscopo + física', acc: 'giróscopo + acelerómetro', 'acc-still': 'acelerómetro (parado)', 'acc-only': 'solo acelerómetro' }[s.source] || s.source);
     var gpsFresh = sens.lastGps && (now - sens.lastGps) < 5000;
     setText('#dgGps', gpsFresh ? Math.round(sens.speedKmh || 0) + ' km/h · ±' + Math.round(sens.gpsAcc || 0) + ' m' + (gpsMode === 'bg' ? ' · segundo plano' : '') : (sens.gpsError || (gpsMode ? 'buscando' : 'parado')));
@@ -1201,6 +1222,7 @@
     isRec: function () { return !!rec; }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { askAndStart(); }, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
     plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); },
+    routeBetween: function (wps) { return routeBetween(wps); },   // [[lat, lon], …] → { coords, dist (km), dur (s), steps, routed }
     previewPlan: function (p) { p.preview = true; showView('map'); followPlan(p, true); },
     // Lo que llevo medido en la ruta en marcha: km, segundos en movimiento e inclinación máxima de cada curva.
     recNow: function () { return rec ? { km: rec.dist || 0, movingS: rec.movingS || 0, peaks: rec.corners.map(function (c) { return Math.abs(c.peak || 0); }) } : null; },
@@ -1239,7 +1261,8 @@
   DB.open().then(function () { return DB.migrateFromLocalStorage(); }).then(function (n) { if (n) toast(n + ' salidas antiguas importadas al historial.', 'ok'); return recoverRide(); })
     .then(reloadVehicles).then(reloadRides).then(loadProfile).then(loadParking).then(loadPlans).then(checkAchievements).then(function () {
       setTimeout(function () { if (!calib && !sens.demo) showNotice('Aún no llegan datos de los sensores de movimiento: el inclinómetro marcará en cuanto lleguen.', 'warn'); }, 2500);
-      initMap(); startGps('fg'); render(); Platform.ready(); maintStartupNotice();
+      initMap(); if (!gpsMode) startGps('fg'); render(); Platform.ready(); maintStartupNotice();
     }).catch(function (e) { toast('Error al iniciar la base de datos: ' + (e && e.message ? e.message : e), 'bad'); initMap(); Platform.ready(); });
+  if (!gpsMode && !rec) startGps('fg');   // el GPS se pide ya, a la vez que carga lo demás (antes esperaba a la base de datos)
   if (!Platform.native && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
 })();

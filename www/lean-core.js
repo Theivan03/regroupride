@@ -60,7 +60,7 @@ var LeanCore = (function () {
     var frame = null, bias = [0, 0, 0], phi = 0, speed = null, speedAt = -1e9, accF = null;
     var learn = { sxy: 0, sxx: 0, syy: 0, lastPhiAcc: null, r: 0 };
     var onGain = null, onFrame = null;
-    var st = { phi: 0, phiAcc: 0, phiPhys: null, rollRate: 0, yawRate: 0, rollRaw: 0, source: 'gyro', ready: false, gain: o.gyroGain, gainConf: 0, speed: null, frameKind: null, autoRideS: 0, stillS: 0 };
+    var st = { phi: 0, phiAcc: 0, phiPhys: null, rollRate: 0, yawRate: 0, rollRaw: 0, source: 'gyro', ready: false, gain: o.gyroGain, gainConf: 0, speed: null, frameKind: null, autoRideS: 0, stillS: 0, confirmed: false };
 
     /* Calibración automática.
        - "auto-quick": sin referencia, bastan 0,3 s de gravedad creíble para dar una referencia provisional;
@@ -68,16 +68,24 @@ var LeanCore = (function () {
        - "auto-still": con el móvil quieto 1,5 s se toma la gravedad como vertical. Sustituye a la provisional
          y, si la referencia guardada está a más de 20° de la gravedad con la moto parada 3 s (el móvil ha
          cambiado de sitio), también a cualquier otra.
-       - "auto-ride": rodando recto (> 18 km/h, sin giro ni frenada) se promedia la gravedad en el móvil; esa
+       - Vertical medida en marcha ("auto-ride", confirmada): en cuanto la moto rueda a más de ~15 km/h, la fuerza
+         que nota el móvil (gravedad + la de la curva) va alineada con la moto, vaya recta o tumbada. Con 1,5 s
+         de eso ya se sabe dónde está su vertical DE VERDAD, sin depender de cómo estaba aparcada (pata de
+         cabra, cuesta, peralte). Hasta entonces la referencia tomada en parado es solo provisional.
+       - "auto-ride" fino: rodando recto (> 18 km/h, sin giro ni frenada) se promedia la gravedad en el móvil; esa
          es la vertical real de la moto en marcha y refina (o sustituye) cualquier referencia anterior.
        - El sesgo del giróscopo se estima siempre que el móvil está quieto. */
-    var seed = false, auto = { quickT: 0, quickSum: [0, 0, 0], ride: [0, 0, 0], rideT: 0, stillT: 0, stillSum: [0, 0, 0], stillRot: [0, 0, 0], stillN: 0, biasT: 0, lastAcc: null, appliedU: null };
+    var seed = false, auto = { fastT: 0, fastSum: [0, 0, 0], quickT: 0, quickSum: [0, 0, 0], ride: [0, 0, 0], rideT: 0, stillT: 0, stillSum: [0, 0, 0], stillRot: [0, 0, 0], stillN: 0, biasT: 0, lastAcc: null, appliedU: null };
 
-    function setFrame(fr, b, kind) { frame = fr; bias = b || [0, 0, 0]; phi = 0; accF = null; seed = true; auto.quickT = 0; auto.quickSum = [0, 0, 0]; auto.stillT = 0; auto.stillSum = [0, 0, 0]; auto.stillRot = [0, 0, 0]; learn.lastPhiAcc = null; st.ready = !!fr; st.frameKind = fr ? (kind || 'manual') : null; auto.appliedU = fr ? fr.u.slice() : null; auto.ride = [0, 0, 0]; auto.rideT = 0; }
-    function refineFrame(fr, kind) { // cambia la referencia sin perder el ángulo integrado
+    function setFrame(fr, b, kind) { frame = fr; bias = b || [0, 0, 0]; phi = 0; accF = null; seed = true; st.confirmed = false; auto.fastT = 0; auto.fastSum = [0, 0, 0]; auto.quickT = 0; auto.quickSum = [0, 0, 0]; auto.stillT = 0; auto.stillSum = [0, 0, 0]; auto.stillRot = [0, 0, 0]; learn.lastPhiAcc = null; st.ready = !!fr; st.frameKind = fr ? (kind || 'manual') : null; auto.appliedU = fr ? fr.u.slice() : null; auto.ride = [0, 0, 0]; auto.rideT = 0; }
+    function refineFrame(fr, kind) {
+      // Cambia la referencia y recoloca el ángulo. En marcha se toma el de la física de la curva (velocidad y giro),
+      // que no depende de la referencia: en plena curva el acelerómetro marcaría 0°. En parado, el del acelerómetro.
       frame = fr; st.ready = true; st.frameKind = kind; auto.appliedU = fr.u.slice();
+      if (kind !== 'auto-ride') { st.confirmed = false; auto.fastT = 0; auto.fastSum = [0, 0, 0]; }
       learn.lastPhiAcc = null; // el salto de referencia no es un movimiento: que no lo aprenda como ganancia del giróscopo
-      if (accF) { var au = v3.dot(accF, frame.u), al = v3.dot(accF, frame.l); phi = Math.atan2(al, au) * R2D; }
+      if (auto.vFresh && speed >= o.vMinPhys && auto.wV) phi = -Math.atan(speed * v3.dot(auto.wV, frame.u) * o.gyroGain * D2R / G) * R2D;
+      else if (accF) phi = Math.atan2(v3.dot(accF, frame.l), v3.dot(accF, frame.u)) * R2D;
       if (onFrame) onFrame({ up: fr.u.slice(), bias: bias.slice(), kind: kind });
     }
     function setSpeed(v, t) { speed = (v == null || isNaN(v)) ? null : v; speedAt = t; }
@@ -93,6 +101,8 @@ var LeanCore = (function () {
       if (rot && !isNaN(rot[0])) {
         var k = dt / (dt + 0.3), wm = Math.hypot(rot[0] - bias[0], rot[1] - bias[1], rot[2] - bias[2]) * Math.abs(o.gyroGain);
         auto.wF = auto.wF == null ? wm : auto.wF + k * (wm - auto.wF); wMag = auto.wF;
+        var wv = [rot[0] - bias[0], rot[1] - bias[1], rot[2] - bias[2]];   // giro filtrado (vector), para la física al cambiar de referencia
+        if (!auto.wV) auto.wV = wv; else { auto.wV[0] += k * (wv[0] - auto.wV[0]); auto.wV[1] += k * (wv[1] - auto.wV[1]); auto.wV[2] += k * (wv[2] - auto.wV[2]); }
       }
       var jitter = auto.lastAcc ? v3.norm(v3.sub(accF, auto.lastAcc)) : 0; auto.lastAcc = accF.slice();
       var quiet = Math.abs(mag - G) < 0.6 && wMag < 2.0 && jitter < 0.25;
@@ -123,7 +133,19 @@ var LeanCore = (function () {
           if (take) refineFrame(buildFrame(up), 'auto-still');
         }
       } else { auto.stillT = 0; auto.stillSum = [0, 0, 0]; auto.stillRot = [0, 0, 0]; st.stillS = 0; }
-      // vertical real rodando recto
+      // vertical medida en marcha: la primera vez de cada sesión (o tras cambiar la referencia en parado) basta
+      // con 1,5 s rodando, en recta o en curva. Si la guardada coincide (menos de 3°), se queda la guardada.
+      if (!st.confirmed) {
+        if (vFresh && speed >= 4 && mag > 7.5 && mag < 15) {
+          auto.fastT += dt; auto.fastSum[0] += accF[0] * dt; auto.fastSum[1] += accF[1] * dt; auto.fastSum[2] += accF[2] * dt;
+          if (auto.fastT >= 1.5) {
+            var uf = v3.unit(auto.fastSum), cf = frame ? frame.u : null, af = cf ? Math.acos(Math.max(-1, Math.min(1, v3.dot(uf, cf)))) * R2D : 999;
+            auto.fastT = 0; auto.fastSum = [0, 0, 0]; st.confirmed = true;
+            if (!frame || st.frameKind !== 'auto-ride' || af > 3) { auto.ride = [0, 0, 0]; auto.rideT = 0; refineFrame(buildFrame(uf), 'auto-ride'); }
+          }
+        } else if (!vFresh || speed < 2) { auto.fastT = 0; auto.fastSum = [0, 0, 0]; }
+      }
+      // vertical real rodando recto (afinado continuo)
       // recta de verdad: sin giro apreciable, sin frenada y, si ya hay referencia, con la moto casi vertical
       var straight = vFresh && speed >= 5 && wMag < 2.5 && Math.abs(mag - G) < 1.0 && (!frame || Math.abs(phi) < 5);
       if (straight) {
@@ -155,7 +177,7 @@ var LeanCore = (function () {
     }
 
     function update(acc, rot, dt, now) {
-      if (!(dt > 0)) dt = 0; if (dt > 1) { seed = true; accF = null; } // tras una pausa de muestras (app en segundo plano) ni el ángulo integrado ni el filtro valen
+      if (!(dt > 0)) dt = 0; if (dt > 1) { seed = true; accF = null; auto.wV = null; } // tras una pausa de muestras (app en segundo plano) ni el ángulo integrado ni el filtro valen
       if (dt > 0.25) dt = 0.25;
       var a = accF ? dt / (dt + o.accTau) : 1;
       if (acc) {
@@ -165,6 +187,7 @@ var LeanCore = (function () {
       var vFresh = speed != null && (now - speedAt) < 4000;
       var still = vFresh && speed < o.vStill;
       st.speed = vFresh ? speed : null;
+      auto.vFresh = vFresh;
       autoCalibrate(acc, rot, dt, vFresh);
       if (!frame) return st;
 

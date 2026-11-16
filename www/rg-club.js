@@ -7,7 +7,8 @@
   var sb = Cl.sb, esc = Cl.esc, $ = function (s, r) { return (r || document).querySelector(s); }, $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var C = window.Capacitor, native = !!(C && C.isNativePlatform && C.isNativePlatform()), P = native ? (C.Plugins || {}) : {};
   var box = $('#clubBody');
-  var S = { user: null, list: [], cid: null, tab: 'events', loaded: false, missing: false, names: {}, evAdmins: {} };
+  var L = window.RGLib;
+  var S = { user: null, list: [], cid: null, tab: 'events', loaded: false, missing: false, names: {}, evAdmins: {}, v6: null };   // v6: ¿está puesto supabase/06 (plazas y enlace de salida)?
   try { S.cid = localStorage.getItem('rg.club') || null; } catch (e) {}
 
   function cur() { for (var i = 0; i < S.list.length; i++) if (S.list[i].id === S.cid) return S.list[i]; return S.list[0] || null; }
@@ -79,11 +80,36 @@
   }
 
   /* ---------- eventos ---------- */
+  // Las plazas y la lista de espera las decide el servidor (supabase/06_plazas_y_salida.sql); aquí se pide y se enseña.
+  function takenOf(att, e) { return att.filter(function (x) { return x.event_id === e.id && (x.status === 'going' || x.status === 'offered'); }); }
+  function queueOf(att, e) {
+    return att.filter(function (x) { return x.event_id === e.id && x.status === 'waiting'; }).sort(function (a, b) {
+      return (a.offered_at ? 1 : 0) - (b.offered_at ? 1 : 0) || new Date(a.offered_at || a.joined_at) - new Date(b.offered_at || b.joined_at) || new Date(a.joined_at) - new Date(b.joined_at);
+    });
+  }
+  // Punto de salida: el que puso el organizador o, si no, donde empieza la ruta. Siempre con su enlace de Maps.
+  function meetOf(e) {
+    var lat = e.meet_lat, lon = e.meet_lon, fromRoute = false, r = e.route;
+    if ((lat == null || lon == null) && r && r.coords && r.coords.length) { lat = r.coords[0][1]; lon = r.coords[0][0]; fromRoute = true; }
+    var has = lat != null && lon != null, name = e.meet_name || (fromRoute && r.wps && r.wps[0] && r.wps[0][2]) || '';
+    return { lat: has ? lat : null, lon: has ? lon : null, name: name, url: e.meet_url || L.mapsPointUrl(has ? lat : null, has ? lon : null, e.meet_name) };
+  }
+  function deadlineOf(e, a) {   // misma cuenta que el servidor: 12 h o la mitad de lo que falte, lo que sea menos
+    if (!a || !a.offered_at) return null;
+    var o = new Date(a.offered_at).getTime(), st = new Date(e.starts_at).getTime();
+    return o + Math.min(12 * 3600e3, Math.max((st - o) / 2, 600e3));
+  }
+  function setStatus(e, mine, status, companion) {
+    var q = mine ? sb.from('event_attendees').update({ status: status, companion: !!companion }).eq('event_id', e.id).eq('user_id', S.user.id).select('status')
+      : sb.from('event_attendees').insert({ event_id: e.id, user_id: S.user.id, status: status, companion: !!companion }).select('status');
+    return q.then(function (r) { var d = ok(r); return d && d[0] ? d[0].status : status; });
+  }
   function paneEvents(c) {
     var since = new Date(Date.now() - 12 * 3600e3).toISOString();
     return sb.from('events').select('*').eq('community_id', c.id).gte('starts_at', since).order('starts_at').limit(40).then(function (r) {
       var evs = ok(r), ids = evs.map(function (e) { return e.id; });
-      return (ids.length ? sb.from('event_attendees').select('event_id,user_id,status,companion').in('event_id', ids) : Promise.resolve({ data: [] })).then(function (a) {
+      if (evs.length) S.v6 = ('capacity' in evs[0]);
+      return (ids.length ? sb.from('event_attendees').select('*').in('event_id', ids) : Promise.resolve({ data: [] })).then(function (a) {
         var att = ok(a);
         return (ids.length ? sb.from('event_admins').select('event_id,user_id').in('event_id', ids) : Promise.resolve({ data: [] })).then(function (ad) {
           S.evAdmins = {}; (ad.data || []).forEach(function (x) { (S.evAdmins[x.event_id] = S.evAdmins[x.event_id] || []).push(x.user_id); });
@@ -96,31 +122,67 @@
     var pane = $('#clPane'); if (!pane || S.tab !== 'events') return;
     pane.innerHTML = (isAdmin() ? '<button class="btn primary club-add" id="evNew" type="button">+ Nuevo evento o ruta</button>' : '') + (evs.length ? evs.map(function (e) {
       var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
-      var people = going.length + going.filter(function (x) { return x.companion; }).length, iGo = mine && mine.status === 'going';
-      var routeAdm = (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0, canRun = isAdmin() || routeAdm;
+      var taken = takenOf(att, e), queue = queueOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap;
+      var st = mine ? mine.status : 'no', iGo = st === 'going', people = going.length + going.filter(function (x) { return x.companion; }).length;
+      var routeAdm = (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0, canRun = isAdmin() || routeAdm, m = meetOf(e), pos = queue.map(function (x) { return x.user_id; }).indexOf(S.user.id) + 1, dl = deadlineOf(e, mine);
+      var count = cap ? taken.length + ' de ' + cap + (cap === 1 ? ' plaza' : ' plazas') + (queue.length ? ' · ' + queue.length + ' en lista de espera' : '')
+        : (going.length ? going.length + (going.length === 1 ? ' moto' : ' motos') + (people > going.length ? ' · ' + people + ' personas' : '') : 'Nadie apuntado todavía');
+      var mineHtml;
+      if (st === 'offered') mineHtml = '<div class="ev-offer"><b>Ha quedado una plaza libre para ti</b><span>Confirma si vienes' + (dl ? ' antes del ' + fmtWhen(dl).toLowerCase() : '') + '. Si no puedes, pasa al siguiente de la lista.</span><div class="ev-go"><button class="btn small primary" data-act="confirm" type="button">Sí, voy</button><button class="btn small" data-act="no" type="button">No puedo</button></div></div>';
+      else if (st === 'waiting') mineHtml = '<div class="ev-go"><span class="ev-wait">En lista de espera' + (pos ? ' · puesto ' + pos + ' de ' + queue.length : '') + '</span><button class="btn small" data-act="no" type="button">Salir de la lista</button>';
+      else mineHtml = '<div class="ev-go"><button class="btn small' + (iGo ? ' primary' : '') + '" data-act="go" type="button">' + (iGo ? 'Voy ✓' : (full ? 'Apuntarme a la lista de espera' : 'Voy')) + '</button>' + (iGo ? '<button class="btn small" data-act="comp" type="button" aria-pressed="' + !!mine.companion + '">Con acompañante</button>' : '') + (iGo ? '<button class="btn small" data-act="no" type="button">No voy</button>' : '');
+      if (st !== 'offered') mineHtml += (e.luma_url ? '<button class="btn small" data-act="luma" type="button">Apuntarse en Luma</button>' : '') + '</div>';
       return '<div class="club-card ev" data-ev="' + e.id + '"><span class="ev-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b>' +
-        (e.meet_name ? '<span class="muted">Salida: ' + esc(e.meet_name) + '</span>' : '') + (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
+        (m.url ? '<div class="ev-meet"><button class="link" data-act="meet" type="button"><svg><use href="#i-gmaps"/></svg><span>Salida: ' + esc(m.name || 'ver en Maps') + '</span></button>' + (m.lat != null ? '<button class="btn small" data-act="gomeet" type="button">Ir al punto de salida</button>' : '') + '</div>'
+          : (e.meet_name ? '<span class="muted">Salida: ' + esc(e.meet_name) + '</span>' : '')) + (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
         (e.route ? '<div class="ev-route"><span><svg><use href="#i-route"/></svg>' + esc(e.route.name || 'Ruta') + ' · ' + String(e.route.dist || 0).replace('.', ',') + ' km</span><button class="btn small" data-act="route" type="button">Cargar ruta</button></div>' : '') +
         (canRun && e.route ? '<button class="btn primary ev-start" data-act="start" type="button">Iniciar la ruta para los apuntados</button>' : '') +
-        (routeAdm && !isAdmin() ? '<span class="muted rg-small">Eres administrador de esta ruta.</span>' : '') +
-        '<div class="ev-go"><button class="btn small' + (iGo ? ' primary' : '') + '" data-act="go" type="button">' + (iGo ? 'Voy ✓' : 'Voy') + '</button>' + (iGo ? '<button class="btn small" data-act="comp" type="button" aria-pressed="' + !!mine.companion + '">Con acompañante</button>' : '') + (iGo ? '<button class="btn small" data-act="no" type="button">No voy</button>' : '') +
-        (e.luma_url ? '<button class="btn small" data-act="luma" type="button">Apuntarse en Luma</button>' : '') + '</div>' +
-        '<button class="link" data-act="who" type="button">' + (going.length ? going.length + (going.length === 1 ? ' moto' : ' motos') + (people > going.length ? ' · ' + people + ' personas' : '') : 'Nadie apuntado todavía') + '</button>' +
-        (iGo && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
+        (routeAdm && !isAdmin() ? '<span class="muted rg-small">Eres administrador de esta ruta.</span>' : '') + mineHtml +
+        '<button class="link" data-act="who" type="button">' + count + '</button>' +
+        ((iGo || st === 'offered') && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
         (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">Administradores de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</button><button class="link" data-act="edit" type="button">Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div>';
     }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
     if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
     $$('.ev', pane).forEach(function (card) {
       var e = evs.filter(function (x) { return x.id === card.dataset.ev; })[0], mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
-      var set = function (status, companion) { return sb.from('event_attendees').upsert({ event_id: e.id, user_id: S.user.id, status: status, companion: !!companion }, { onConflict: 'event_id,user_id' }).then(function (r) { ok(r); return paneEvents(c); }).catch(fail); };
+      var set = function (status, companion, said) {
+        return setStatus(e, mine, status, companion).then(function (got) {
+          if (got === 'waiting' && (!mine || mine.status !== 'waiting')) A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn');
+          else if (said) A.toast(said, 'ok');
+          inbox(true); return paneEvents(c);
+        }).catch(fail);
+      };
       $$('[data-act]', card).forEach(function (b) { b.addEventListener('click', function () {
-        var act = b.dataset.act;
-        if (act === 'go') set('going', mine && mine.companion); else if (act === 'no') set('no', false); else if (act === 'comp') set('going', !(mine && mine.companion));
+        var act = b.dataset.act, st = mine ? mine.status : 'no';
+        if (act === 'go') set('going', mine && mine.companion, st === 'going' ? '' : 'Apuntado. Te lo recordaré el día antes y una hora antes.');
+        else if (act === 'confirm') set('going', mine && mine.companion, 'Confirmado: la plaza es tuya.');
+        else if (act === 'no') set('no', false, st === 'offered' ? 'Vale. La plaza pasa al siguiente de la lista.' : (st === 'waiting' ? 'Has salido de la lista de espera.' : 'Desapuntado.'));
+        else if (act === 'comp') set(st, !(mine && mine.companion));
         else if (act === 'luma') openUrl(e.luma_url); else if (act === 'route') loadRoute(e);
+        else if (act === 'meet') openUrl(meetOf(e).url); else if (act === 'gomeet') goMeet(e, b);
         else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
-        else if (act === 'who') whoGoes(e, att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }));
-        else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); return paneEvents(c); }).catch(fail); });
+        else if (act === 'who') whoGoes(e, att);
+        else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
       }); });
+    });
+  }
+  // «Ir al punto de salida»: lo pone en el mapa de la app con el camino desde donde estás. «Iniciar ruta» te guía hasta allí.
+  function goMeet(e, btn) {
+    var m = meetOf(e), label = (m.name || 'Punto de salida').split(',')[0];
+    if (m.lat == null) { if (m.url) openUrl(m.url); return; }
+    if (A.isRec()) { A.toast('Ya tienes una ruta en marcha. Párala antes de ir al punto de salida.', 'warn'); return; }
+    var fix = A.lastFix();
+    if (!fix) {
+      A.showView('map'); var mp = A.map(); if (mp) mp.easeTo({ center: [m.lon, m.lat], zoom: 15 });
+      A.previewPlan({ id: 9e12 + 1, name: 'Salida: ' + label, wps: [[m.lat, m.lon, label]], pois: [], coords: [[m.lon, m.lat], [m.lon, m.lat]], steps: [], dist: 0, dur: 0, routed: false, created: Date.now(), toMeet: true });
+      A.toast('Te marco el punto de salida. En cuanto tenga tu ubicación, vuelve a pulsar para ver el camino.', 'warn'); return;
+    }
+    Cl.busy(btn, function () {
+      return A.routeBetween([[fix.lat, fix.lon], [m.lat, m.lon]]).then(function (r) {
+        var st = r.steps || []; if (st.length && st[st.length - 1].icon === 'arrive') st[st.length - 1].text = 'llegas al punto de salida';
+        A.previewPlan({ id: 9e12 + 1, name: 'Hasta la salida: ' + label, wps: [[fix.lat, fix.lon, ''], [m.lat, m.lon, label]], pois: [], coords: r.coords, steps: st, dist: Math.round(r.dist * 10) / 10, dur: Math.round(r.dur), routed: !!r.routed, created: Date.now(), toMeet: true });
+        A.toast('Punto de salida en el mapa' + (r.routed ? ': ' + String(Math.round(r.dist * 10) / 10).replace('.', ',') + ' km' : '') + '. Pulsa «Iniciar ruta» para que te guíe hasta allí.', 'ok');
+      });
     });
   }
   // El administrador (de la comunidad o solo de esta ruta) inicia la ruta: se crea el grupo sin códigos, se le carga la ruta,
@@ -166,30 +228,62 @@
     var p = { id: parseInt(e.id.replace(/-/g, '').slice(0, 12), 16), name: r.name || e.title, wps: r.wps || [], pois: r.pois || [], coords: r.coords, dist: r.dist || 0, dur: r.dur || 0, routed: true, steps: r.steps || [], created: Date.now(), eventId: e.id };
     A.usePlan(p).then(function () { A.toast('Ruta cargada. Pulsa «Iniciar ruta» cuando salgáis.', 'ok'); });
   }
-  function whoGoes(e, going) {
-    Cl.sheet('<div class="head"><h1>Quién viene</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + '</p><div class="rg-list">' +
-      (going.length ? going.map(function (g) { return '<div class="club-person"><span class="rg-ava">' + esc(who(g.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(g.user_id)) + (g.companion ? ' <span class="mstatus">+1</span>' : '') + '</b><span class="muted">' + esc(bike(g.user_id)) + '</span></div></div>'; }).join('') : '<p class="muted">Nadie apuntado todavía.</p>') + '</div>');
+  function whoGoes(e, att) {
+    var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), off = att.filter(function (x) { return x.event_id === e.id && x.status === 'offered'; }), queue = queueOf(att, e);
+    var person = function (g, tag) { return '<div class="club-person"><span class="rg-ava">' + esc(who(g.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(g.user_id)) + (g.companion ? ' <span class="mstatus">+1</span>' : '') + (tag ? ' <span class="mstatus">' + tag + '</span>' : '') + '</b><span class="muted">' + esc(bike(g.user_id)) + '</span></div></div>'; };
+    Cl.sheet('<div class="head"><h1>Quién viene</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + (e.capacity ? ' · ' + e.capacity + (e.capacity === 1 ? ' plaza' : ' plazas') : '') + '</p><div class="rg-list">' +
+      (going.length || off.length ? going.map(function (g) { return person(g); }).join('') + off.map(function (g) { return person(g, 'por confirmar'); }).join('') : '<p class="muted">Nadie apuntado todavía.</p>') + '</div>' +
+      (queue.length ? '<h2 class="rg-h2">Lista de espera</h2><div class="rg-list">' + queue.map(function (g, i) { return person(g, 'puesto ' + (i + 1)); }).join('') + '</div>' : ''));
     $('#clX').addEventListener('click', Cl.closeSheet);
   }
   function eventForm(c, e) {
     var plans = A.plans(), keep = e && e.route ? '<option value="keep" selected>' + esc('Mantener: ' + (e.route.name || 'ruta actual')) + '</option>' : '';
+    var link0 = e ? (e.meet_url || (e.meet_lat != null ? L.mapsPointUrl(e.meet_lat, e.meet_lon) : '')) : '', v6 = S.v6 !== false;
     Cl.sheet('<div class="head"><h1>' + (e ? 'Editar evento' : 'Nuevo evento') + '</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><form class="rg-form" id="evForm">' +
       '<label>Nombre<input id="evTitle" required maxlength="120" value="' + esc(e ? e.title : '') + '" placeholder="Ruta del domingo"></label>' +
       '<label>Día y hora de salida<input id="evWhen" type="datetime-local" required value="' + localInput(e && e.starts_at) + '"></label>' +
       '<label>Punto de salida<input id="evMeet" maxlength="120" value="' + esc(e ? e.meet_name : '') + '" placeholder="Gasolinera de…"></label>' +
+      (v6 ? '<label>Enlace de Google Maps del punto de salida<input id="evMeetUrl" inputmode="url" maxlength="600" value="' + esc(link0) + '" placeholder="Pega aquí el enlace del sitio"></label>' +
+        '<div class="rg-row" style="margin-top:-4px"><button class="btn small" id="evPaste" type="button">Pegar</button><button class="btn small" id="evHere" type="button">Usar donde estoy ahora</button></div>' +
+        '<p class="muted rg-small" style="text-align:left">En Google Maps: toca el sitio → Compartir → Copiar enlace. Si lo dejas vacío y el evento lleva ruta, la salida es donde empieza la ruta.</p>' +
+        '<label>Plazas (motos)<input id="evCap" type="number" inputmode="numeric" min="1" max="1000" value="' + (e && e.capacity ? e.capacity : '') + '" placeholder="Sin límite"></label>' +
+        '<p class="muted rg-small" style="text-align:left">Con límite, quien se apunte cuando esté lleno queda en lista de espera. Si alguien se desapunta, la plaza se ofrece al siguiente y tiene que confirmar.</p>'
+        : (isAdmin() ? '<p class="muted rg-small" style="text-align:left">Para poner límite de plazas, lista de espera y enlace de Maps de la salida falta ejecutar <b>supabase/06_plazas_y_salida.sql</b> en Supabase.</p>' : '')) +
       '<label>Descripción<textarea id="evDesc" maxlength="4000" placeholder="Paradas, nivel, normas, lo que quieras contar">' + esc(e ? e.description : '') + '</textarea></label>' +
       '<label>Ruta<select id="evRoute"><option value="">Sin ruta</option>' + keep + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
       '<p class="muted rg-small" style="text-align:left">Salen tus rutas planificadas. Para añadir una, créala en el mapa (pegando el enlace de Google Maps) y guárdala.</p>' +
       '<label>Enlace de Luma (opcional)<input id="evLuma" inputmode="url" maxlength="300" value="' + esc(e && e.luma_url ? e.luma_url : '') + '" placeholder="https://luma.com/…"></label>' +
       '<button class="btn big primary" type="submit">' + (e ? 'Guardar cambios' : 'Publicar') + '</button></form>');
     $('#clX').addEventListener('click', Cl.closeSheet);
+    if ($('#evPaste')) $('#evPaste').addEventListener('click', function () {
+      var job = P.Clipboard ? P.Clipboard.read().then(function (r) { return (r && r.value) || ''; }) : (navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : Promise.reject());
+      Promise.resolve(job).then(function (t) { var u = L.extractUrl(t) || (L.parseMapsPoint(t) ? t.trim() : ''); if (u) $('#evMeetUrl').value = u; else A.toast('No hay ningún enlace copiado.', 'warn'); }, function () { A.toast('No puedo leer lo copiado: mantén pulsado el campo y elige Pegar.', 'warn'); });
+    });
+    if ($('#evHere')) $('#evHere').addEventListener('click', function () { var f = A.lastFix(); if (!f) { A.toast('Aún no tengo tu ubicación.', 'warn'); return; } $('#evMeetUrl').value = L.mapsPointUrl(f.lat, f.lon); });
     $('#evForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
       var row = { community_id: c.id, title: $('#evTitle').value.trim(), starts_at: new Date($('#evWhen').value).toISOString(), meet_name: $('#evMeet').value.trim(), description: $('#evDesc').value.trim(), luma_url: $('#evLuma').value.trim() || null };
-      var sel = $('#evRoute').value;
-      if (sel !== 'keep') { var p = plans.filter(function (x) { return String(x.id) === sel; })[0]; row.route = p ? { name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } : null; }
+      var sel = $('#evRoute').value, route = e ? e.route : null;
+      if (sel !== 'keep') { var p = plans.filter(function (x) { return String(x.id) === sel; })[0]; row.route = route = p ? { name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } : null; }
+      var link = v6 ? $('#evMeetUrl').value.trim() : '', cap = v6 ? parseInt($('#evCap').value, 10) : NaN, warn = '';
+      if (v6 && $('#evCap').value.trim() && !(cap >= 1 && cap <= 1000)) { A.toast('Las plazas tienen que ser un número entre 1 y 1000.', 'warn'); return; }
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
-        return (e ? sb.from('events').update(row).eq('id', e.id) : sb.from('events').insert(row)).then(function (r) { ok(r); Cl.closeSheet(); A.toast(e ? 'Evento actualizado.' : 'Evento publicado.', 'ok'); return paneEvents(c); });
+        var point = !v6 ? Promise.resolve(null) : (link ? (e && link === link0 && e.meet_lat != null ? Promise.resolve({ url: e.meet_url, lat: e.meet_lat, lon: e.meet_lon }) : window.RGNav.resolvePoint(link)) : Promise.resolve({ url: null, lat: null, lon: null }));
+        return point.then(function (pt) {
+          if (pt) {
+            row.capacity = cap >= 1 ? cap : null; row.meet_url = pt.url || null; row.meet_lat = pt.lat != null ? pt.lat : null; row.meet_lon = pt.lon != null ? pt.lon : null;
+            if (pt.url && pt.lat == null) warn = 'El enlace se abrirá en Google Maps, pero no trae coordenadas: no podré marcar la salida en el mapa de la app.';
+            if (pt.name && !row.meet_name) row.meet_name = pt.name;
+          }
+          var save = function () { return (e ? sb.from('events').update(row).eq('id', e.id) : sb.from('events').insert(row)); };
+          return save().then(function (r) {
+            if (r.error && pt && /capacity|meet_(url|lat|lon)/i.test(r.error.message || '')) {     // el servidor aún no tiene el 06
+              S.v6 = false; delete row.capacity; delete row.meet_url; delete row.meet_lat; delete row.meet_lon; warn = 'Guardado sin plazas ni enlace de salida: falta ejecutar supabase/06_plazas_y_salida.sql.';
+              return save();
+            }
+            return r;
+          }).then(function (r) { ok(r); Cl.closeSheet(); A.toast(warn || (e ? 'Evento actualizado.' : 'Evento publicado.'), warn ? 'warn' : 'ok'); inbox(true); return paneEvents(c); });
+        });
       });
     });
   }
@@ -267,6 +361,110 @@
     });
   }
 
-  Cl.onChange(function (u) { var changed = (S.user && S.user.id) !== (u && u.id); S.user = u; if (changed) { S.loaded = false; S.names = {}; if (!$('#view-club').hidden) show(); } });
-  window.RGClub = { show: show };
+  /* ---------- mis eventos: recordatorios y plazas ofrecidas ----------
+     event_inbox() devuelve mis eventos próximos (apuntado, en espera o con plaza ofrecida). Con eso:
+     - se programan en el móvil dos recordatorios por evento (un día antes y una hora antes), con el botón «No puedo ir»;
+       son notificaciones del propio teléfono, así que saltan aunque la app esté cerrada;
+     - si me han ofrecido una plaza, se me pregunta si voy (en pantalla, o con una notificación si la app está en segundo plano).
+     Lo que NO puede hacer sin notificaciones push: avisar de una plaza ofrecida con la app cerrada. */
+  var LN = P.LocalNotifications || null, IN = { events: [], at: 0, busy: false, pending: [] };
+  function jget(k) { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } }
+  function jset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function nid(evId, k) { return (parseInt(String(evId).replace(/-/g, '').slice(0, 7), 16) || 1) * 4 + k; }   // cabe en un entero de 32 bits
+  function hhmm(ms) { return new Date(ms).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); }
+  function inbox(force) {
+    if (!sb || !S.user || IN.busy || S.v6 === false) return Promise.resolve();
+    if (!force && Date.now() - IN.at < 20000) return Promise.resolve();
+    IN.busy = true; IN.at = Date.now();
+    return sb.rpc('event_inbox').then(function (r) {
+      IN.busy = false;
+      if (r.error) { if (/could not find|schema cache|does not exist/i.test(r.error.message || '')) S.v6 = false; return; }
+      S.v6 = true; IN.events = (r.data && r.data.events) || [];
+      remind(); offers(); drain();
+    }, function () { IN.busy = false; });
+  }
+  // Deja programados exactamente los recordatorios que tocan: quita los de eventos que ya no voy o que han cambiado de hora.
+  function remind() {
+    if (!LN) return;
+    var want = {}, now = Date.now(), had = jget('rg.remind'), drop = [], add = [];
+    IN.events.forEach(function (e) {
+      if (e.status !== 'going') return;
+      var key = e.starts_at + '|' + e.title + '|' + (e.meet_name || '');
+      [[24 * 3600e3, 0, 'Mañana: ' + e.title, fmtWhen(e.starts_at) + (e.meet_name ? ' · Salida: ' + e.meet_name : '') + '. Si no puedes ir, desapúntate y tu plaza pasa a otro.'],
+       [3600e3, 1, 'En 1 hora: ' + e.title, 'Sales a las ' + hhmm(e.starts_at) + (e.meet_name ? ' desde ' + e.meet_name : '') + '. ¿No llegas? Desapúntate.']].forEach(function (x) {
+        var at = e.starts_at - x[0]; if (at < now + 30000) return;
+        want[nid(e.id, x[1])] = { key: key, n: { id: nid(e.id, x[1]), title: x[2], body: x[3], schedule: { at: new Date(at), allowWhileIdle: true }, actionTypeId: 'RG_EVENT', extra: { eventId: e.id, title: e.title, kind: 'remind' } } };
+      });
+    });
+    Object.keys(had).forEach(function (id) { if (!want[id] || want[id].key !== had[id]) drop.push({ id: +id }); });
+    Object.keys(want).forEach(function (id) { if (had[id] !== want[id].key) add.push(want[id].n); });
+    var next = {}; Object.keys(want).forEach(function (id) { next[id] = want[id].key; });
+    Promise.resolve(drop.length ? LN.cancel({ notifications: drop }) : null).catch(function () {}).then(function () { return add.length ? LN.schedule({ notifications: add }) : null; }).then(function () { jset('rg.remind', next); }, function () {});
+  }
+  function forgetReminders() { var had = jget('rg.remind'), ids = Object.keys(had).map(function (id) { return { id: +id }; }); if (LN && ids.length) { try { LN.cancel({ notifications: ids }).catch(function () {}); } catch (e) {} } jset('rg.remind', {}); }
+  // Plaza ofrecida: una vez por oferta. En pantalla, pregunta; en segundo plano, notificación con «Sí, voy» / «No puedo».
+  function offers() {
+    var seen = jget('rg.offers'), now = Date.now(), ch = false;
+    Object.keys(seen).forEach(function (k) { if (now - (seen[k].at || 0) > 20 * 864e5) { delete seen[k]; ch = true; } });
+    IN.events.forEach(function (e) {
+      if (e.status !== 'offered') return;
+      var k = e.id + ':' + e.offered_at, sn = seen[k] || (seen[k] = { at: now });
+      if (document.visibilityState === 'visible') {
+        if (sn.asked || A.isRec() || !$('#rgSheet').hidden) return;
+        sn.asked = 1; ch = true; offerSheet(e);
+      } else if (LN && !sn.notified) {
+        sn.notified = 1; ch = true;
+        try { LN.schedule({ notifications: [{ id: nid(e.id, 2), title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y eres el siguiente. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', actionTypeId: 'RG_OFFER', extra: { eventId: e.id, title: e.title, kind: 'offer' } }] }).catch(function () {}); } catch (x) {}
+      }
+    });
+    if (ch) jset('rg.offers', seen);
+  }
+  function offerSheet(e) {
+    Cl.sheet('<div class="head"><h1>Hay una plaza para ti</h1></div><p><b>' + esc(e.title) + '</b><br>' + fmtWhen(e.starts_at) + (e.meet_name ? ' · Salida: ' + esc(e.meet_name) : '') + '</p>' +
+      '<p>Alguien se ha desapuntado y eres el siguiente de la lista de espera. ¿Vas a venir?</p>' +
+      '<button class="btn big primary" id="ofYes" type="button">Sí, voy</button><button class="btn big" id="ofNo" type="button">No puedo, que pase al siguiente</button>' +
+      '<p class="muted rg-small" style="text-align:left">Si no contestas antes del ' + fmtWhen(e.deadline).toLowerCase() + ', la plaza pasa al siguiente y tú vuelves a la lista.</p>');
+    $('#ofYes').addEventListener('click', function (ev) { Cl.busy(ev.currentTarget, function () { return answer(e.id, e.title, true).then(Cl.closeSheet); }); });
+    $('#ofNo').addEventListener('click', function (ev) { Cl.busy(ev.currentTarget, function () { return answer(e.id, e.title, false).then(Cl.closeSheet); }); });
+  }
+  function refresh() { var c = cur(); if (c && S.tab === 'events' && !$('#view-club').hidden) paneEvents(c).catch(function () {}); }
+  function answer(evId, title, yes) {
+    return sb.from('event_attendees').update({ status: yes ? 'going' : 'no' }).eq('event_id', evId).eq('user_id', S.user.id).select('status').then(function (r) {
+      var d = ok(r), got = d && d[0] ? d[0].status : null;
+      A.toast(yes ? (got === 'going' ? 'Confirmado: vas a «' + title + '».' : 'La plaza ya no estaba libre: sigues en la lista de espera.') : 'Vale. La plaza pasa al siguiente de la lista.', yes && got !== 'going' ? 'warn' : 'ok');
+      refresh(); return inbox(true);
+    });
+  }
+  // Botones de las notificaciones. Si la app estaba cerrada, se espera a tener la sesión.
+  function drain() {
+    if (!S.user || !IN.pending.length) return;
+    var p = IN.pending.shift(), title = p.title || 'la ruta';
+    var job = p.act === 'leave' ? sb.from('event_attendees').update({ status: 'no' }).eq('event_id', p.ev).eq('user_id', S.user.id).then(function (r) { ok(r); A.toast('Te has desapuntado de «' + title + '».', 'ok'); refresh(); return inbox(true); })
+      : p.act === 'yes' ? answer(p.ev, title, true) : p.act === 'no' ? answer(p.ev, title, false)
+      : p.act === 'tap' ? Promise.resolve().then(function () {
+          var e = IN.events.filter(function (x) { return x.id === p.ev; })[0];
+          if (e && e.status === 'offered' && $('#rgSheet').hidden) offerSheet(e); else { if (e && e.community_id) setCid(e.community_id); S.tab = 'events'; A.showView('club'); }
+        }) : Promise.resolve();
+    Promise.resolve(job).catch(fail).then(drain);
+  }
+  if (LN) {
+    try {
+      LN.registerActionTypes({ types: [
+        { id: 'RG_EVENT', actions: [{ id: 'leave', title: 'No puedo ir', destructive: true }, { id: 'ok', title: 'Allí estaré' }] },
+        { id: 'RG_OFFER', actions: [{ id: 'yes', title: 'Sí, voy' }, { id: 'no', title: 'No puedo', destructive: true }] }] });
+      LN.addListener('localNotificationActionPerformed', function (a) {
+        var x = (a && a.notification && a.notification.extra) || {}; if (!x.eventId) return;
+        IN.pending.push({ act: a.actionId, ev: x.eventId, title: x.title, kind: x.kind });
+        if (IN.events.length || a.actionId !== 'tap') drain(); else inbox(true);
+      });
+    } catch (e) {}
+  }
+  setInterval(function () { inbox(false); }, 60000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(function () { inbox(false); }, 1500); });
+
+  Cl.onChange(function (u) {
+    var changed = (S.user && S.user.id) !== (u && u.id); S.user = u;
+    if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) forgetReminders(); else setTimeout(function () { inbox(true); }, 2000); if (!$('#view-club').hidden) show(); }
+  });
+  window.RGClub = { show: show, inbox: inbox, state: S, mine: function () { return IN.events.slice(); } };
 })();

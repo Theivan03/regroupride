@@ -4,6 +4,18 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
+## Qué hay en la versión 0.10
+
+Necesita ejecutar **`supabase/06_plazas_y_salida.sql`** en Supabase (después de los anteriores). Sin él la app funciona como la 0.9.
+
+- **Plazas y lista de espera en los eventos.** El administrador pone un límite de motos. Quien se apunta con el evento lleno queda en lista de espera, por orden de llegada. Cuando alguien con plaza se desapunta, la plaza se **ofrece** al primero de la lista, que tiene que confirmar («Sí, voy» / «No puedo»); si dice que no, pasa al siguiente. Si no contesta en 12 horas (o en la mitad del tiempo que falte para la salida), pasa al siguiente y él vuelve al final. Las reglas las aplica la base de datos (disparadores sobre `event_attendees`), así que valen también para móviles con la app antigua.
+- **Recordatorios un día antes y una hora antes** de cada evento al que estás apuntado, con el botón **«No puedo ir»** para desapuntarse desde la propia notificación. Son notificaciones programadas en el teléfono: saltan con la app cerrada. Se reprograman solas si el organizador cambia la hora (cuando el móvil abre la app y lo ve).
+- **Aviso de plaza libre**: en pantalla si la app está abierta; como notificación con «Sí, voy» / «No puedo» si está en segundo plano. Con la app cerrada del todo no llega (haría falta push).
+- **Punto de salida con enlace de Maps**: el organizador pega el enlace del sitio (o usa su posición). La tarjeta del evento enlaza siempre a Maps, y **«Ir al punto de salida»** pone en el mapa de la app el camino desde donde estás; «Iniciar ruta» te guía hasta allí. Si no hay enlace y el evento lleva ruta, la salida es donde empieza la ruta.
+- **Inclinómetro: la vertical se mide en marcha.** En cuanto la moto rueda a más de ~15 km/h, 1,5 s bastan para saber dónde está su vertical de verdad, vaya recta o en curva, sin depender de cómo estaba aparcada (pata de cabra, cuesta, peralte). Lo que marque en parado es provisional y **no cuenta**: en una ruta, máximas, «última» y curvas solo se apuntan rodando y con la vertical ya medida.
+- **Ubicación rápida**: el plugin de GPS pedía una posición cada 15 s (su valor por defecto); ahora cada segundo. Además el GPS se pide al arrancar, el mapa abre donde estabas la última vez y se centra con la posición aproximada del teléfono mientras llega la buena.
+- Pruebas: `tools/test-arranque.js` (vertical en marcha), `tools/test-rg.js` (enlaces de Maps a un sitio).
+
 ## Qué hay en la versión 0.9.1
 
 - **El inclinómetro marca desde que se abre la app.** Antes los sensores no se encendían hasta abrir el inclinómetro o empezar la ruta, y sin referencia guardada había que tener el móvil 1,5 s completamente quieto (en la mano o con el motor en marcha no llegaba nunca). Ahora:

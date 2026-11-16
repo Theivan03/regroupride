@@ -206,6 +206,15 @@ th{letter-spacing:0;text-transform:none}
 .ev-route svg{width:18px;height:18px;flex:none;color:var(--color-accent)}
 .ev-go{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .ev-go .btn{flex:1 1 auto}
+.ev-meet{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ev-meet .link{display:flex;align-items:center;gap:6px;margin-top:0;text-align:left;min-width:0}
+.ev-meet .link svg{width:17px;height:17px;flex:none}
+.ev-meet .link span{overflow:hidden;text-overflow:ellipsis}
+.ev-wait{display:inline-flex;align-items:center;font-weight:700;font-size:14px;color:var(--color-warn);background:color-mix(in srgb,var(--color-warn) 16%,transparent);border-radius:999px;padding:8px 14px}
+.ev-offer{display:flex;flex-direction:column;gap:4px;background:color-mix(in srgb,var(--color-accent) 12%,transparent);border:1.5px solid var(--color-accent);border-radius:16px;padding:12px 14px;margin-top:8px}
+.ev-offer b{font-family:var(--font-display);font-size:16px}
+.ev-offer span{font-size:14px;line-height:1.4}
+.rg-h2{font-family:var(--font-display);font-weight:650;font-size:16px;margin:18px 0 8px}
 .ev-admin{display:flex;gap:18px;margin-top:6px;padding-top:10px;border-top:1px solid var(--color-line)}
 .link.danger{color:var(--color-error)}
 .club-card .link{align-self:flex-start;margin-top:4px}

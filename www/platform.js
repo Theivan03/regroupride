@@ -11,7 +11,9 @@ var Platform = (function () {
 
   /* --- GPS: devuelve una función para parar el seguimiento --- */
   function watchPosition(onFix, onError) {
-    var opts = { enableHighAccuracy: true, maximumAge: 500, timeout: 15000 };
+    // interval/minimumUpdateInterval: en el plugin de Capacitor (Android) el intervalo por defecto es el «timeout»,
+    // o sea una posición cada 15 s; hay que pedir 1 s a propósito. El navegador los ignora.
+    var opts = { enableHighAccuracy: true, maximumAge: 500, timeout: 20000, interval: 1000, minimumUpdateInterval: 1000 };
     if (has('Geolocation')) {
       var id = null, stopped = false;
       P.Geolocation.requestPermissions({ permissions: ['location'] }).then(function (st) {
@@ -28,6 +30,22 @@ var Platform = (function () {
     if (!('geolocation' in navigator)) { onError({ code: 0, message: 'unsupported' }); return function () {}; }
     var w = navigator.geolocation.watchPosition(onFix, onError, opts);
     return function () { navigator.geolocation.clearWatch(w); };
+  }
+
+  /* --- posición rápida: la última que conozca el teléfono (red, wifi o GPS de hace poco), sin esperar al GPS ---
+     No pide permisos: si aún no los hay, no hace nada (ya los pide watchPosition). */
+  function quickPosition(onPos) {
+    var o = { enableHighAccuracy: false, maximumAge: 10 * 60000, timeout: 8000 };
+    try {
+      if (has('Geolocation')) {
+        P.Geolocation.checkPermissions().then(function (st) {
+          if (!st || (st.location !== 'granted' && st.coarseLocation !== 'granted')) return;
+          return P.Geolocation.getCurrentPosition(o).then(function (pos) { if (pos) onPos(pos); });
+        }).catch(function () {});
+      } else if ('geolocation' in navigator && navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then(function (st) { if (st.state === 'granted') navigator.geolocation.getCurrentPosition(onPos, function () {}, o); }, function () {});
+      }
+    } catch (e) {}
   }
 
   /* --- pantalla encendida --- */
@@ -143,7 +161,7 @@ var Platform = (function () {
 
   return { native: native, os: os, watchPosition: watchPosition, keepAwake: keepAwake, isAwake: isAwake, onWakeChange: onWakeChange,
     canShare: canShare, shareCsv: shareCsv, downloadCsv: downloadCsv, onBack: onBack, ready: ready,
-    hasNativeMotion: hasNativeMotion, startNativeMotion: startNativeMotion,
+    quickPosition: quickPosition, hasNativeMotion: hasNativeMotion, startNativeMotion: startNativeMotion,
     hasBackgroundGps: hasBackgroundGps, watchPositionBackground: watchPositionBackground, openLocationSettings: openLocationSettings,
     canSpeak: canSpeak, speak: speak, sharePng: sharePng, openExternal: openExternal };
 })();

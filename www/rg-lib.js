@@ -33,6 +33,30 @@ var RGLib = (function () {
     }
     return null;
   }
+  /* Punto de un enlace de mapa (un sitio, no una ruta): { lat, lon, name } o null si el enlace no lleva coordenadas.
+     Vale para enlaces de Google Maps ya abiertos (place, search, ?q=, @lat,lon), Apple Maps, geo: y "lat, lon" a secas.
+     De un sitio se prefieren sus coordenadas reales (!3d…!4d…) a las del centro de la pantalla (@…). */
+  function parseMapsPoint(input) {
+    var raw = String(input || '').trim(), url = extractUrl(raw) || raw, m, c, name = '';
+    if ((m = raw.match(/^geo:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/i))) { c = { lat: parseFloat(m[1]), lon: parseFloat(m[2]) }; return okLL(c.lat, c.lon) ? { lat: c.lat, lon: c.lon, name: '' } : null; }
+    if (!/^https?:/i.test(url)) { c = coordText(raw); return c && /^\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*$/.test(raw) ? { lat: c.lat, lon: c.lon, name: '' } : null; }
+    var u; try { u = new URL(url); } catch (e) { return null; }
+    var path = u.pathname, qp = u.searchParams, pm = path.match(/\/place\/([^/@]+)/);
+    if (pm && !coordText(decodeSeg(pm[1]))) name = decodeSeg(pm[1]).split(',')[0].slice(0, 80);
+    var all = path + u.search, re = /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/g, last = null;
+    while ((m = re.exec(all))) last = m;                      // el último par es el del sitio elegido
+    if (last && okLL(parseFloat(last[1]), parseFloat(last[2]))) return { lat: parseFloat(last[1]), lon: parseFloat(last[2]), name: name };
+    var keys = ['q', 'query', 'destination', 'daddr', 'll', 'sll', 'center'];
+    for (var i = 0; i < keys.length; i++) { var v = qp.get(keys[i]); if (v && /^\s*(?:loc:)?-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*$/.test(v)) { c = coordText(v.replace(/^\s*loc:/, '')); if (c) return { lat: c.lat, lon: c.lon, name: name }; } }
+    if ((m = path.match(/\/(?:place|search|dir\/[^/]*)\/(-?\d+(?:\.\d+)?),\+?(-?\d+(?:\.\d+)?)(?:[/?]|$)/)) && okLL(parseFloat(m[1]), parseFloat(m[2]))) return { lat: parseFloat(m[1]), lon: parseFloat(m[2]), name: name };
+    if ((m = path.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)) && okLL(parseFloat(m[1]), parseFloat(m[2]))) return { lat: parseFloat(m[1]), lon: parseFloat(m[2]), name: name };
+    return null;
+  }
+  // Enlace de Google Maps a un punto (o, si no hay coordenadas, a la búsqueda de su nombre).
+  function mapsPointUrl(lat, lon, name) {
+    if (lat != null && lon != null && okLL(+lat, +lon)) return 'https://www.google.com/maps/search/?api=1&query=' + (+lat).toFixed(6) + ',' + (+lon).toFixed(6);
+    return name ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(name) : null;
+  }
   // Mete un punto de paso donde menos alarga el recorrido.
   function insertByDetour(pts, via) {
     if (pts.length < 2) return pts.concat([via]);
@@ -454,7 +478,7 @@ var RGLib = (function () {
   }
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
-  return { dist: dist, findMapsUrl: findMapsUrl, parseMapsUrl: parseMapsUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
+  return { dist: dist, findMapsUrl: findMapsUrl, parseMapsUrl: parseMapsUrl, parseMapsPoint: parseMapsPoint, mapsPointUrl: mapsPointUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
     rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, poiKind: poiKind, stopKind: stopKind, stopSteps: stopSteps, navSteps: navSteps, LEVELS: LEVELS, LEVEL_HINT: LEVEL_HINT, paceScore: paceScore, riderScore: riderScore, levelAdvice: levelAdvice, makeGroups: makeGroups, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = RGLib;
