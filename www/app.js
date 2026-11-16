@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.12.1';
+  var APP_VERSION = '0.13.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -188,9 +188,9 @@
 
   /* ---------- mapa ---------- */
   var map = null, dmap = null, posMarker = null, mapReady = false, liveFeatures = [], mapFollow = settings.follow !== false;
-  function styleUrl() { return isDark() ? 'https://tiles.openfreemap.org/styles/dark' : 'https://tiles.openfreemap.org/styles/liberty'; }
-  function fallbackStyle() { return { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': isDark() ? '#1f1e1b' : '#e6e3da' } }] }; }
-  function loadStyle() { return fetch(styleUrl(), { mode: 'cors' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).catch(function () { return fallbackStyle(); }); }
+  // El mapa lleva estilo propio (rg-mapstyle.js, Dirección A): no hay que descargar nada para montarlo.
+  function fallbackStyle() { return { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': isDark() ? '#1D2226' : '#F4F1EC' } }] }; }
+  function loadStyle() { var st; try { st = window.RGMapStyle ? window.RGMapStyle(isDark()) : fallbackStyle(); } catch (e) { st = fallbackStyle(); } return Promise.resolve(st); }
   function setMapStyle(m, isDetail) { loadStyle().then(function (st) { m.setStyle(st); m.once('style.load', function () { if (isDetail) { if (detailTrack) drawDetailTrack(); } else drawLiveTrack(true); }); }); }
   function addTrackLayers(m, prefix) {
     if (m.getSource(prefix + '-track')) return;

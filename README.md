@@ -141,3 +141,10 @@ Decisiones técnicas y pendientes: `docs/DECISIONES.md`.
 - La píldora del tiempo dice solo los grados («17°»). Si llueve, nieva o hay tormenta se vuelve ámbar y cambia el icono; al tocarla se lee el tiempo entero. Antes el texto («17° · Cubierto») empujaba el avatar fuera de la pantalla.
 - Si los sensores o el GPS fallan, ese aviso se lee con palabras y el tiempo se aparta para dejarle sitio.
 - El crédito del mapa sale recogido en una «i» bajo las píldoras (se abre al tocarla); ya no queda medio tapado por la barra de pestañas.
+
+## 0.13 · la pantalla del mapa, como en la lámina de la Dirección A
+
+- **Mapa con estilo propio** (`www/rg-mapstyle.js`): crema de día y pizarra de noche, verde, agua, carreteras claras con las principales en ocre, pocos rótulos y las gasolineras marcadas. Sigue usando las teselas de OpenFreeMap, pero ya no descarga un estilo ajeno para arrancar.
+- **Columna de botones redondos**: centrar (verde cuando el mapa te sigue), brújula, grupo y «más» (planificar y aparcamiento). En móviles bajitos y en reposo quedan centrar y «más».
+- **Cartel de giro en dos líneas**, con flecha que dobla; lo que queda de ruta va pequeño en la esquina.
+- **Medidas de la lámina**: margen de 12 px, píldoras de 32, avatar de 38, barra de pestañas de 58 con esquinas de 20 e iconos nuevos en Rutas y Garaje.

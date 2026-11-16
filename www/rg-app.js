@@ -23,6 +23,9 @@
     if (kind === 'roundabout') return '<svg viewBox="0 0 32 32"><circle cx="16" cy="15" r="6.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 29v-7.5M21 9l5-5m0 0h-5.5M26 4v5.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     if (kind === 'stop') return '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M12.500 11v10M19.500 11v10" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg>';
     if (kind === 'off') return '<svg viewBox="0 0 32 32"><path d="M16 5 3.5 26.5h25z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M16 13v6.5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="23" r="1.7" fill="currentColor"/></svg>';
+    // giros a derecha e izquierda: flecha que dobla, como en una señal
+    if (kind === 'right' || kind === 'left') return '<svg viewBox="0 0 32 32"><g' + (kind === 'left' ? ' transform="matrix(-1 0 0 1 32 0)"' : '') + '><path d="M9.5 27V16.5a5 5 0 0 1 5-5H25m0 0-6.5-6.500M25 11.500 18.500 18" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
+    if (kind === 'uturn') return '<svg viewBox="0 0 32 32"><path d="M9 27V13.5a6.5 6.5 0 0 1 13 0V23m0 0-5.5-5.5M22 23l5.5-5.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     var a = ARROW[kind] == null ? 0 : ARROW[kind];
     return '<svg viewBox="0 0 32 32"><g transform="rotate(' + a + ' 16 16)"><path d="M16 27V6m0 0-7.5 7.5M16 6l7.5 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
   }
@@ -140,9 +143,9 @@
       } else if (r.finished) { ico = 'arrive'; text = 'Has llegado'; sub = 'Fin de la ruta'; cls = 'ok'; }
       else {
         nx = r.next;
-        if (nx) { ico = nx.icon; dist = L.fmtDist(nx.dist); text = L.cap(nx.text); if (nx.name && nx.icon !== 'arrive') sub = nx.name; }
+        if (nx) { ico = nx.icon; dist = L.fmtDist(nx.dist); text = L.cap(nx.text); }
         else { text = 'Sigue la ruta'; }
-        sub = (sub ? sub + ' · ' : '') + 'quedan ' + fmtKm(r.remaining);
+        sub = 'quedan ' + fmtKm(r.remaining);   // en ruta el cartel va en dos líneas; lo que queda, pequeño en la esquina (el nombre de la carretera ya está en el mapa)
       }
     }
     var key = cls + '|' + ico + '|' + dist + '|' + text + '|' + sub;
@@ -592,7 +595,7 @@
   }
 
   /* ================= pantalla de ruta: poco intrusiva ================= */
-  // Menú lateral plegado en un solo botón: se abre al tocarlo y se cierra al tocar fuera o al elegir una opción.
+  // Columna del mapa: centrar, brújula, grupo y «más»; lo demás (planificar, aparcamiento) sale al tocar «más» y se recoge al tocar fuera o al elegir.
   var ctrls = $('#mapCtrls'), more = $('#btnMore');
   function setMenu(open) { if (!ctrls) return; ctrls.classList.toggle('open', open); more.setAttribute('aria-expanded', String(open)); }
   if (more) {
