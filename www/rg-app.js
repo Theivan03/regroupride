@@ -638,7 +638,7 @@
         return on.then(function (isOn) {
           s2.locationOn = isOn;
           var still = NEED.filter(function (n) { return s2[n[0]] !== 'granted'; });
-          if ((still.length || !isOn) && !quiet) showMissing(s2, still);
+          if ((still.length || !isOn || s2.fullScreen === false) && !quiet) showMissing(s2, still);
           renderPerms();
           return s2.location === 'granted' && isOn;
         });
@@ -647,15 +647,20 @@
   }
   function showMissing(s, still) {
     if (!$('#rgSheet').hidden) return;      // hay otra ventana abierta: se dirá la próxima vez
+    var noFull = s.fullScreen === false, onlyFull = noFull && !still.length && s.locationOn;
     var rows = still.map(function (n) { return '<div class="perm"><div><b>' + n[1] + '</b><span class="muted">' + n[2] + '</span></div><span class="mstatus due">Falta</span></div>'; }).join('') +
-      (s.locationOn ? '' : '<div class="perm"><div><b>Ubicación del teléfono</b><span class="muted">Está apagada: sin ella la app no sabe dónde estás.</span></div><span class="mstatus due">Apagada</span></div>');
-    sheet('<div class="head"><h1>Falta algo para rodar</h1></div><p>ReGroupRide necesita esto para funcionar bien:</p>' + rows +
+      (s.locationOn ? '' : '<div class="perm"><div><b>Ubicación del teléfono</b><span class="muted">Está apagada: sin ella la app no sabe dónde estás.</span></div><span class="mstatus due">Apagada</span></div>') +
+      (noFull ? '<div class="perm"><div><b>Alarma sobre la pantalla de bloqueo</b><span class="muted">Para que un SOS o una avería del grupo se te abra en grande, como una llamada, aunque el móvil esté bloqueado.</span></div><span class="mstatus due">Falta</span></div>' : '');
+    // Este permiso Android no lo da con una ventana: hay que activar un interruptor en una pantalla suya. El botón lleva directo a ella.
+    sheet('<div class="head"><h1>' + (onlyFull ? 'Un permiso más' : 'Falta algo para rodar') + '</h1></div><p>' + (onlyFull ? 'Solo queda esto para que los avisos del grupo te lleguen como deben:' : 'ReGroupRide necesita esto para funcionar bien:') + '</p>' + rows +
       (s.locationOn ? '' : '<button class="btn big primary" id="pmOn" type="button">Encender la ubicación</button>') +
       (still.length ? '<p class="muted rg-small" style="text-align:left">Android ya no deja volver a preguntar por lo que has denegado. Se activa en los ajustes del teléfono: Permisos.</p><button class="btn big' + (s.locationOn ? ' primary' : '') + '" id="pmApp" type="button">Abrir los ajustes de la app</button>' : '') +
+      (noFull ? '<button class="btn big' + (onlyFull ? ' primary' : '') + '" id="pmFullNow" type="button">Permitir la alarma a pantalla completa</button><p class="muted rg-small" style="text-align:left">Se abre una pantalla de Android: activa el interruptor de ReGroupRide y vuelve atrás.</p>' : '') +
       '<button class="btn rg-skip" id="pmLater" type="button">Ahora no</button>');
     $('#pmLater').addEventListener('click', closeSheet);
     if ($('#pmOn')) $('#pmOn').addEventListener('click', function () { closeSheet(); permAt = 0; checkAll(false); });
     if ($('#pmApp')) $('#pmApp').addEventListener('click', function () { closeSheet(); permAt = 0; SYS.openAppSettings(); });
+    if ($('#pmFullNow')) $('#pmFullNow').addEventListener('click', function () { closeSheet(); permAt = 0; SYS.openFullScreenSettings(); });
   }
   function ensure() { return SYS ? checkAll(false).then(function (ok) { if (!ok) A.toast('Sin ubicación no se puede seguir ni grabar la ruta.', 'warn'); return ok; }) : oldEnsure(); }
   if (SYS) {

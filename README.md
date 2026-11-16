@@ -14,6 +14,8 @@ El plan completo (funciones y fases) está en el documento «App para moteros �
 
 - **0.8.1** · Al importar una ruta (GPX, o una grabada convertida) se elige entre «Guardar en mis rutas» y «Guardar y empezarla ahora»; ya no se pone a seguirla sola. · **Consejo de nivel**: si el nivel elegido y las rutas no cuadran por un nivel o más (con al menos 3 rutas, 2 horas y 40 curvas medidas), la app propone cambiarlo, con buenas palabras, al guardar una ruta o al entrar en Ajustes; si se dice que no, no insiste en un mes.
 
+- **0.8.2** · «Voz al salir de cada curva» y «Pausa automática al parar» vienen apagadas (en las instalaciones anteriores se apagan una vez). · El permiso de alarma sobre la pantalla de bloqueo (Android 14 o superior) se pide al abrir la app, con un botón que lleva directo a su interruptor.
+
 ## Qué hay en la versión 0.7
 
 - **Ir al punto de salida**: al iniciar una ruta lejos de su comienzo, cada uno elige entre ir primero a la salida o entrar por el punto más cercano.

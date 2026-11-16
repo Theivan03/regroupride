@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.8.1';
+  var APP_VERSION = '0.8.2';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -21,7 +21,10 @@
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
     del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
-  var settings = Object.assign({ invert: false, vMin: 15, minPeak: 10, theme: 'auto', gyroGain: 1, gyroGainSrc: 'web', voice: true, autoPause: true, autoStart: false, follow: true, headingUp: false, colorMode: 'lean' }, LS.get('inclina.settings', {}));
+  var settings = Object.assign({ invert: false, vMin: 15, minPeak: 10, theme: 'auto', gyroGain: 1, gyroGainSrc: 'web', voice: false, autoPause: false, autoStart: false, follow: true, headingUp: false, colorMode: 'lean' }, LS.get('inclina.settings', {}));
+  // La voz y la pausa automática vienen apagadas. En las instalaciones anteriores venían encendidas: se apagan una vez
+  // (quien las quiera las vuelve a encender en Ajustes y ya se quedan así).
+  if (!settings.defaultsOff) { settings.voice = false; settings.autoPause = false; settings.defaultsOff = 1; LS.set('inclina.settings', settings); }
   var MOTION_SRC = Platform.hasNativeMotion() ? 'native' : 'web';
   if (settings.gyroGainSrc !== MOTION_SRC) { settings.gyroGain = 1; settings.gyroGainSrc = MOTION_SRC; }
   var calib = LS.get('inclina.calib', null);
