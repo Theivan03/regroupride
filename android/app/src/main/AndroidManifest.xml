@@ -38,6 +38,8 @@
     <!-- Aviso de «fuera de ruta»: vibración y notificación. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Cámara: solo para leer el QR de un grupo. -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <!-- Alarma de SOS o avería de alguien del grupo: se abre por encima de la pantalla de bloqueo, como una llamada. -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Ubicación: para seguir y grabar la ruta. En segundo plano solo mientras hay una ruta en marcha (servicio con aviso). -->

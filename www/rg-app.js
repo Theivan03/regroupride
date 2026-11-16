@@ -12,7 +12,7 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function fmtKm(m) { return (m / 1000).toFixed(m >= 100000 ? 0 : 1).replace('.', ',') + ' km'; }
   function fmtMin(s) { var m = Math.round(s / 60), h = Math.floor(m / 60); return h ? h + ' h ' + String(m % 60).padStart(2, '0') + ' min' : m + ' min'; }
-  function say(t) { if (A.settings.navVoice !== false && window.Platform && Platform.canSpeak()) Platform.speak(t); }
+  function say(t) { if (A.settings.navVoice === true && window.Platform && Platform.canSpeak()) Platform.speak(t); }   // apagada salvo que se encienda en Ajustes
   function buzz(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
   var EMPTY = { type: 'FeatureCollection', features: [] };
 
@@ -290,42 +290,58 @@
                         : sb.from('routes').insert(cloudRow(p)).select('id').single().then(function (r) { if (r.error) throw r.error; p.cloudId = r.data.id; A.toast('Ruta publicada: ya la puede ver y seguir cualquiera.', 'ok'); });
     return job.then(function () { return A.updatePlan(p); }).catch(function (e) { A.toast(msg(e), 'bad'); });
   }
-  function explore() {
-    if (!user) { A.toast('Entra en tu cuenta para ver las rutas de otros moteros.', 'warn'); openAuth(false); return; }
+  // Rutas que otros moteros han hecho públicas. Se pintan dentro de Rutas → «De otros moteros» (o en una hoja).
+  var pubBy = null;
+  function fetchPlan(x) {
+    return sb.from('routes').select('name,plan').eq('id', x.id).single().then(function (q) {
+      if (q.error || !q.data || !q.data.plan || !(q.data.plan.coords || []).length) throw (q.error || new Error('Esa ruta ya no está disponible.'));
+      var pl = q.data.plan, p = { id: parseInt(x.id.replace(/-/g, '').slice(0, 12), 16), name: q.data.name, wps: pl.wps || [], pois: pl.pois || [], coords: pl.coords, steps: pl.steps || [], dist: pl.dist || Math.round((x.m || 0) / 100) / 10, dur: pl.dur || x.s || 0, routed: true, created: Date.now(), from: x.by };
+      if (x.mine) p.cloudId = x.id;
+      return p;
+    });
+  }
+  function renderPublic(box, inSheet) {
+    if (!sb || !user) { box.innerHTML = '<div class="empty">Entra en tu cuenta para ver las rutas que comparten otros moteros.</div><button class="btn primary wide" type="button" id="pbLogin">Entrar o crear cuenta</button>'; box.querySelector('#pbLogin').addEventListener('click', function () { openAuth(false); }); return; }
     var fix = A.lastFix();
-    sheet('<div class="head"><h1>Rutas públicas</h1><button class="btn small icon" id="exX" type="button"><svg><use href="#i-close"/></svg></button></div><div id="exList"><div class="empty">Cargando…</div></div>');
-    $('#exX').addEventListener('click', closeSheet);
-    sb.rpc('routes_public', { p_lat: fix ? fix.lat : null, p_lon: fix ? fix.lon : null, p_limit: 60 }).then(function (r) {
-      var box = $('#exList'); if (!box) return;
+    box.innerHTML = '<div class="empty">Cargando rutas…</div>';
+    sb.rpc('routes_public', { p_lat: fix ? fix.lat : null, p_lon: fix ? fix.lon : null, p_limit: 80 }).then(function (r) {
+      if (!box.isConnected) return;
       if (r.error) { box.innerHTML = '<div class="notice">' + esc(msg(r.error)) + '</div>'; return; }
-      var list = r.data || [];
-      box.innerHTML = (fix ? '<p class="muted rg-small" style="text-align:left">Primero, las que salen más cerca de ti.</p>' : '') + (list.length ? list.map(function (x) {
-        var far = fix && x.lat != null ? L.dist(fix.lat, fix.lon, x.lat, x.lon) : null;
-        return '<div class="club-card ex" data-id="' + x.id + '"><b>' + esc(x.name) + '</b><span class="muted">' + fmtKm(x.m || 0) + (x.s ? ' · ' + fmtMin(x.s) : '') + ' · de ' + esc(x.mine ? 'ti' : x.by) + (far != null ? ' · sale a ' + L.fmtDist(far) : '') + '</span>' +
-          '<div class="rg-row"><button class="btn small primary" data-act="use" type="button">Guardar y seguir</button>' + (x.mine ? '' : '<button class="link" data-act="rep" type="button">Denunciar</button>') + '</div></div>';
-      }).join('') : '<div class="empty">Todavía no hay rutas públicas. Publica la primera desde Rutas → Planificadas.</div>');
+      var all = r.data || [], list = pubBy ? all.filter(function (x) { return x.by === pubBy; }) : all;
+      if (pubBy && !list.length) { pubBy = null; list = all; }
+      box.innerHTML = (pubBy ? '<div class="rg-row" style="margin-bottom:8px"><b>Rutas de ' + esc(pubBy) + '</b><button class="link" id="pbAll" type="button">Ver todas</button></div>' : '<p class="muted rg-small" style="text-align:left;margin:0 0 8px">' + (all.length ? (fix ? 'Rutas públicas de otros moteros. Primero, las que salen más cerca de ti.' : 'Rutas públicas de otros moteros, de la más nueva a la más antigua.') : '') + '</p>') +
+        (list.length ? list.map(function (x) {
+          var far = fix && x.lat != null ? L.dist(fix.lat, fix.lon, x.lat, x.lon) : null;
+          return '<div class="club-card ex" data-id="' + x.id + '"><b>' + esc(x.name) + '</b><span class="muted">' + fmtKm(x.m || 0) + (x.s ? ' · ' + fmtMin(x.s) : '') + (far != null ? ' · sale a ' + L.fmtDist(far) : '') + '</span>' +
+            '<span class="muted">' + (x.mine ? 'La has publicado tú' : 'De <button class="link" data-act="by" type="button">' + esc(x.by) + '</button>') + '</span>' +
+            '<div class="rg-row"><button class="btn small primary" data-act="see" type="button">Ver en el mapa</button><button class="btn small" data-act="use" type="button">Guardar en mis rutas</button>' + (x.mine ? '' : '<button class="link" data-act="rep" type="button">Denunciar</button>') + '</div></div>';
+        }).join('') : '<div class="empty">Todavía no hay rutas públicas. Publica la primera: en «Planificadas», botón «Privada · publicar».</div>');
+      if (box.querySelector('#pbAll')) box.querySelector('#pbAll').addEventListener('click', function () { pubBy = null; renderPublic(box, inSheet); });
       [].forEach.call(box.querySelectorAll('.ex'), function (card) {
         var x = list.filter(function (y) { return y.id === card.dataset.id; })[0];
-        card.querySelector('[data-act=use]').addEventListener('click', function (ev) {
-          busy(ev.currentTarget, function () {
-            return sb.from('routes').select('name,plan').eq('id', x.id).single().then(function (q) {
-              if (q.error || !q.data || !q.data.plan || !(q.data.plan.coords || []).length) throw (q.error || new Error('Esa ruta ya no está disponible.'));
-              var pl = q.data.plan, p = { id: parseInt(x.id.replace(/-/g, '').slice(0, 12), 16), name: q.data.name, wps: pl.wps || [], pois: pl.pois || [], coords: pl.coords, steps: pl.steps || [], dist: pl.dist || Math.round((x.m || 0) / 100) / 10, dur: pl.dur || x.s || 0, routed: true, created: Date.now(), from: x.by };
-              if (x.mine) p.cloudId = x.id;
-              closeSheet(); return A.usePlan(p).then(function () { A.toast('Ruta guardada en tus rutas planificadas.', 'ok'); });
-            });
-          });
-        });
+        card.querySelector('[data-act=see]').addEventListener('click', function (ev) { busy(ev.currentTarget, function () { return fetchPlan(x).then(function (p) { if (inSheet) closeSheet(); A.previewPlan(p); A.toast('«' + p.name + '», de ' + (x.mine ? 'ti' : x.by) + '. Pulsa «Guardar» si te la quieres quedar.', 'ok'); }); }); });
+        card.querySelector('[data-act=use]').addEventListener('click', function (ev) { busy(ev.currentTarget, function () { return fetchPlan(x).then(function (p) { if (inSheet) closeSheet(); return A.usePlan(p).then(function () { A.toast('Ruta guardada en tus rutas planificadas.', 'ok'); }); }); }); });
+        var by = card.querySelector('[data-act=by]'); if (by) by.addEventListener('click', function () { pubBy = x.by; renderPublic(box, inSheet); });
         var rep = card.querySelector('[data-act=rep]');
         if (rep) rep.addEventListener('click', function () {
-          if (!rep.dataset.armed) { rep.dataset.armed = '1'; rep.textContent = '¿Denunciar esta ruta? Toca otra vez'; return; }
+          if (!rep.dataset.armed) { rep.dataset.armed = '1'; rep.textContent = '¿Denunciar? Toca otra vez'; return; }
           sb.from('feedback').insert({ kind: 'fallo', message: 'Ruta pública denunciada: «' + x.name + '» (' + x.id + '), de ' + x.by, app_version: A.version }).then(function (q) { A.toast(q.error ? msg(q.error) : 'Gracias. La revisaremos.', q.error ? 'bad' : 'ok'); rep.remove(); });
         });
       });
-    }, function () { var box = $('#exList'); if (box) box.innerHTML = '<div class="notice">Sin conexión.</div>'; });
+    }, function () { if (box.isConnected) box.innerHTML = '<div class="notice">Sin conexión.</div>'; });
+  }
+  function explore() {
+    sheet('<div class="head"><h1>Rutas de otros moteros</h1><button class="btn small icon" id="exX" type="button"><svg><use href="#i-close"/></svg></button></div><div id="exList"></div>');
+    $('#exX').addEventListener('click', closeSheet); renderPublic($('#exList'), true);
+  }
+  // Una ruta grabada, como ruta para seguir: el mismo camino que un GPX.
+  function trackAsPlan(name, coords) {
+    var a = coords[0], b = coords[coords.length - 1];
+    A.showView('map');
+    return gpxAsPlan({ name: name || 'Ruta grabada', coords: coords, wps: [[a[1], a[0], 'Salida'], [b[1], b[0], 'Llegada']], pois: [] });
   }
 
-  window.RGNav = { togglePublic: togglePublic, explore: explore, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx };
+  window.RGNav = { togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx };
 
   /* ================= importar enlace de Google Maps ================= */
   function readClipboard() {
@@ -548,7 +564,64 @@
   function askNotifNow() { return (native && P.LocalNotifications) ? P.LocalNotifications.requestPermissions().then(function (s) { return s.display; }, function () { return 'unknown'; }) : Promise.resolve('granted'); }
   // Si la comprobación falla o tarda, no bloquea: se deja empezar y el propio GPS pedirá el permiso.
   function quick(p, ms, fallback) { return Promise.race([p, new Promise(function (r) { setTimeout(function () { r(fallback); }, ms); })]).catch(function () { return fallback; }); }
-  function ensure() {
+  // En la app de Android: al abrirla (y al volver a ella, y al iniciar una ruta) se comprueba todo lo que hace falta.
+  //  1) Permisos que falten (ubicación, notificaciones, cámara): Android enseña sus ventanas, una tras otra.
+  //  2) Ubicación del teléfono apagada: sale la ventana del sistema para encenderla con un toque.
+  //  3) Lo que siga faltando (porque Android ya no deja preguntar) se explica, con un botón para abrir los ajustes.
+  var SYS = native && P.RideAlerts && P.RideAlerts.system ? P.RideAlerts : null, permBusy = false, permAt = 0;
+  var NEED = [['location', 'Ubicación', 'Para seguir la ruta, grabarla y que el grupo te vea.'], ['notifications', 'Notificaciones', 'Avisos del grupo, «fuera de ruta» y los botones de SOS en la pantalla de bloqueo.'], ['camera', 'Cámara', 'Solo para leer el QR de un grupo.']];
+  function sysState() { return SYS ? quick(SYS.system(), 3000, null) : Promise.resolve(null); }
+  function turnOn() {
+    return SYS.enableLocation().then(function (r) {
+      if (r && r.on) return true;
+      return new Promise(function (resolve) {      // la ventana es del sistema: se mira cada segundo si ya la han encendido
+        var n = 0, done = false, t0 = Date.now();
+        var end = function (v) { if (done) return; done = true; clearInterval(t); window.removeEventListener('focus', back); resolve(v); };
+        var look = function (last) { sysState().then(function (s) { if (s && s.locationOn) end(true); else if (last || ++n > 12) end(false); }); };
+        var back = function () { if (Date.now() - t0 > 1200) setTimeout(function () { look(true); }, 900); };     // han cerrado la ventana
+        var t = setInterval(function () { look(false); }, 1000);
+        window.addEventListener('focus', back);
+      });
+    }, function () { return false; });
+  }
+  function checkAll(quiet) {
+    if (!SYS) return oldEnsure();
+    if (permBusy) return Promise.resolve(true);
+    permBusy = true;
+    return sysState().then(function (s) {
+      if (!s) return true;
+      var missing = NEED.filter(function (n) { return s[n[0]] !== 'granted'; });
+      var asked = missing.length ? SYS.requestAll().then(function (r) { return r || s; }, function () { return sysState().then(function (x) { return x || s; }); }) : Promise.resolve(s);
+      return asked.then(function (s2) {
+        var on = !s2.locationOn ? turnOn() : Promise.resolve(true);
+        return on.then(function (isOn) {
+          s2.locationOn = isOn;
+          var still = NEED.filter(function (n) { return s2[n[0]] !== 'granted'; });
+          if ((still.length || !isOn) && !quiet) showMissing(s2, still);
+          renderPerms();
+          return s2.location === 'granted' && isOn;
+        });
+      });
+    }).catch(function () { return true; }).then(function (ok) { permBusy = false; permAt = Date.now(); return ok; });
+  }
+  function showMissing(s, still) {
+    if (!$('#rgSheet').hidden) return;      // hay otra ventana abierta: se dirá la próxima vez
+    var rows = still.map(function (n) { return '<div class="perm"><div><b>' + n[1] + '</b><span class="muted">' + n[2] + '</span></div><span class="mstatus due">Falta</span></div>'; }).join('') +
+      (s.locationOn ? '' : '<div class="perm"><div><b>Ubicación del teléfono</b><span class="muted">Está apagada: sin ella la app no sabe dónde estás.</span></div><span class="mstatus due">Apagada</span></div>');
+    sheet('<div class="head"><h1>Falta algo para rodar</h1></div><p>ReGroupRide necesita esto para funcionar bien:</p>' + rows +
+      (s.locationOn ? '' : '<button class="btn big primary" id="pmOn" type="button">Encender la ubicación</button>') +
+      (still.length ? '<p class="muted rg-small" style="text-align:left">Android ya no deja volver a preguntar por lo que has denegado. Se activa en los ajustes del teléfono: Permisos.</p><button class="btn big' + (s.locationOn ? ' primary' : '') + '" id="pmApp" type="button">Abrir los ajustes de la app</button>' : '') +
+      '<button class="btn rg-skip" id="pmLater" type="button">Ahora no</button>');
+    $('#pmLater').addEventListener('click', closeSheet);
+    if ($('#pmOn')) $('#pmOn').addEventListener('click', function () { closeSheet(); permAt = 0; checkAll(false); });
+    if ($('#pmApp')) $('#pmApp').addEventListener('click', function () { closeSheet(); permAt = 0; SYS.openAppSettings(); });
+  }
+  function ensure() { return SYS ? checkAll(false).then(function (ok) { if (!ok) A.toast('Sin ubicación no se puede seguir ni grabar la ruta.', 'warn'); return ok; }) : oldEnsure(); }
+  if (SYS) {
+    setTimeout(function () { checkAll(false); }, 1800);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - permAt > 12000) setTimeout(function () { checkAll(false); }, 600); });
+  }
+  function oldEnsure() {
     return quick(locState(), 3000, 'unknown').then(function (st) {
       if (st === 'granted' || st === 'unknown') { notifState().then(function (n) { if (n !== 'granted' && n !== 'denied') askNotifNow(); }); return true; }
       return new Promise(function (resolve) { explain(st === 'denied', resolve); });
@@ -576,15 +649,19 @@
     var box = $('#rgPerms'); if (!box) return;
     if (!native) { box.hidden = true; return; }
     var RA = P.RideAlerts, full = RA ? RA.status().then(function (x) { return x && x.fullScreen === false ? 'denied' : 'granted'; }, function () { return 'unknown'; }) : Promise.resolve(null);
-    Promise.all([locState(), notifState(), full]).then(function (r) {
+    Promise.all([locState(), notifState(), full, sysState()]).then(function (r) {
+      var sy = r[3]; if (sy) { r[0] = sy.location; r[1] = sy.notifications; }
       var row = function (name, why, st) { var t = PERM_TXT[st] || PERM_TXT.unknown; return '<div class="perm"><div><b>' + name + '</b><span class="muted">' + why + '</span></div><span class="mstatus ' + t[1] + '">' + t[0] + '</span></div>'; };
       box.hidden = false;
-      box.innerHTML = '<span class="label">Permisos</span>' + row('Ubicación', 'Para seguir y grabar la ruta.', r[0]) + row('Notificaciones', 'Aviso de «fuera de ruta» y aviso fijo durante la ruta.', r[1]) +
+      box.innerHTML = '<span class="label">Permisos</span>' + row('Ubicación', 'Para seguir y grabar la ruta.', r[0]) +
+        (sy ? '<div class="perm"><div><b>Ubicación del teléfono</b><span class="muted">Tiene que estar encendida.</span></div><span class="mstatus ' + (sy.locationOn ? 'ok">Encendida' : 'due">Apagada') + '</span></div>' : '') +
+        row('Notificaciones', 'Aviso de «fuera de ruta» y aviso fijo durante la ruta.', r[1]) + (sy ? row('Cámara', 'Solo para leer el QR de un grupo.', sy.camera) : '') +
         (r[2] ? row('Alarma sobre la pantalla de bloqueo', 'Para que un SOS o una avería del grupo se abra en grande, como una llamada.', r[2]) : '') +
         (r[2] === 'denied' ? '<div class="rg-row"><button class="btn small" id="pmFull" type="button">Permitir la alarma a pantalla completa</button></div>' : '') +
         '<div class="perm"><div><b>Sensores de inclinación</b><span class="muted">Android no pide permiso para usarlos.</span></div><span class="mstatus ok">Disponible</span></div>' +
-        ((r[0] !== 'granted' || r[1] !== 'granted') ? '<div class="rg-row"><button class="btn small primary" id="pmFix" type="button">Revisar permisos</button></div>' : '');
+        ((r[0] !== 'granted' || r[1] !== 'granted' || (sy && (!sy.locationOn || sy.camera !== 'granted'))) ? '<div class="rg-row"><button class="btn small primary" id="pmFix" type="button">Revisar permisos</button></div>' : '');
       if ($('#pmFull')) $('#pmFull').addEventListener('click', function () { RA.openFullScreenSettings(); });
+      if ($('#pmFix') && SYS) { $('#pmFix').addEventListener('click', function () { permAt = 0; checkAll(false); }); return; }
       if ($('#pmFix')) $('#pmFix').addEventListener('click', function () {
         if (r[0] !== 'granted') ensure().then(renderPerms);
         else askNotifNow().then(function (n) { if (n !== 'granted' && window.Platform) Platform.openLocationSettings(); renderPerms(); });
@@ -597,7 +674,7 @@
 
   // Indicaciones por voz
   var sw = $('#setNavVoice');
-  if (sw) { sw.checked = A.settings.navVoice !== false; sw.addEventListener('change', function () { A.settings.navVoice = sw.checked; A.saveSettings(); if (sw.checked && window.Platform) Platform.speak('Indicaciones activadas'); }); }
+  if (sw) { sw.checked = A.settings.navVoice === true; sw.addEventListener('change', function () { A.settings.navVoice = sw.checked; A.saveSettings(); if (sw.checked && window.Platform) Platform.speak('Indicaciones activadas'); }); }
 
   renderAccount();
   refresh().then(function () {

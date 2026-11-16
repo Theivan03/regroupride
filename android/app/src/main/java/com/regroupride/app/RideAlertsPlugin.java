@@ -1,5 +1,6 @@
 package com.regroupride.app;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -7,6 +8,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.location.LocationManager;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
@@ -23,10 +25,23 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+import com.google.android.gms.common.api.ResolvableApiException;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResponse;
+import com.google.android.gms.location.Priority;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+
+import java.util.ArrayList;
 
 /**
  * Avisos del grupo durante la ruta.
@@ -35,7 +50,14 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *  - alarm: aviso recibido. Si es «loud» (SOS o avería) suena como una alarma, vibra, enciende la pantalla y
  *    abre la app por encima del bloqueo, hasta que se pulsa «Entendido» (o pasan dos minutos).
  */
-@CapacitorPlugin(name = "RideAlerts")
+@CapacitorPlugin(
+    name = "RideAlerts",
+    permissions = {
+        @Permission(alias = "location", strings = { Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION }),
+        @Permission(alias = "notifications", strings = { "android.permission.POST_NOTIFICATIONS" }),
+        @Permission(alias = "camera", strings = { Manifest.permission.CAMERA })
+    }
+)
 public class RideAlertsPlugin extends Plugin {
     static final String ACTION = "com.regroupride.app.RIDE_ALERT";
     static final String CH_BANNER = "rg_ride_buttons";
@@ -224,6 +246,136 @@ public class RideAlertsPlugin extends Plugin {
             }
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             c.startActivity(i);
+        } catch (Exception ignored) { }
+        call.resolve();
+    }
+
+    /* ---------- permisos y ubicación del teléfono ---------- */
+
+    private boolean locationOn() {
+        try {
+            LocationManager lm = (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
+            if (lm == null) return false;
+            if (Build.VERSION.SDK_INT >= 28) return lm.isLocationEnabled();
+            return lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String state(String alias) {
+        try {
+            if ("notifications".equals(alias) && Build.VERSION.SDK_INT < 33) {
+                return NotificationManagerCompat.from(getContext()).areNotificationsEnabled() ? "granted" : "denied";
+            }
+            PermissionState st = getPermissionState(alias);
+            return st == null ? "prompt" : st.toString();
+        } catch (Exception e) {
+            return "prompt";
+        }
+    }
+
+    private JSObject systemState() {
+        Context c = getContext();
+        JSObject r = new JSObject();
+        r.put("location", state("location"));
+        r.put("notifications", state("notifications"));
+        r.put("camera", state("camera"));
+        r.put("locationOn", locationOn());
+        boolean full = true;
+        if (Build.VERSION.SDK_INT >= 34) {
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            full = nm != null && nm.canUseFullScreenIntent();
+        }
+        r.put("fullScreen", full);
+        return r;
+    }
+
+    /** Cómo están los permisos y si el teléfono tiene la ubicación encendida. */
+    @PluginMethod
+    public void system(PluginCall call) {
+        call.resolve(systemState());
+    }
+
+    /** Pide de una vez todos los permisos que falten (ubicación, notificaciones, cámara). Android enseña sus ventanas una tras otra. */
+    @PluginMethod
+    public void requestAll(PluginCall call) {
+        ArrayList<String> need = new ArrayList<>();
+        if (!"granted".equals(state("location"))) need.add("location");
+        if (Build.VERSION.SDK_INT >= 33 && !"granted".equals(state("notifications"))) need.add("notifications");
+        if (!"granted".equals(state("camera"))) need.add("camera");
+        if (need.isEmpty()) {
+            call.resolve(systemState());
+            return;
+        }
+        try {
+            requestPermissionForAliases(need.toArray(new String[0]), call, "permsDone");
+        } catch (Exception e) {
+            call.resolve(systemState());
+        }
+    }
+
+    @PermissionCallback
+    private void permsDone(PluginCall call) {
+        call.resolve(systemState());
+    }
+
+    /** Si la ubicación del teléfono está apagada, enseña la ventana del sistema para encenderla con un toque. */
+    @PluginMethod
+    public void enableLocation(final PluginCall call) {
+        final Activity a = getActivity();
+        final JSObject r = new JSObject();
+        if (locationOn()) {
+            r.put("on", true);
+            call.resolve(r);
+            return;
+        }
+        r.put("on", false);
+        try {
+            LocationRequest req = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000).build();
+            LocationSettingsRequest settings = new LocationSettingsRequest.Builder().addLocationRequest(req).setAlwaysShow(true).build();
+            LocationServices.getSettingsClient(a).checkLocationSettings(settings)
+                .addOnSuccessListener(new OnSuccessListener<LocationSettingsResponse>() {
+                    @Override
+                    public void onSuccess(LocationSettingsResponse res) {
+                        r.put("on", locationOn());
+                        call.resolve(r);
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(Exception e) {
+                        boolean asked = false;
+                        if (e instanceof ResolvableApiException) {
+                            try {
+                                ((ResolvableApiException) e).startResolutionForResult(a, 9911);
+                                asked = true;
+                            } catch (Exception ignored) { }
+                        }
+                        if (!asked) openLocationPanel();
+                        r.put("asked", asked);
+                        call.resolve(r);
+                    }
+                });
+        } catch (Throwable t) {
+            openLocationPanel();
+            r.put("asked", false);
+            call.resolve(r);
+        }
+    }
+
+    private void openLocationPanel() {
+        try {
+            getContext().startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception ignored) { }
+    }
+
+    /** Abre la ficha de la app en los ajustes del teléfono (para dar un permiso que Android ya no deja pedir). */
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        try {
+            Context c = getContext();
+            c.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } catch (Exception ignored) { }
         call.resolve();
     }

@@ -4,6 +4,14 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
+## Qué hay en la versión 0.8
+
+- **Permisos al abrir la app** (y al volver a ella y al iniciar una ruta): se piden los que falten —ubicación, notificaciones, cámara— y, si la ubicación del teléfono está apagada, sale la ventana del sistema para encenderla. Lo que Android ya no deja pedir se explica con un botón a los ajustes.
+- **Voz apagada por defecto**; se enciende en Ajustes.
+- **Plan de mantenimiento con vista previa**: se ve lo que se va a añadir, se puede quitar o cambiar cada tarea y hay que confirmar.
+- **Opciones del mapa**: fuera «seguirme», «orientar al rumbo» y «ver mis rutas». El botón de recentrar solo aparece al mover el mapa.
+- **Rutas de otros moteros** en una pestaña propia de Rutas, con «Ver en el mapa» antes de guardar y filtro por autor. Una ruta grabada se puede convertir en ruta para seguir y publicarla.
+
 ## Qué hay en la versión 0.7
 
 - **Ir al punto de salida**: al iniciar una ruta lejos de su comienzo, cada uno elige entre ir primero a la salida o entrar por el punto más cercano.

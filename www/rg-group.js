@@ -13,7 +13,7 @@
   var EVERY = 15000, FAST = 5000;   // posiciones cada 15 s; el organizador, quien espera la salida y quien espera respuesta a un aviso, cada 5 s
   var RA = native && P.RideAlerts ? P.RideAlerts : null, noop = function () {};
   var KIND = { sos: { t: 'SOS', say: 'pide ayuda', loud: true }, averia: { t: 'Avería', say: 'tiene una avería', loud: true }, gasolina: { t: 'Gasolina', say: 'necesita repostar', loud: false } };
-  function speak(t) { if (window.Platform && Platform.canSpeak && Platform.canSpeak()) Platform.speak(t); }
+  function speak(t) { if (A.settings.navVoice === true && window.Platform && Platform.canSpeak && Platform.canSpeak()) Platform.speak(t); }   // la voz viene apagada: se enciende en Ajustes
   var G = { s: null, rows: [], rank: null, lastSync: 0, busy: false, wasRec: false, markers: {}, timer: null, sheetOpen: false, skew: 0, alarm: null, bannerKey: '', lastTry: 0, admin: false, groups: null, groupsAt: 0, lastPace: 0, autoStart: 0, pop: null, callsAt: 0, callsOff: false };
   try { G.s = JSON.parse(localStorage.getItem('rg.group') || 'null'); } catch (e) {}
   function save() { try { if (G.s) localStorage.setItem('rg.group', JSON.stringify(G.s)); else localStorage.removeItem('rg.group'); } catch (e) {} }

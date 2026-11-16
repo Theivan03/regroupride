@@ -362,3 +362,18 @@ body.rg-rec #followCard{display:none}
 .stop-marker.named.food .ico{background:#0B8A4B}
 .stop-marker.named.view .ico{background:#8E6BFF}
 .stop-marker.named.park .ico{background:#2F7CF6}
+
+/* ---------- 0.8 ---------- */
+/* opciones del mapa: fuera «seguirme», «orientar al rumbo» y «ver mis rutas». Queda solo el botón de recentrar cuando mueves el mapa. */
+.map-ctrls>#btnHeading,.map-ctrls>#btnLayers{display:none!important}
+.map-ctrls.open>#btnFollow[aria-pressed="true"]{display:none}
+/* plan de mantenimiento: vista previa editable */
+.pr-head,.pr-row{display:grid;grid-template-columns:26px 1fr 78px 58px;gap:6px;align-items:center}
+.pr-head{font-size:11.5px;color:var(--color-text-2);font-weight:600;margin:10px 0 4px}
+.pr-row{margin-bottom:6px}
+.pr-row input[type=checkbox]{width:22px;height:22px;accent-color:var(--color-accent)}
+.pr-row input[type=text],.pr-row input[type=number]{min-width:0;width:100%;padding:9px 8px;border-radius:10px;border:1.5px solid var(--color-line);background:var(--color-bg);color:var(--color-text);font:inherit;font-size:14px}
+.pr-row.off input:not([type=checkbox]){opacity:.35}
+#followSave{min-height:36px;padding:0 12px;flex:none}
+.club-card.ex{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.club-card.ex .rg-row{margin-top:6px;flex-wrap:wrap}

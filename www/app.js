@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.7.1';
+  var APP_VERSION = '0.8.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -356,7 +356,13 @@
     activePlan = p; settings.activePlanId = p ? p.id : null; saveSettings(); drawPlan(); renderFollow();
     if (p && fit && map && mapReady) { setFollow(false); var b = Geo.bounds(p.coords.map(function (c) { return [0, c[1], c[0]]; })); if (b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: 120, bottom: 220, left: 40, right: 70 }, duration: 600 }); }
   }
-  function renderFollow() { $('#followCard').hidden = !activePlan || planMode; if (activePlan) $('#followName').textContent = activePlan.name; if (window.RGNav) RGNav.sync(); }
+  function renderFollow() { $('#followCard').hidden = !activePlan || planMode; if (activePlan) $('#followName').textContent = activePlan.name; $('#followSave').hidden = !(activePlan && activePlan.preview); if (window.RGNav) RGNav.sync(); }
+  // Ruta de otro motero que estoy mirando en el mapa: «Guardar» la pasa a mis rutas planificadas.
+  $('#followSave').addEventListener('click', function () {
+    var p = activePlan; if (!p || !p.preview) return;
+    delete p.preview; plans = plans.filter(function (x) { return x.id !== p.id; }); plans.unshift(p);
+    savePlans().then(function () { settings.activePlanId = p.id; saveSettings(); renderFollow(); toast('Ruta guardada en tus rutas planificadas.', 'ok'); });
+  });
   $('#btnPlan').addEventListener('click', function () { if (planMode) exitPlanMode(); else enterPlanMode(); });
   $('#planClose').addEventListener('click', exitPlanMode);
   $('#planUndo').addEventListener('click', function () { var m = pl.markers.pop(); if (m) m.remove(); pl.wps.pop(); relabelWps(); scheduleRoute(); });
@@ -567,6 +573,7 @@
     $('#ridesSummary').innerHTML = fig('Total', Math.round(km) + '<span class="unit">km</span>') + fig('Este año', Math.round(kmYear) + '<span class="unit">km</span>') + fig('Horas', hours.toFixed(1).replace('.', ',')) + fig('Media', (rides.length ? Math.round(km / rides.length) : 0) + '<span class="unit">km</span>');
     var hasCar = vehicles.some(function (v) { return v.type === 'coche'; }); $('#pillMoto').hidden = !hasCar; $('#pillCoche').hidden = !hasCar;
     if (ridesFilter === 'plans') { $('#ridesActions').hidden = true; renderPlans(list); return; }
+    if (ridesFilter === 'public') { $('#ridesActions').hidden = true; list.innerHTML = ''; if (window.RGNav) RGNav.renderPublic(list); return; }
     $('#ridesActions').hidden = rides.length === 0;
     var q = ridesQuery.trim().toLowerCase(), principal = vehicles.filter(function (v) { return v.principal; })[0];
     var typeOf = function (r) { var v = vehicles.filter(function (x) { return x.id === r.vehicleId; })[0] || (!r.vehicleId ? principal : null); return v ? v.type || 'moto' : 'moto'; };
@@ -657,7 +664,7 @@
     $('#btnFav').setAttribute('aria-pressed', String(!!r.favorite));
     var sel = $('#rideVehicle'); sel.innerHTML = '<option value="">Sin vehículo</option>' + vehicles.map(function (v) { return '<option value="' + v.id + '"' + (r.vehicleId === v.id ? ' selected' : '') + '>' + esc(v.name) + '</option>'; }).join('');
     $('#btnExportRide span').textContent = Platform.native ? 'Curvas CSV' : 'Curvas CSV';
-    $('#btnGmaps').disabled = !r.hasTrack; $('#btnGpx').disabled = !r.hasTrack; $('#replay').hidden = !r.hasTrack;
+    $('#btnGmaps').disabled = !r.hasTrack; $('#btnGpx').disabled = !r.hasTrack; $('#btnAsRoute').disabled = !r.hasTrack; $('#replay').hidden = !r.hasTrack;
     disarm($('#btnDeleteRide'), 'Borrar esta ruta');
     renderPhotos(r.id);
     showView('detail');
@@ -785,6 +792,15 @@
   // exportaciones
   function rideFileBase(r) { return 'inclina_' + new Date(r.start).toISOString().slice(0, 16).replace(/[:T]/g, '-'); }
   function exportFail(e) { if (!/abort|cancel/i.test(String(e))) toast('No se ha podido exportar en este dispositivo.', 'bad'); }
+  // Una ruta grabada se puede convertir en ruta para seguir (y, desde Planificadas, publicarla).
+  $('#btnAsRoute').addEventListener('click', function () {
+    if (!detailRide || !window.RGNav) return;
+    var r = detailRide;
+    DB.getTrack(r.id).then(function (pts) {
+      if (!pts || pts.length < 2) { toast('Esta ruta no tiene trazado.', 'warn'); return; }
+      return RGNav.trackAsPlan(rideTitle(r), pts.map(function (p) { return [p[2], p[1]]; }));
+    });
+  });
   $('#btnGpx').addEventListener('click', function () {
     if (!detailRide) return;
     DB.getTrack(detailRide.id).then(function (pts) { return Platform.downloadCsv(rideFileBase(detailRide) + '.gpx', Geo.toGpx(detailRide, pts), 'Ruta Inclina ' + rideTitle(detailRide)); }).then(function () { return setFlag('gpxExport'); }).catch(exportFail);
@@ -896,7 +912,7 @@
         if (b.dataset.act === 'edit') openVehicleForm(v);
         if (b.dataset.act === 'del') armOrRun(b, 'Quitar del garaje', 'Toca otra vez para quitar', function () { DB.deleteVehicle(v.id).then(reloadVehicles).then(renderGarage); });
         if (b.dataset.act === 'addm') openMaintForm(v, null, odo);
-        if (b.dataset.act === 'preset') loadPreset(v, odo);
+        if (b.dataset.act === 'preset') previewPreset(v, odo);
         if (b.dataset.act === 'mdone') markMaintDone(v, b.dataset.m, odo);
         if (b.dataset.act === 'medit') openMaintForm(v, v.maint.filter(function (m) { return m.id === b.dataset.m; })[0], odo);
       }); });
@@ -940,6 +956,36 @@
       '<div class="actions" style="margin-top:var(--sp-2)"><button class="btn small" type="button" data-act="addm"><svg><use href="#i-plus"/></svg>Tarea</button><button class="btn small" type="button" data-act="preset"><svg><use href="#i-wrench"/></svg>' + (isZontes(v) ? 'Plan 703RR' : 'Plan genérico') + '</button></div></div>';
   }
   function fmtInt(n) { return Math.round(n).toLocaleString('es-ES'); }
+  // El plan no se pone solo: primero se enseña lo que se va a añadir, se puede quitar o cambiar cada tarea, y hay que confirmar.
+  function previewPreset(v, odo) {
+    var C = window.RGCloud; if (!C) { loadPreset(v, odo); return; }
+    var p = isZontes(v) ? PRESETS.zontes703 : PRESETS.generic, have = (v.maint || []).map(function (m) { return m.name.toLowerCase(); });
+    var fresh = p.items.filter(function (it) { return have.indexOf(it[0].toLowerCase()) < 0; }), old = p.items.length - fresh.length;
+    if (!fresh.length) { toast('Ese plan ya está cargado.', 'warn'); return; }
+    C.sheet('<div class="head"><h1>Plan de mantenimiento</h1><button class="btn small icon" id="prX" type="button"><svg><use href="#i-close"/></svg></button></div>' +
+      '<p>' + esc(p.name) + '. Esto es lo que se añadiría a <b>' + esc(v.name || 'tu moto') + '</b>, contando desde ' + fmtInt(odo) + ' km. Quita lo que no quieras y cambia los intervalos antes de confirmar.</p>' +
+      '<div class="pr-head"><span></span><span>Tarea</span><span>Cada km</span><span>Meses</span></div>' +
+      fresh.map(function (it, i) { return '<div class="pr-row" data-i="' + i + '"><input type="checkbox" checked aria-label="Añadir ' + esc(it[0]) + '"><input type="text" class="pr-n" maxlength="40" value="' + esc(it[0]) + '"><input type="number" class="pr-k" inputmode="numeric" min="0" step="500" value="' + (it[1] || '') + '"><input type="number" class="pr-m" inputmode="numeric" min="0" value="' + (it[2] || '') + '" placeholder="—"></div>'; }).join('') +
+      (old ? '<p class="muted rg-small" style="text-align:left">' + old + (old === 1 ? ' tarea del plan ya la tienes' : ' tareas del plan ya las tienes') + ' y no se repite.</p>' : '') +
+      '<button class="btn big primary" id="prOk" type="button"></button><button class="btn rg-skip" id="prNo" type="button">Cancelar</button>');
+    var rows = $$('#rgSheet .pr-row'), okb = $('#prOk');
+    var count = function () { var n = rows.filter(function (r) { return r.querySelector('input[type=checkbox]').checked; }).length; okb.textContent = n ? 'Añadir ' + n + (n === 1 ? ' tarea' : ' tareas') : 'Marca alguna tarea'; okb.disabled = !n; };
+    rows.forEach(function (r) { r.querySelector('input[type=checkbox]').addEventListener('change', function () { r.classList.toggle('off', !this.checked); count(); }); });
+    count();
+    $('#prX').addEventListener('click', C.closeSheet); $('#prNo').addEventListener('click', C.closeSheet);
+    okb.addEventListener('click', function () {
+      var added = 0; v.maint = v.maint || [];
+      rows.forEach(function (r) {
+        if (!r.querySelector('input[type=checkbox]').checked) return;
+        var name = r.querySelector('.pr-n').value.trim(), km = parseInt(r.querySelector('.pr-k').value, 10) || null, mo = parseInt(r.querySelector('.pr-m').value, 10) || null;
+        if (!name || (!km && !mo)) return;
+        v.maint.push({ id: 'm' + Date.now() + '-' + (added++), name: name, everyKm: km, everyMonths: mo, lastKm: odo, lastAt: Date.now() });
+      });
+      C.closeSheet();
+      if (!added) { toast('No se ha añadido nada: cada tarea necesita nombre y un intervalo.', 'warn'); return; }
+      DB.putVehicle(v).then(reloadVehicles).then(function () { renderGarage(); toast(added + (added === 1 ? ' tarea añadida' : ' tareas añadidas') + ', contando desde ' + fmtInt(odo) + ' km. Toca una tarea para ajustar cuándo se hizo.', 'ok'); });
+    });
+  }
   function loadPreset(v, odo) {
     var p = isZontes(v) ? PRESETS.zontes703 : PRESETS.generic, have = (v.maint || []).map(function (m) { return m.name.toLowerCase(); }), added = 0;
     v.maint = v.maint || [];
@@ -1146,6 +1192,7 @@
     isRec: function () { return !!rec; }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { askAndStart(); }, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
     plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); },
+    previewPlan: function (p) { p.preview = true; showView('map'); followPlan(p, true); },
     // Lo que llevo medido en la ruta en marcha: km, segundos en movimiento e inclinación máxima de cada curva.
     recNow: function () { return rec ? { km: rec.dist || 0, movingS: rec.movingS || 0, peaks: rec.corners.map(function (c) { return Math.abs(c.peak || 0); }) } : null; },
     updatePlan: function (p) { plans = plans.map(function (x) { return x.id === p.id ? p : x; }); if (activePlan && activePlan.id === p.id) activePlan = p; return savePlans().then(function () { if (currentView === 'rides') renderRides(); }); },
