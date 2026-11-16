@@ -373,7 +373,7 @@ body.rg-rec #followCard{display:none}
 .stop-marker.named.park .ico{background:#2F7CF6}
 
 /* ---------- 0.8 ---------- */
-/* (0.8 escondía «seguirme» y «orientar al rumbo»; desde la 0.13 vuelven a verse, como en la lámina de la Dirección A) */
+/* opciones del mapa: fuera «orientar al rumbo» y «ver mis rutas». «Centrar» solo sale cuando mueves el mapa. */
 .map-ctrls>#btnHeading,.map-ctrls>#btnLayers{display:none!important}
 .map-ctrls.open>#btnFollow[aria-pressed="true"]{display:none}
 /* plan de mantenimiento: vista previa editable */
@@ -556,7 +556,7 @@ body.rg-hud #hudCard .hud{padding:2px 4px 10px 0;margin-bottom:8px;border-bottom
 
 /* ================= 0.13 · la pantalla del mapa, fiel a la lámina de la Dirección A =================
    Medidas tomadas de la muestra (móvil de 345 px) y pasadas a 390: margen de 12 px, píldoras de 32, avatar de 38,
-   cartel de dos líneas, columna de cuatro botones redondos y barra de pestañas de 58 con esquinas de 20. */
+   botones redondos y barra de pestañas de 58 con esquinas de 20. */
 :root{--rg-inset:12px;--h-tabbar:74px}
 /* fila de estado */
 .map-top{padding-left:max(var(--rg-inset),env(safe-area-inset-left,0px));padding-right:max(var(--rg-inset),env(safe-area-inset-right,0px));gap:6px}
@@ -569,23 +569,26 @@ body.rg-hud #hudCard .hud{padding:2px 4px 10px 0;margin-bottom:8px;border-bottom
 .map-top .bar .chip.wx::before{width:16px;height:16px}
 .map-top .avatar{width:38px;height:38px;font-size:15px}
 #map .maplibregl-ctrl-top-left{top:calc(max(var(--sp-3),env(safe-area-inset-top,0px)) + 38px);left:calc(max(var(--rg-inset),env(safe-area-inset-left,0px)) - 10px)}
-/* cartel de giro: dos líneas; lo que queda de ruta, pequeño en la esquina */
-.nav-banner{left:max(var(--rg-inset),env(safe-area-inset-left,0px));right:max(var(--rg-inset),env(safe-area-inset-right,0px));top:calc(max(var(--sp-3),env(safe-area-inset-top,0px)) + 46px);min-height:92px;padding:15px 16px 15px 15px;gap:14px}
-.nav-ico{width:62px;height:62px;border-radius:15px}
-.nav-ico svg{width:42px;height:42px}
-.nav-main b{font-size:39px;letter-spacing:-.01em}
-.nav-main span{font-size:20px;text-transform:lowercase}
-.nav-banner:not(.to):not(.off) .nav-sub{position:absolute;right:16px;top:15px;font-size:12.5px;font-weight:650;opacity:.82;white-space:nowrap}
-/* columna de botones: centrar (verde cuando te sigue), brújula, grupo y «más» */
+/* cartel de giro (0.14): la mitad de alto que antes. Una fila: ficha pequeña con la flecha, la distancia y la indicación
+   (hasta dos líneas si es larga, como en las rotondas). Debajo, en pequeño, lo que queda o el motivo del cartel. */
+.nav-banner{left:max(var(--rg-inset),env(safe-area-inset-left,0px));right:max(var(--rg-inset),env(safe-area-inset-right,0px));top:calc(max(var(--sp-3),env(safe-area-inset-top,0px)) + 46px);min-height:46px;padding:5px 12px 5px 5px;gap:10px;border-radius:15px;align-items:center}
+.nav-ico{width:36px;height:36px;border-radius:10px;flex:none}
+.nav-ico svg{width:25px;height:25px}
+.nav-txt{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:1fr auto;column-gap:10px;align-items:center;flex:1;min-width:0}
+.nav-main{display:contents}
+.nav-main b{grid-column:1;grid-row:1/3;font-size:22px;font-weight:700;line-height:1;white-space:nowrap;letter-spacing:-.01em}
+.nav-main b:empty{display:none}
+.nav-main span{grid-column:2;grid-row:1;font-size:15.5px;font-weight:700;line-height:1.2;margin:0;text-transform:none;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nav-banner .nav-sub,.nav-banner:not(.to):not(.off) .nav-sub{grid-column:2;grid-row:2;position:static;font-size:11.5px;font-weight:600;line-height:1.2;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-banner .nav-sub:empty{display:none}
+/* menú lateral (0.14): como antes de la 0.13. Un solo botón «más» con todo dentro; fuera solo quedan «centrar»,
+   que aparece únicamente cuando el mapa no está centrado en ti, y el grupo mientras ruedas en uno. Sin brújula. */
 .map-ctrls{right:max(var(--rg-inset),env(safe-area-inset-right,0px));gap:10px}
-.map-ctrls>#btnFollow,.map-ctrls>#btnHeading,.map-ctrls>#btnGroup,.map-ctrls>#btnMore{display:flex!important}
-.map-ctrls>#btnPlan,.map-ctrls>#btnPark{display:none}
-.map-ctrls.open>#btnPlan,.map-ctrls.open>#btnPark{display:flex}
-.map-ctrls>#btnLayers{display:none!important}
+.map-ctrls>#btnHeading,.map-ctrls>#btnLayers{display:none!important}
 .map-ctrls #btnGroup[aria-pressed="true"]:not(.alert){background:var(--color-surface);color:var(--color-text)}
 .map-ctrls #btnMore svg{width:24px;height:24px}
-.nav-banner:not([hidden])~.map-ctrls{top:calc(max(var(--sp-3),env(safe-area-inset-top,0px)) + 46px + 104px)}
-.nav-banner.to:not([hidden])~.map-ctrls,.nav-banner.off:not([hidden])~.map-ctrls{top:calc(max(var(--sp-3),env(safe-area-inset-top,0px)) + 46px + 124px)}
+.map-ctrls.open{z-index:6}
+.nav-banner:not([hidden])~.map-ctrls{top:calc(max(var(--sp-3),env(safe-area-inset-top,0px)) + 46px + 58px)}
 /* abajo: marcador y tarjetas al mismo ancho que la barra de pestañas, y pegados a ella */
 .map-bottom{padding-left:max(var(--rg-inset),env(safe-area-inset-left,0px));padding-right:max(var(--rg-inset),env(safe-area-inset-right,0px));padding-bottom:6px}
 .rg-warnbtn,#btnAlert{border-radius:16px;margin-bottom:10px}
@@ -594,9 +597,3 @@ body.rg-hud #hudCard .hud{padding:2px 4px 10px 0;margin-bottom:8px;border-bottom
 .tab{height:50px;border-radius:16px;font-size:10.5px;font-weight:600;gap:2px}
 .tab svg{width:21px;height:21px}
 .tab[aria-selected="true"]::after{bottom:1px;width:4px;height:4px;margin-left:-2px}
-@media (max-height:640px){.map-ctrls button,body.rg-rec .map-ctrls button{width:50px;height:50px}.map-ctrls{gap:8px}}
-/* móviles bajitos, en reposo: la tarjeta de abajo es alta, así que brújula y grupo esperan dentro de «más» */
-.map-ctrls.open{z-index:6}
-@media (max-height:700px){
-  body:not(.rg-rec) .map-ctrls:not(.open)>#btnHeading,body:not(.rg-rec) .map-ctrls:not(.open)>#btnGroup[aria-pressed="false"]{display:none!important}
-}

@@ -137,15 +137,16 @@
       if (r.offRoute || !r.started) {
         cls = r.offRoute ? 'off' : 'to';
         nx = rj && rj.next;
-        if (nx && nx.dist < 2500 && !rj.offRoute) { ico = nx.icon; dist = L.fmtDist(nx.dist); text = L.cap(nx.text); }
+        if (nx && nx.dist < 2500 && !rj.offRoute) { ico = nx.icon; dist = L.fmtDist(nx.dist); text = nx.text; }
         else { ico = r.offRoute ? 'off' : 'straight'; dist = L.fmtDist(rj ? rj.remaining : r.off); text = r.offRoute ? 'para volver a la ruta' : (nav.toStart ? 'hasta la salida' : 'hasta la ruta'); }
         sub = r.offRoute ? 'Te has salido de la ruta' : (nav.toStart ? 'Yendo al punto de salida' : 'Yendo a la ruta');
       } else if (r.finished) { ico = 'arrive'; text = 'Has llegado'; sub = 'Fin de la ruta'; cls = 'ok'; }
       else {
         nx = r.next;
-        if (nx) { ico = nx.icon; dist = L.fmtDist(nx.dist); text = L.cap(nx.text); }
+        if (nx) { ico = nx.icon; dist = L.fmtDist(nx.dist); text = nx.text; }
         else { text = 'Sigue la ruta'; }
-        sub = 'quedan ' + fmtKm(r.remaining);   // en ruta el cartel va en dos líneas; lo que queda, pequeño en la esquina (el nombre de la carretera ya está en el mapa)
+        // cartel pequeño: si la indicación es corta cabe debajo lo que queda de ruta; si es larga (rotondas) ocupa ella las dos líneas
+        sub = text.length <= 24 ? 'quedan ' + fmtKm(r.remaining) : '';
       }
     }
     var key = cls + '|' + ico + '|' + dist + '|' + text + '|' + sub;
@@ -500,40 +501,56 @@
     return sb.auth.getSession().then(function (r) {
       user = (r.data && r.data.session && r.data.session.user) || null; profile = null;
       if (!user) return;
-      return sb.from('profiles').select('*').eq('id', user.id).maybeSingle().then(function (p) { profile = p.data || null; });
+      return sb.from('profiles').select('*').eq('id', user.id).maybeSingle().then(function (p) { profile = p.data || null; }).then(loadPhone);
     }).catch(function () {}).then(renderAccount).then(function () { if (user) setTimeout(sendStats, 4000); });
   }
   function levelOptions(cur) { var o = ''; for (var i = 5; i >= 1; i--) o += '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + esc(L.LEVELS[i] + ' — ' + L.LEVEL_HINT[i]) + '</option>'; return o; }
-  // Mi ficha de motero: nivel (para repartir grupos) y teléfono para las rutas (solo lo ven otros administradores y quien pida ayuda).
+  // Nivel de motero (para repartir grupos): se elige en el Perfil. El teléfono para las rutas (opcional) va aparte, en Ajustes.
   function openRider() {
     if (!user) { openAuth(false); return; }
+    var lvl = profile && profile.level;
+    sheet('<div class="head"><h1>Mi nivel de motero</h1><button class="btn small icon" id="rdX" type="button"><svg><use href="#i-close"/></svg></button></div><form class="rg-form" id="rdForm">' +
+      '<label>¿Cómo vas en moto?<select id="rdLevel">' + (lvl ? '' : '<option value="" selected>Elige uno</option>') + levelOptions(lvl || 0) + '</select></label>' +
+      '<p class="muted rg-small" style="text-align:left">Sirve para repartir los grupos en las rutas. Solo lo ven los administradores de la ruta en la que vayas, junto con tus medias de velocidad e inclinación.</p>' +
+      '<div id="rdStats" class="muted rg-small" style="text-align:left"></div><button class="btn big primary" type="submit">Guardar</button></form>');
+    $('#rdX').addEventListener('click', closeSheet);
+    sb.from('rider_stats').select('*').eq('user_id', user.id).maybeSingle().then(function (q) {
+      var st = q.data, el = $('#rdStats'); if (!el || !st || !st.rides) return;
+      var adv = L.levelAdvice(lvl, st);
+      if (adv) {     // aquí se dice siempre, con un botón para ponerlo
+        var tx = adviceText(adv, lvl), box = document.createElement('div'); box.className = 'notice rg-advice';
+        box.innerHTML = '<div><b>' + esc(tx[0]) + '</b><span>' + esc(tx[1]) + '</span><button class="btn small" type="button">Poner «' + esc(L.LEVELS[adv.suggest]) + '»</button></div>';
+        el.parentNode.insertBefore(box, el);
+        box.querySelector('button').addEventListener('click', function () { $('#rdLevel').value = String(adv.suggest); box.remove(); A.toast('Puesto. Pulsa «Guardar» para confirmarlo.', 'ok'); });
+      }
+      el.textContent = 'Tus medias en ' + st.rides + (st.rides === 1 ? ' ruta' : ' rutas') + ': ' + (st.moving_s > 600 ? Math.round(st.km / (st.moving_s / 3600)) + ' km/h en movimiento' : 'velocidad sin datos') + (st.corners >= 5 ? ' · ' + Math.round(st.lean_sum / st.corners) + '° de media en curva' : '') + '.';
+    }, function () {});
+    $('#rdForm').addEventListener('submit', function (ev) {
+      ev.preventDefault(); var lv = +$('#rdLevel').value || null;
+      busy(ev.target.querySelector('button[type=submit]'), function () {
+        return sb.from('profiles').update({ level: lv }).eq('id', user.id).then(function (a) { if (a.error) throw a.error; return refresh(); }).then(function () { closeSheet(); A.toast('Nivel guardado.', 'ok'); });
+      });
+    });
+  }
+  // Teléfono para las rutas: solo lo ven otros administradores y quien pida ayuda.
+  var ridePhone = null;   // null = aún no se sabe · '' = sin teléfono
+  function loadPhone() {
+    if (!user) { ridePhone = null; return Promise.resolve(); }
+    return sb.from('profile_private').select('*').eq('id', user.id).maybeSingle().then(function (r) { var d = r.data || {}; ridePhone = 'ride_phone' in d ? (d.ride_phone || '') : null; }, function () { ridePhone = null; });
+  }
+  function openPhone() {
+    if (!user) { openAuth(false); return; }
     sb.from('profile_private').select('*').eq('id', user.id).maybeSingle().then(function (r) {
-      var priv = r.data || {}, hasPhone = 'ride_phone' in priv, lvl = profile && profile.level;
-      sheet('<div class="head"><h1>Mi ficha de motero</h1><button class="btn small icon" id="rdX" type="button"><svg><use href="#i-close"/></svg></button></div><form class="rg-form" id="rdForm">' +
-        '<label>¿Cómo vas en moto?<select id="rdLevel">' + (lvl ? '' : '<option value="" selected>Elige uno</option>') + levelOptions(lvl || 0) + '</select></label>' +
-        '<p class="muted rg-small" style="text-align:left">Sirve para repartir los grupos en las rutas. Solo lo ven los administradores de la ruta en la que vayas, junto con tus medias de velocidad e inclinación.</p>' +
-        '<label>Teléfono para las rutas (opcional)<input id="rdPhone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" value="' + esc(priv.ride_phone || '') + '" placeholder="600 000 000"' + (hasPhone ? '' : ' disabled') + '></label>' +
-        '<p class="muted rg-small" style="text-align:left">Solo se usa cuando eres administrador de una ruta: lo ven los demás administradores y quien pida ayuda, para poder llamarte.</p>' +
-        '<div id="rdStats" class="muted rg-small" style="text-align:left"></div><button class="btn big primary" type="submit">Guardar</button></form>');
+      var priv = r.data || {}, hasPhone = 'ride_phone' in priv;
+      sheet('<div class="head"><h1>Teléfono para las rutas</h1><button class="btn small icon" id="rdX" type="button"><svg><use href="#i-close"/></svg></button></div><form class="rg-form" id="rdForm">' +
+        '<label>Teléfono (opcional)<input id="rdPhone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" value="' + esc(priv.ride_phone || '') + '" placeholder="600 000 000"' + (hasPhone ? '' : ' disabled') + '></label>' +
+        '<p class="muted rg-small" style="text-align:left">Solo se usa cuando eres administrador de una ruta: lo ven los demás administradores y quien pida ayuda, para poder llamarte. Si lo dejas vacío no pasa nada.</p>' +
+        '<button class="btn big primary" type="submit"' + (hasPhone ? '' : ' disabled') + '>Guardar</button></form>');
       $('#rdX').addEventListener('click', closeSheet);
-      sb.from('rider_stats').select('*').eq('user_id', user.id).maybeSingle().then(function (q) {
-        var st = q.data, el = $('#rdStats'); if (!el || !st || !st.rides) return;
-        var adv = L.levelAdvice(lvl, st);
-        if (adv) {     // en la ficha se dice siempre, con un botón para ponerlo
-          var tx = adviceText(adv, lvl), box = document.createElement('div'); box.className = 'notice rg-advice';
-          box.innerHTML = '<div><b>' + esc(tx[0]) + '</b><span>' + esc(tx[1]) + '</span><button class="btn small" type="button">Poner «' + esc(L.LEVELS[adv.suggest]) + '»</button></div>';
-          el.parentNode.insertBefore(box, el);
-          box.querySelector('button').addEventListener('click', function () { $('#rdLevel').value = String(adv.suggest); box.remove(); A.toast('Puesto. Pulsa «Guardar» para confirmarlo.', 'ok'); });
-        }
-        el.textContent = 'Tus medias en ' + st.rides + (st.rides === 1 ? ' ruta' : ' rutas') + ': ' + (st.moving_s > 600 ? Math.round(st.km / (st.moving_s / 3600)) + ' km/h en movimiento' : 'velocidad sin datos') + (st.corners >= 5 ? ' · ' + Math.round(st.lean_sum / st.corners) + '° de media en curva' : '') + '.';
-      }, function () {});
       $('#rdForm').addEventListener('submit', function (ev) {
-        ev.preventDefault(); var lv = +$('#rdLevel').value || null, ph = $('#rdPhone').value.trim();
+        ev.preventDefault(); var ph = $('#rdPhone').value.trim(); if (!hasPhone) return;
         busy(ev.target.querySelector('button[type=submit]'), function () {
-          return sb.from('profiles').update({ level: lv }).eq('id', user.id).then(function (a) {
-            if (a.error) throw a.error;
-            return hasPhone ? sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id) : { error: null };
-          }).then(function (b) { if (b.error) throw b.error; return refresh(); }).then(function () { closeSheet(); A.toast('Ficha guardada.', 'ok'); });
+          return sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id).then(function (b) { if (b.error) throw b.error; ridePhone = ph; renderAccount(); closeSheet(); A.toast(ph ? 'Teléfono guardado.' : 'Teléfono quitado.', 'ok'); });
         });
       });
     });
@@ -541,14 +558,19 @@
   var authListeners = [];
   function renderAccount() {
     authListeners.forEach(function (f) { try { f(user); } catch (e) {} });
+    // Perfil: el nivel de motero (cómo vas en moto), que es lo que usan los administradores para repartir grupos
+    var pl = $('#rgRiderLevel'), lv = user && profile && profile.level;
+    if (pl) {
+      pl.innerHTML = '<button class="rg-level" id="rgRider" type="button"><span>' + (lv ? esc(L.LEVELS[lv]) : 'Elige tu nivel de motero') + '</span><small>' + (user ? (lv ? esc(L.LEVEL_HINT[lv]) + ' · tocar para cambiarlo' : 'Cómo vas en moto: sirve para repartir los grupos en las rutas') : 'Entra con tu cuenta para elegirlo') + '</small></button>';
+      $('#rgRider').addEventListener('click', openRider);
+    }
     var box = $('#rgAccount'); if (!box) return;
     if (user) {
       var name = (profile && profile.name) || (user.user_metadata && user.user_metadata.name) || 'Tu cuenta';
-      var lv = profile && profile.level;
       box.innerHTML = '<div class="rg-acc"><span class="rg-ava">' + esc(name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(name) + '</b><span class="muted">' + esc(user.email || '') + '</span></div></div>' +
-        '<button class="rg-level" id="rgRider" type="button"><span>' + (lv ? esc(L.LEVELS[lv]) : 'Elige tu nivel de motero') + '</span><small>Mi ficha: nivel y teléfono para las rutas</small></button>' +
+        '<button class="rg-level" id="rgPhone" type="button"><span>' + (ridePhone ? esc(ridePhone) : 'Teléfono para las rutas') + '</span><small>' + (ridePhone ? 'Teléfono para las rutas (opcional) · tocar para cambiarlo' : 'Opcional · para que puedan llamarte si administras una ruta') + '</small></button>' +
         '<div class="rg-row"><button class="btn small" id="rgFeedback" type="button">Sugerencias y fallos</button><button class="btn small" id="rgOut" type="button">Cerrar sesión</button></div>';
-      $('#rgRider').addEventListener('click', openRider);
+      $('#rgPhone').addEventListener('click', openPhone);
       $('#rgOut').addEventListener('click', function () { sb.auth.signOut().then(function () { user = null; profile = null; renderAccount(); A.toast('Sesión cerrada.', 'ok'); }); });
     } else {
       box.innerHTML = '<div class="rg-acc"><span class="rg-ava">?</span><div><b>Sin cuenta</b><span class="muted">Entra para las rutas en grupo y para enviarnos sugerencias.</span></div></div>' +
@@ -595,7 +617,7 @@
   }
 
   /* ================= pantalla de ruta: poco intrusiva ================= */
-  // Columna del mapa: centrar, brújula, grupo y «más»; lo demás (planificar, aparcamiento) sale al tocar «más» y se recoge al tocar fuera o al elegir.
+  // Menú lateral plegado en un solo botón: se abre al tocarlo y se cierra al tocar fuera o al elegir una opción.
   var ctrls = $('#mapCtrls'), more = $('#btnMore');
   function setMenu(open) { if (!ctrls) return; ctrls.classList.toggle('open', open); more.setAttribute('aria-expanded', String(open)); }
   if (more) {

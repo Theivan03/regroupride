@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.13.0';
+  var APP_VERSION = '0.14.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -227,6 +227,7 @@
   function setFollow(on) { mapFollow = on; settings.follow = on; saveSettings(); $('#btnFollow').setAttribute('aria-pressed', String(on)); if (on && lastFix) updatePosition(lastFix, true); }
   $('#btnFollow').addEventListener('click', function () { setFollow(!mapFollow); });
   $('#btnHeading').addEventListener('click', function () { settings.headingUp = !settings.headingUp; saveSettings(); $('#btnHeading').setAttribute('aria-pressed', String(settings.headingUp)); if (map && !settings.headingUp) map.easeTo({ bearing: 0 }); });
+  if (settings.headingUp) { settings.headingUp = false; saveSettings(); }   // la brújula ya no está en el menú: el mapa vuelve a ir con el norte arriba
   $('#btnHeading').setAttribute('aria-pressed', String(!!settings.headingUp)); $('#btnFollow').setAttribute('aria-pressed', String(mapFollow));
   var firstFixCentered = false;
   function updatePosition(fix, force) {

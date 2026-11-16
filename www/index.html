@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.webmanifest?v=0.13.0">
+<link rel="manifest" href="manifest.webmanifest?v=0.14.0">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
@@ -416,7 +416,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
-<link rel="stylesheet" href="rg-theme.css?v=0.13.0">
+<link rel="stylesheet" href="rg-theme.css?v=0.14.0">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -474,13 +474,13 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
     <div class="nav-txt"><div class="nav-main"><b id="navDist"></b><span id="navText"></span></div><div class="nav-sub" id="navSub"></div></div>
   </div>
   <div class="map-ctrls" id="mapCtrls">
-    <button type="button" id="btnFollow" aria-pressed="true" title="Centrar en mi posición"><svg><use href="#i-locate"/></svg></button>
-    <button type="button" id="btnHeading" aria-pressed="false" title="Orientar el mapa al rumbo"><svg><use href="#i-compass"/></svg></button>
-    <button type="button" id="btnGroup" aria-pressed="false" title="Rodar en grupo"><svg><use href="#i-people"/></svg><span class="grp-badge" id="groupCount" hidden>0</span></button>
     <button type="button" id="btnMore" aria-expanded="false" title="Más opciones"><svg viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.9" fill="currentColor"/><circle cx="12" cy="12" r="1.9" fill="currentColor"/><circle cx="18.5" cy="12" r="1.9" fill="currentColor"/></svg></button>
+    <button type="button" id="btnFollow" aria-pressed="true" title="Centrar en mi posición"><svg><use href="#i-locate"/></svg></button>
+    <button type="button" id="btnGroup" aria-pressed="false" title="Rodar en grupo"><svg><use href="#i-people"/></svg><span class="grp-badge" id="groupCount" hidden>0</span></button>
     <button type="button" id="btnPlan" aria-pressed="false" title="Planificar una ruta"><svg><use href="#i-route"/></svg></button>
     <button type="button" id="btnPark" aria-pressed="false" title="Aparcamiento"><svg><use href="#i-park"/></svg></button>
-    <button type="button" id="btnLayers" aria-pressed="false" title="Ver mis rutas en el mapa"><svg><use href="#i-layers"/></svg></button>
+    <button type="button" id="btnHeading" aria-pressed="false" title="Orientar el mapa al rumbo" hidden><svg><use href="#i-compass"/></svg></button>
+    <button type="button" id="btnLayers" aria-pressed="false" title="Ver mis rutas en el mapa" hidden><svg><use href="#i-layers"/></svg></button>
   </div>
   <div class="map-bottom">
     <div class="card slim" id="followCard" hidden>
@@ -646,6 +646,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
   <div class="goals">
     <div class="goal"><span class="label" style="color:var(--color-text)">XP</span><span class="label" id="levelNext"></span><span class="bar3"><i id="levelBar" style="width:0%"></i></span></div>
   </div>
+  <div><span class="label">Nivel de motero</span><div id="rgRiderLevel"></div></div>
   <div class="summary-row" id="profileTotals"></div>
   <div class="goals" id="profileStreak"></div>
   <span class="label">Logros · <span id="achCount"></span></span>
@@ -783,19 +784,19 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 <div class="lightbox" id="lightbox" hidden><img id="lightboxImg" alt=""></div>
 
 <script data-cfasync="false" src="vendor/maplibre-gl.js"></script>
-<script data-cfasync="false" src="lean-core.js?v=0.13.0"></script>
-<script data-cfasync="false" src="geo.js?v=0.13.0"></script>
-<script data-cfasync="false" src="db.js?v=0.13.0"></script>
-<script data-cfasync="false" src="achievements.js?v=0.13.0"></script>
-<script data-cfasync="false" src="platform.js?v=0.13.0"></script>
-<script data-cfasync="false" src="rg-lib.js?v=0.13.0"></script>
-<script data-cfasync="false" src="rg-mapstyle.js?v=0.13.0"></script>
+<script data-cfasync="false" src="lean-core.js?v=0.14.0"></script>
+<script data-cfasync="false" src="geo.js?v=0.14.0"></script>
+<script data-cfasync="false" src="db.js?v=0.14.0"></script>
+<script data-cfasync="false" src="achievements.js?v=0.14.0"></script>
+<script data-cfasync="false" src="platform.js?v=0.14.0"></script>
+<script data-cfasync="false" src="rg-lib.js?v=0.14.0"></script>
+<script data-cfasync="false" src="rg-mapstyle.js?v=0.14.0"></script>
 <script data-cfasync="false" src="vendor/supabase.js"></script>
-<script data-cfasync="false" src="app.js?v=0.13.0"></script>
-<script data-cfasync="false" src="rg-app.js?v=0.13.0"></script>
-<script data-cfasync="false" src="rg-club.js?v=0.13.0"></script>
+<script data-cfasync="false" src="app.js?v=0.14.0"></script>
+<script data-cfasync="false" src="rg-app.js?v=0.14.0"></script>
+<script data-cfasync="false" src="rg-club.js?v=0.14.0"></script>
 <script data-cfasync="false" src="vendor/qrcode.js"></script>
-<script data-cfasync="false" src="rg-group.js?v=0.13.0"></script>
-<script data-cfasync="false" src="rg-sync.js?v=0.13.0"></script>
+<script data-cfasync="false" src="rg-group.js?v=0.14.0"></script>
+<script data-cfasync="false" src="rg-sync.js?v=0.14.0"></script>
 </body>
 </html>

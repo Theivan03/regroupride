@@ -148,3 +148,10 @@ Decisiones técnicas y pendientes: `docs/DECISIONES.md`.
 - **Columna de botones redondos**: centrar (verde cuando el mapa te sigue), brújula, grupo y «más» (planificar y aparcamiento). En móviles bajitos y en reposo quedan centrar y «más».
 - **Cartel de giro en dos líneas**, con flecha que dobla; lo que queda de ruta va pequeño en la esquina.
 - **Medidas de la lámina**: margen de 12 px, píldoras de 32, avatar de 38, barra de pestañas de 58 con esquinas de 20 e iconos nuevos en Rutas y Garaje.
+
+## 0.14 · cartel pequeño, menú lateral plegado, nivel en el perfil y avisos siempre a la vista
+
+- **Cartel de giro a la mitad de alto** (46 px en vez de 92): ficha pequeña con la flecha, la distancia y la indicación en una fila; si la indicación es larga (rotondas) usa dos líneas.
+- **Menú lateral como antes**: un solo botón «•••» con todo dentro. Fuera solo quedan «centrar», que aparece únicamente cuando el mapa no está centrado en ti, y el grupo mientras ruedas en uno. La brújula desaparece.
+- **Nivel de motero en el Perfil**. En Ajustes queda solo el teléfono para las rutas, que es opcional.
+- **SOS · Avería · Gasolina siempre a la vista** (Android): mientras se graba, los tres botones van dentro del aviso del seguimiento por GPS, así la app enseña un solo aviso y el teléfono no los apila. Se recoloca solo cada pocos segundos y al encender la pantalla. El aviso de «enviado» lleva «Cancelar aviso» a la vista.

@@ -6,8 +6,10 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.location.LocationManager;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
@@ -18,11 +20,13 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.service.notification.StatusBarNotification;
 import android.view.WindowManager;
 import android.widget.RemoteViews;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -48,6 +52,9 @@ import java.util.ArrayList;
  * Avisos del grupo durante la ruta.
  *  - showBanner: aviso fijo, visible en la pantalla de bloqueo, con tres botones (SOS, Avería, Gasolina).
  *    Al pulsar uno se avisa a la parte web (evento «action»), que es la que lo envía al grupo.
+ *    Mientras se graba la ruta hay otro aviso de la app (el del seguimiento por GPS). Con dos avisos de la misma app
+ *    el teléfono los apila y los botones quedan escondidos hasta desplegarlos, así que los botones se ponen DENTRO
+ *    del aviso del seguimiento: queda un solo aviso de la app y los tres botones se ven nada más encender la pantalla.
  *  - alarm: aviso recibido. Si es «loud» (SOS o avería) suena como una alarma, vibra, enciende la pantalla y
  *    abre la app por encima del bloqueo, hasta que se pulsa «Entendido» (o pasan dos minutos).
  */
@@ -66,6 +73,10 @@ public class RideAlertsPlugin extends Plugin {
     static final String CH_NOTICE = "rg_group_notice";
     static final int ID_BANNER = 7101;
     static final int ID_ALARM = 7102;
+    /** El aviso del seguimiento por GPS (plugin BackgroundGeolocation 1.3.x): su número y su canal. */
+    static final int ID_TRACK = 28351;
+    static final String CH_TRACK = "com.equimaps.capacitor_background_geolocation";
+    private static final long BANNER_CHECK_MS = 5000;
     private static final long ALARM_MAX_MS = 120000;
 
     private static RideAlertsPlugin instance;
@@ -73,6 +84,12 @@ public class RideAlertsPlugin extends Plugin {
     private static Vibrator vibrating;   // el mismo objeto que empezó a vibrar: solo él puede pararlo
     private static Runnable silence;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    private static boolean bannerOn;
+    private static String bannerSent = "";
+    private static String bannerLabel = "";
+    private static boolean bannerSeen;
+    private static Runnable bannerTick;
+    private static BroadcastReceiver screenRx;
 
     @Override
     public void load() {
@@ -85,9 +102,7 @@ public class RideAlertsPlugin extends Plugin {
         if (instance == this) instance = null;
         Context c = getContext();
         stopSound(c);
-        try {
-            NotificationManagerCompat.from(c).cancel(ID_BANNER);   // sin la app abierta los botones no harían nada
-        } catch (Exception ignored) { }
+        removeBanner(c);   // sin la app abierta los botones no harían nada
     }
 
     private static void channels(Context c) {
@@ -133,10 +148,22 @@ public class RideAlertsPlugin extends Plugin {
     /** Botones en la pantalla de bloqueo. sent = aviso que ya he enviado (entonces se ofrece cancelarlo). */
     @PluginMethod
     public void showBanner(PluginCall call) {
-        Context c = getContext();
+        Context c = getContext().getApplicationContext();
         String sent = call.getString("sent", "");
         String label = call.getString("label", "");
-        boolean seen = Boolean.TRUE.equals(call.getBoolean("seen", false));
+        synchronized (RideAlertsPlugin.class) {
+            bannerSent = sent == null ? "" : sent;
+            bannerLabel = label == null ? "" : label;
+            bannerSeen = Boolean.TRUE.equals(call.getBoolean("seen", false));
+            bannerOn = true;
+        }
+        placeBanner(c, true);
+        watchBanner(c);
+        call.resolve();
+    }
+
+    /** El aviso con los botones (o, si ya he enviado uno, con «Cancelar aviso»). Siempre con vista propia: se ve entero aunque el aviso esté recogido. */
+    private static Notification bannerNotification(Context c, boolean merged) {
         NotificationCompat.Builder b = new NotificationCompat.Builder(c, CH_BANNER)
             .setSmallIcon(R.drawable.ic_stat_rg)
             .setColor(0xFF0B8A4B)
@@ -145,31 +172,150 @@ public class RideAlertsPlugin extends Plugin {
             .setShowWhen(false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
+            .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
             .setContentIntent(open(c, 20));
-        if (sent == null || sent.isEmpty()) {
-            RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.rg_alert_banner);
+        if (merged) b.setSubText("Siguiendo tu ruta");
+        RemoteViews rv;
+        if (bannerSent.isEmpty()) {
+            rv = new RemoteViews(c.getPackageName(), R.layout.rg_alert_banner);
             rv.setOnClickPendingIntent(R.id.rg_sos, tap(c, "sos", 1));
             rv.setOnClickPendingIntent(R.id.rg_averia, tap(c, "averia", 2));
             rv.setOnClickPendingIntent(R.id.rg_gasolina, tap(c, "gasolina", 3));
-            b.setContentTitle("Avisar al grupo")
-                .setContentText("SOS · Avería · Gasolina")
-                .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
-                .setCustomContentView(rv)
-                .setCustomBigContentView(rv);
+            b.setContentTitle("Avisar al grupo").setContentText("SOS · Avería · Gasolina");
         } else {
-            b.setContentTitle("Aviso enviado: " + label)
-                .setContentText(seen ? "El organizador lo ha visto." : "Enviado al organizador.")
-                .addAction(0, "Cancelar aviso", tap(c, "cancel", 4));
+            String title = "Aviso enviado: " + bannerLabel;
+            String text = bannerSeen ? "El organizador lo ha visto." : "Enviado al organizador.";
+            rv = new RemoteViews(c.getPackageName(), R.layout.rg_alert_sent);
+            rv.setTextViewText(R.id.rg_sent_title, title);
+            rv.setTextViewText(R.id.rg_sent_text, text);
+            rv.setOnClickPendingIntent(R.id.rg_cancel, tap(c, "cancel", 4));
+            b.setContentTitle(title).setContentText(text);
         }
-        post(c, ID_BANNER, b.build());
-        call.resolve();
+        b.setCustomContentView(rv).setCustomBigContentView(rv);
+        return b.build();
+    }
+
+    /**
+     * Coloca los botones donde toca: dentro del aviso del seguimiento si existe (un solo aviso de la app),
+     * y si no en el suyo. force = el contenido ha cambiado y hay que volver a pintarlo.
+     */
+    private static synchronized void placeBanner(Context c, boolean force) {
+        if (!bannerOn) return;
+        try {
+            boolean track = false, trackOurs = false, own = false;
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                for (StatusBarNotification s : nm.getActiveNotifications()) {
+                    if (s.getId() == ID_TRACK) {
+                        if (!isService(s)) {   // el seguimiento ya paró y quedó un aviso suelto con su número: fuera
+                            nm.cancel(ID_TRACK);
+                            continue;
+                        }
+                        track = true;
+                        trackOurs = CH_BANNER.equals(s.getNotification().getChannelId());
+                    } else if (s.getId() == ID_BANNER) {
+                        own = true;
+                    }
+                }
+            }
+            if (track) {
+                if (force || !trackOurs) post(c, ID_TRACK, bannerNotification(c, true));
+                if (own) NotificationManagerCompat.from(c).cancel(ID_BANNER);
+            } else if (force || !own) {
+                post(c, ID_BANNER, bannerNotification(c, false));
+            }
+        } catch (Exception ignored) { }
+    }
+
+    /** ¿Es el aviso de un servicio en marcha (el seguimiento por GPS)? */
+    private static boolean isService(StatusBarNotification s) {
+        return (s.getNotification().flags & Notification.FLAG_FOREGROUND_SERVICE) != 0;
+    }
+
+    /** Si el seguimiento paró justo cuando se repintaba su aviso, puede quedar uno suelto que no se quita solo: se retira. */
+    private static void sweepOrphan(Context c) {
+        try {
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            for (StatusBarNotification s : nm.getActiveNotifications()) {
+                if (s.getId() == ID_TRACK && !isService(s)) nm.cancel(ID_TRACK);
+            }
+        } catch (Exception ignored) { }
+    }
+
+    /** Mientras los botones están puestos se comprueba cada pocos segundos y al encender la pantalla que siguen en su sitio. */
+    private static synchronized void watchBanner(final Context c) {
+        if (bannerTick == null) {
+            bannerTick = new Runnable() {
+                @Override
+                public void run() {
+                    if (!bannerOn) return;
+                    placeBanner(c, false);
+                    MAIN.postDelayed(this, BANNER_CHECK_MS);
+                }
+            };
+            MAIN.postDelayed(bannerTick, 1500);
+        }
+        if (screenRx == null) {
+            screenRx = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    placeBanner(c, false);
+                }
+            };
+            try {
+                IntentFilter f = new IntentFilter(Intent.ACTION_SCREEN_ON);
+                f.addAction(Intent.ACTION_USER_PRESENT);
+                ContextCompat.registerReceiver(c, screenRx, f, ContextCompat.RECEIVER_NOT_EXPORTED);
+            } catch (Exception e) {
+                screenRx = null;
+            }
+        }
+    }
+
+    /** Quita los botones. Si estaban dentro del aviso del seguimiento, ese aviso vuelve a su texto de siempre. */
+    private static synchronized void removeBanner(Context ctx) {
+        Context c = ctx.getApplicationContext();
+        bannerOn = false;
+        if (bannerTick != null) { MAIN.removeCallbacks(bannerTick); bannerTick = null; }
+        if (screenRx != null) {
+            try { c.unregisterReceiver(screenRx); } catch (Exception ignored) { }
+            screenRx = null;
+        }
+        try {
+            NotificationManagerCompat.from(c).cancel(ID_BANNER);
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            for (StatusBarNotification s : nm.getActiveNotifications()) {
+                if (s.getId() == ID_TRACK && isService(s) && CH_BANNER.equals(s.getNotification().getChannelId())) {
+                    Notification plain = new NotificationCompat.Builder(c, CH_TRACK)
+                        .setSmallIcon(R.drawable.ic_stat_rg)
+                        .setContentTitle("ReGroupRide está siguiendo tu ruta")
+                        .setContentText("Toca Parar en la app cuando acabes.")
+                        .setOngoing(true)
+                        .setOnlyAlertOnce(true)
+                        .setShowWhen(false)
+                        .setContentIntent(open(c, 20))
+                        .build();
+                    post(c, ID_TRACK, plain);
+                }
+            }
+        } catch (Exception ignored) { }
+        final Context app = c;
+        Runnable sweep = new Runnable() {
+            @Override
+            public void run() {
+                if (!bannerOn) sweepOrphan(app);
+            }
+        };
+        MAIN.postDelayed(sweep, 1500);
+        MAIN.postDelayed(sweep, 6000);
     }
 
     @PluginMethod
     public void hideBanner(PluginCall call) {
-        try {
-            NotificationManagerCompat.from(getContext()).cancel(ID_BANNER);
-        } catch (Exception ignored) { }
+        removeBanner(getContext());
         call.resolve();
     }
 
