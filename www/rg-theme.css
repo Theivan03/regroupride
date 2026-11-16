@@ -597,3 +597,6 @@ body.rg-hud #hudCard .hud{padding:2px 4px 10px 0;margin-bottom:8px;border-bottom
 .tab{height:50px;border-radius:16px;font-size:10.5px;font-weight:600;gap:2px}
 .tab svg{width:21px;height:21px}
 .tab[aria-selected="true"]::after{bottom:1px;width:4px;height:4px;margin-left:-2px}
+/* Datos: «17h 44m» ya no pisa a la cifra de al lado (cada columna mide lo que necesita) */
+#perRow{grid-template-columns:repeat(4,auto);justify-content:space-between}
+#perRow .fig .val{font-size:23px;white-space:nowrap}
