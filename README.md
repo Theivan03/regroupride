@@ -135,3 +135,9 @@ npx cap sync android
 ```
 
 Decisiones técnicas y pendientes: `docs/DECISIONES.md`.
+
+## 0.12.1 · la fila de arriba del mapa
+
+- La píldora del tiempo dice solo los grados («17°»). Si llueve, nieva o hay tormenta se vuelve ámbar y cambia el icono; al tocarla se lee el tiempo entero. Antes el texto («17° · Cubierto») empujaba el avatar fuera de la pantalla.
+- Si los sensores o el GPS fallan, ese aviso se lee con palabras y el tiempo se aparta para dejarle sitio.
+- El crédito del mapa sale recogido en una «i» bajo las píldoras (se abre al tocarla); ya no queda medio tapado por la barra de pestañas.

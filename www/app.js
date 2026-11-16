@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.12.0';
+  var APP_VERSION = '0.12.1';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -202,8 +202,11 @@
     if (!HAS_MAP || map) return;
     loadStyle().then(function (st) {
       var c0 = lastFix || quickFix || savedFix;
-      map = new maplibregl.Map({ container: 'map', style: st, center: c0 ? [c0.lon, c0.lat] : [-3.7, 40.4], zoom: lastFix ? 15 : (c0 ? 13 : 5), attributionControl: { compact: true }, pitchWithRotate: false, touchPitch: false });
-      map.on('load', function () { mapReady = true; addTrackLayers(map, 'live'); addExtraLayers(map); drawLiveTrack(true); refreshMine(); drawPlan(); drawParking(); if (lastFix) { map.jumpTo({ center: [lastFix.lon, lastFix.lat], zoom: 15 }); updatePosition(lastFix); } else if (quickFix) showQuick(); });
+      map = new maplibregl.Map({ container: 'map', style: st, center: c0 ? [c0.lon, c0.lat] : [-3.7, 40.4], zoom: lastFix ? 15 : (c0 ? 13 : 5), attributionControl: false, pitchWithRotate: false, touchPitch: false });
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-left');
+    // el crédito del mapa sale recogido (una «i» que se abre al tocarla) y fuera de la barra de pestañas
+    function tidyAttrib() { var cr = document.querySelector('#map .maplibregl-ctrl-attrib'); if (cr) { cr.classList.remove('maplibregl-compact-show'); cr.removeAttribute('open'); } }
+      map.on('load', function () { mapReady = true; tidyAttrib(); map.once('idle', tidyAttrib); addTrackLayers(map, 'live'); addExtraLayers(map); drawLiveTrack(true); refreshMine(); drawPlan(); drawParking(); if (lastFix) { map.jumpTo({ center: [lastFix.lon, lastFix.lat], zoom: 15 }); updatePosition(lastFix); } else if (quickFix) showQuick(); });
       map.on('style.load', function () { if (mapReady) { addTrackLayers(map, 'live'); addExtraLayers(map); refreshMine(); drawPlan(); } });
       map.on('click', function (e) { if (planMode) addWaypoint(e.lngLat.lat, e.lngLat.lng); });
       map.on('dragstart', function () { setFollow(false); });
@@ -293,7 +296,8 @@
       if (rec && !rec.weather) rec.weather = wx.data;
     }).catch(function () { wx.failAt = now; }).then(function () { wx.busy = false; });
   }
-  function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; return; } e.hidden = false; e.textContent = wx.data.t + '° · ' + (WX_CODES[wx.data.code] || '—'); e.title = wxText(wx.data); e.className = 'chip wx' + (wx.data.rain > 0 || wx.data.code >= 51 ? ' warn' : ' ok'); }
+  // en la píldora del mapa, solo los grados (ámbar si moja); el cielo entero se lee al tocarla
+function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; return; } e.hidden = false; e.textContent = wx.data.t + '°'; e.title = wxText(wx.data); e.setAttribute('aria-label', wxText(wx.data)); e.onclick = function () { if (wx.data) toast(wxText(wx.data)); }; e.className = 'chip wx' + (wx.data.rain > 0 || wx.data.code >= 51 ? ' warn' : ' ok'); }
 
   /* ---------- aparcamiento ---------- */
   var parking = null, parkMarker = null, parkOpen = false;
