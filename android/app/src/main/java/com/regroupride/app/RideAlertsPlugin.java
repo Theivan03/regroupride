@@ -47,6 +47,7 @@ public class RideAlertsPlugin extends Plugin {
 
     private static RideAlertsPlugin instance;
     private static MediaPlayer player;
+    private static Vibrator vibrating;   // el mismo objeto que empezó a vibrar: solo él puede pararlo
     private static Runnable silence;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
@@ -170,6 +171,12 @@ public class RideAlertsPlugin extends Plugin {
             .setAutoCancel(!loud)
             .setContentIntent(full)
             .addAction(0, "Entendido", tap(c, "ack", 5));
+        String phone = call.getString("phone", "");
+        if (phone != null && !phone.isEmpty()) {     // «Llamar a…»: abre el marcador con el número puesto
+            Intent dial = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phone.replaceAll("[^0-9+]", ""))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            PendingIntent pd = PendingIntent.getActivity(c, 22, dial, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            b.addAction(0, call.getString("phoneLabel", "Llamar"), pd);
+        }
         if (loud) {
             b.setFullScreenIntent(full, true);
             overLock(true);
@@ -263,7 +270,13 @@ public class RideAlertsPlugin extends Plugin {
         }
         try {
             Vibrator v = (Vibrator) c.getSystemService(Context.VIBRATOR_SERVICE);
-            if (v != null && v.hasVibrator()) v.vibrate(VibrationEffect.createWaveform(new long[] { 0, 900, 500 }, 0), attrs);
+            if (v != null && v.hasVibrator()) {
+                // Sin repetición infinita: 60 pulsos (unos 84 s). Si algo impidiera cancelarla, se acaba sola.
+                long[] wave = new long[120];
+                for (int i = 0; i < wave.length; i += 2) { wave[i] = i == 0 ? 0 : 500; wave[i + 1] = 900; }
+                v.vibrate(VibrationEffect.createWaveform(wave, -1), attrs);
+                vibrating = v;
+            }
         } catch (Exception ignored) { }
         silence = new Runnable() {
             @Override
@@ -286,8 +299,13 @@ public class RideAlertsPlugin extends Plugin {
             } catch (Exception ignored) { }
             player = null;
         }
+        // La vibración solo la para el mismo objeto que la empezó: pedir otro (desde la pantalla o desde el aviso) no la cancela.
         try {
-            Vibrator v = (Vibrator) c.getSystemService(Context.VIBRATOR_SERVICE);
+            if (vibrating != null) vibrating.cancel();
+        } catch (Exception ignored) { }
+        vibrating = null;
+        try {
+            Vibrator v = (Vibrator) c.getApplicationContext().getSystemService(Context.VIBRATOR_SERVICE);
             if (v != null) v.cancel();
         } catch (Exception ignored) { }
     }

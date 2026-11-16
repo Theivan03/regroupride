@@ -4,6 +4,18 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
+## Qué hay en la versión 0.7
+
+- **Ir al punto de salida**: al iniciar una ruta lejos de su comienzo, cada uno elige entre ir primero a la salida o entrar por el punto más cercano.
+- **Rutas de evento sin códigos**: un administrador pulsa «Iniciar la ruta para los apuntados» en el evento; a quien dijo «Voy» le sale «¿Vienes?» (con la app abierta) y entra con un toque.
+- **Administradores solo de una ruta** (`event_admins`), además de los de la comunidad. Varias comunidades a la vista.
+- **Avisos al administrador más cercano**: a él le salta la alarma; al resto de administradores, un aviso sencillo con su teléfono y un botón para llamarle. Si nadie lo atiende en un minuto, salta a todos. Arreglada la vibración que no paraba.
+- **Nivel del motero** (cinco opciones), **medias guardadas** de velocidad e inclinación (`rider_stats`, se suman al guardar cada ruta) y **medición durante la ruta**.
+- **Organizar por grupos**: el administrador elige de cuántas motos y a cada uno le sale su grupo.
+- **Rutas públicas o privadas** y «Explorar rutas públicas».
+- **GPX**: los puntos marcados aparte (gasolineras, paradas…) salen en el mapa.
+- Todo lo del servidor está en `supabase/04_rutas_niveles.sql` (hay que ejecutarlo).
+
 ## Qué hay en la versión 0.6
 
 - **Avisos del grupo: SOS, avería y gasolina.** Se envían desde el botón del triángulo (junto a «Parar») o, en Android, desde la **pantalla de bloqueo**: mientras ruedas en grupo hay un aviso fijo con los tres botones (`RideAlertsPlugin.java`). Al organizador le salta a pantalla completa con el nombre y la distancia; SOS y avería suenan como una alarma (canal de alarmas, en bucle, con vibración, encendiendo la pantalla por encima del bloqueo) hasta que pulsa «Entendido». Quien avisa se entera de que lo han visto y puede cancelarlo. Si no hay cobertura, el aviso se reintenta solo.

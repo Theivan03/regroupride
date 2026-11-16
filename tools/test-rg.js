@@ -189,4 +189,57 @@ t('GPX: indicaciones de giro solo de los tramos donde OSRM va por la misma carre
   var tr = L.Tracker(line.c, r.steps); assert.ok(Math.abs(tr.steps[0].along - corner) < 30); assert.ok(Math.abs(tr.steps[1].along - line.total) < 30);
   var mid = L.trackSteps({ legs: legs.slice(0, 3) }, vias, 0, line, false); assert.equal(mid.steps.filter(function (s) { return s.icon === 'arrive'; }).length, 0);
 });
+t('GPX con puntos marcados aparte (gasolineras, bar…): salen como puntos de interés, no como paradas', function () {
+  var o = osmandGpx();
+  var wpts = '  <wpt lat="38.6002" lon="-0.4"><name>Repsol Ibi</name><extensions><osmand:icon>fuel</osmand:icon><osmand:background>circle</osmand:background></extensions></wpt>\n' +
+    '  <wpt lat="38.65" lon="-0.3001"><name>Almuerzo</name><type>Restaurant</type></wpt>\n  <wpt lat="38.69" lon="-0.3"><name>Foto</name><sym>Scenic Area</sym></wpt>\n' +
+    '  <wpt lat="38.6" lon="-0.45"><name>Punto de reagrupamiento</name></wpt>\n  <wpt lat="' + o.pts[0][1] + '" lon="' + o.pts[0][0] + '"><name>Salida</name></wpt>\n';
+  var g = L.gpxToPlan(o.text.replace('  <rte>', wpts + '  <rte>'));
+  assert.equal(g.wps.length, 3, 'las paradas siguen siendo las del rte');
+  assert.deepEqual(g.pois.map(function (p) { return p[2] + ':' + p[3]; }), ['Punto de reagrupamiento:poi', 'Repsol Ibi:fuel', 'Almuerzo:food', 'Foto:view'], 'en el orden del recorrido y sin repetir la salida');
+  // sin rte: si los wpt son gasolineras y demás, la ruta va de principio a fin y ellos son puntos de interés
+  var g2 = L.gpxToPlan(o.text.replace(/  <rte>[\s\S]*<\/rte>\n/, wpts));
+  assert.deepEqual(g2.wps.map(function (w) { return w[2]; }), ['Salida', 'Llegada']); assert.equal(g2.pois.length, 4);
+  // nuestro GPX conserva los puntos de interés al volver a importarlo
+  var back = L.gpxToPlan(L.planToGpx({ name: 'X', wps: g.wps, coords: g.coords, pois: g.pois }));
+  assert.equal(back.wps.length, 3); assert.deepEqual(back.pois.map(function (p) { return p[3]; }), ['poi', 'fuel', 'food', 'view']);
+  assert.equal(L.poiKind('E.S. Cepsa'), 'fuel'); assert.equal(L.poiKind('Bar Paco'), 'food'); assert.equal(L.poiKind('Barranco'), 'poi');
+});
+t('Ir a la salida: una ruta circular no se da por empezada al pasar junto a otro tramo', function () {
+  var sq = seg(-0.5, -0.4, 38.5, 50).concat([[-0.4, 38.5]]);
+  for (var y = 38.5005; y <= 38.56; y += 0.0005) sq.push([-0.4, y]);
+  for (var x = -0.4005; x >= -0.5; x -= 0.0005) sq.push([x, 38.56]);
+  for (y = 38.5595; y >= 38.5; y -= 0.0005) sq.push([-0.5, y]);
+  var mid = { lat: 38.56, lon: -0.45, v: 15, acc: 5 };                     // en el lado de arriba, lejos de la salida
+  var a = L.Tracker(sq, []), b = L.Tracker(sq, [], { fromStart: true });
+  assert.equal(a.update(mid, 0).started, true, 'sin la opción, empieza por donde pilla');
+  var r = b.update(mid, 0); assert.equal(r.started, false); assert.ok(r.off > 5000, 'distancia hasta la salida: ' + r.off);
+  r = b.update({ lat: 38.5, lon: -0.4995, v: 10, acc: 5 }, 1000); assert.equal(r.started, true); assert.ok(r.along < 100);
+  r = b.update({ lat: 38.5, lon: -0.45, v: 20, acc: 5 }, 2000); assert.ok(r.started && !r.offRoute && r.along > 4000, 'y luego sigue normal');
+});
+t('Nota de cada motero: nivel elegido, historial y medición de hoy', function () {
+  assert.deepEqual(L.riderScore({}), { score: 3, known: false });
+  assert.equal(L.riderScore({ level: 5 }).score, 5); assert.equal(L.riderScore({ level: 1 }).score, 1);
+  assert.equal(L.paceScore(35, 14), 1); assert.equal(L.paceScore(85, 40), 5); assert.ok(Math.abs(L.paceScore(60, 27) - 3) < 0.01);
+  var fast = L.riderScore({ level: 2, hr: 12, hs: 80, hl: 38 }), slow = L.riderScore({ level: 5, hr: 12, hs: 40, hl: 16 });
+  assert.ok(fast.score > slow.score, 'el historial pesa más que lo que uno dice de sí mismo: ' + fast.score + ' vs ' + slow.score);
+  assert.equal(L.riderScore({ level: 3, hr: 1, hs: 90, hl: 45 }).score, 3, 'con una sola ruta aún no hay historial');
+  assert.equal(L.riderScore({ level: 3, pm: 4, ps: 90, pl: 45 }).score, 3, 'con 4 minutos aún no hay medición');
+  assert.ok(L.riderScore({ level: 3, pm: 25, ps: 85, pl: 40 }).score > 3.5);
+  assert.equal(L.LEVELS.length, 6);
+});
+t('Grupos por ritmo: parejos, del más rápido al más tranquilo y con un administrador de guía en cada uno', function () {
+  var rows = []; for (var i = 0; i < 13; i++) rows.push({ user_id: 'u' + i, name: 'M' + String(i).padStart(2, '0'), level: 1 + (i % 5), admin: i === 0 || i === 7 || i === 12 });
+  var g = L.makeGroups(rows, 5);
+  assert.deepEqual(g.map(function (x) { return x.members.length; }), [5, 4, 4]);
+  var all = [].concat.apply([], g.map(function (x) { return x.members.map(function (m) { return m.id; }); }));
+  assert.equal(all.length, 13); assert.equal(all.filter(function (id, k) { return all.indexOf(id) === k; }).length, 13, 'nadie repetido ni fuera');
+  assert.deepEqual(g.map(function (x) { return x.guide; }), ['u7', 'u12', 'u0'], 'los administradores guían, el más rápido al primer grupo');
+  g.forEach(function (x) { assert.equal(x.members[0].id, x.guide); });
+  var avg = g.map(function (x) { var m = x.members.slice(1); return m.reduce(function (a, b) { return a + b.score; }, 0) / m.length; });
+  assert.ok(avg[0] > avg[1] && avg[1] > avg[2], 'ritmo medio decreciente: ' + avg.join(', '));
+  assert.deepEqual(L.makeGroups(rows.slice(0, 6), 5).map(function (x) { return x.members.length; }), [3, 3], 'seis en grupos de cinco: dos de tres, no cinco y uno');
+  assert.deepEqual(L.makeGroups(rows.slice(1, 4), 8).map(function (x) { return [x.members.length, x.guide]; }), [[3, null]]);
+  assert.deepEqual(L.makeGroups([], 5), []);
+});
 console.log('rg-lib: ' + n + ' pruebas correctas');

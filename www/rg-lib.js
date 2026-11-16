@@ -107,6 +107,7 @@ var RGLib = (function () {
     out.push('<?xml version="1.0" encoding="UTF-8"?>', '<gpx version="1.1" creator="ReGroupRide" xmlns="http://www.topografix.com/GPX/1/1">',
       '<metadata><name>' + name + '</name><time>' + new Date(when || Date.now()).toISOString() + '</time></metadata>');
     wps.forEach(function (w, i) { out.push('<wpt lat="' + n(w[0]) + '" lon="' + n(w[1]) + '"><name>' + label(w, i) + '</name>' + (w[2] ? '<desc>' + xml(w[2]) + '</desc>' : '') + '</wpt>'); });
+    (plan.pois || []).forEach(function (q) { out.push('<wpt lat="' + n(q[0]) + '" lon="' + n(q[1]) + '"><name>' + xml(q[2] || POI_NAME[q[3]] || 'Punto') + '</name><type>' + xml(q[3] || 'poi') + '</type></wpt>'); });
     out.push('<rte><name>' + name + '</name>'); wps.forEach(function (w, i) { out.push('<rtept lat="' + n(w[0]) + '" lon="' + n(w[1]) + '"><name>' + label(w, i) + '</name></rtept>'); }); out.push('</rte>');
     out.push('<trk><name>' + name + '</name><trkseg>'); (plan.coords || []).forEach(function (c) { out.push('<trkpt lat="' + n(c[1]) + '" lon="' + n(c[0]) + '"/>'); }); out.push('</trkseg></trk>', '</gpx>');
     return out.join('\n');
@@ -127,6 +128,47 @@ var RGLib = (function () {
         gap: (me && me.along != null && r.along != null) ? r.along - me.along : null, age: now - r.at };
     }).sort(function (a, b) { return (b.along == null ? -1 : b.along) - (a.along == null ? -1 : a.along); });
     return { list: list, total: list.length, behind: list.filter(function (x) { return x.behind || x.off || x.stale; }).length, waiting: rows.length - live.length };
+  }
+
+  /* ================= nivel y grupos por ritmo ================= */
+  var LEVELS = [null, 'Paseo dominguero', 'Voy a mi bola', 'Curveo alegre', 'Rozando estriberas', 'Voy folladísimo'];
+  var LEVEL_HINT = [null, 'Tranquilo, mirando el paisaje.', 'Ritmo suave, sin prisa.', 'Me gusta enlazar curvas a buen ritmo.', 'Rápido y con oficio en curva.', 'A fuego. Los demás, por el retrovisor.'];
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  // Nota de 1 a 5 a partir de la velocidad media en movimiento (km/h) y la inclinación media en curva (grados). Pesa más la curva.
+  function paceScore(speed, lean) {
+    var sp = speed != null && speed > 0 ? clamp(1 + (speed - 35) / 12.5, 1, 5) : null, le = lean != null && lean > 0 ? clamp(1 + (lean - 14) / 6.5, 1, 5) : null;
+    if (sp == null) return le; if (le == null) return sp; return 0.4 * sp + 0.6 * le;
+  }
+  // Nota de un motero juntando lo que se sabe de él: el nivel que eligió, sus medias de todas las rutas (hr rutas, hs km/h,
+  // hl grados) y lo medido en esta ruta (pm minutos, ps km/h, pl grados). Rodando en grupo todos llevan la misma velocidad,
+  // así que la medición de hoy pesa poco; lo que más cuenta es el historial.
+  function riderScore(r) {
+    var parts = [], h = (r.hr || 0) >= 2 ? paceScore(r.hs, r.hl) : null, p = (r.pm || 0) >= 10 ? paceScore(r.ps, r.pl) : null;
+    if (r.level) parts.push([+r.level, 0.35]);
+    if (h != null) parts.push([h, 0.45]);
+    if (p != null) parts.push([p, 0.20]);
+    if (!parts.length) return { score: 3, known: false };
+    var w = 0, t = 0; parts.forEach(function (x) { t += x[0] * x[1]; w += x[1]; });
+    return { score: Math.round(t / w * 10) / 10, known: true };
+  }
+  // Reparte a la gente en grupos de «size» por ritmo, del más rápido al más tranquilo. Si hay administradores, cada grupo
+  // lleva uno de guía mientras alcancen. Los grupos quedan parejos (nunca uno suelto al final).
+  // rows: [{user_id, name, admin, level, hr, hs, hl, pm, ps, pl}] → [{n, guide, members: [{id, name, score, known}]}]
+  function makeGroups(rows, size) {
+    size = clamp(Math.round(size) || 5, 2, 40);
+    var list = rows.map(function (r) { var sc = riderScore(r); return { id: r.user_id, name: r.name || 'Motero', admin: !!r.admin, score: sc.score, known: sc.known }; })
+      .sort(function (a, b) { return b.score - a.score || (a.name < b.name ? -1 : 1); });
+    var N = list.length; if (!N) return [];
+    var k = Math.ceil(N / size), base = Math.floor(N / k), extra = N % k, guides = list.filter(function (x) { return x.admin; }).slice(0, k);
+    var rest = list.filter(function (x) { return guides.indexOf(x) < 0; }), out = [];
+    for (var i = 0; i < k; i++) {
+      var cap = base + (i < extra ? 1 : 0), g = { n: i + 1, guide: guides[i] ? guides[i].id : null, members: [] };
+      if (guides[i]) g.members.push(guides[i]);
+      while (g.members.length < cap && rest.length) g.members.push(rest.shift());
+      g.members = g.members.map(function (m) { return { id: m.id, name: m.name, score: m.score, known: m.known }; });
+      out.push(g);
+    }
+    return out;
   }
 
   /* ================= seguir una ruta ================= */
@@ -216,12 +258,29 @@ var RGLib = (function () {
       var lat = parseFloat(la[1]), lon = parseFloat(lo[1]);
       if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
       var body = m[2] || '', nm = /<name>([\s\S]*?)<\/name>/.exec(body);
-      out.push({ lat: lat, lon: lon, name: nm ? xmlText(nm[1]) : '', time: /<time>/.test(body) });
+      var o = { lat: lat, lon: lon, name: nm ? xmlText(nm[1]) : '', time: /<time>/.test(body) };
+      if (tag === 'wpt') {
+        var hint = [], re2 = /<(sym|type|desc|cmt|[a-z]+:(?:icon|amenity_subtype|amenity_type|category))>([\s\S]*?)<\/\1>/g, h;
+        while ((h = re2.exec(body))) hint.push(xmlText(h[2]));
+        o.kind = poiKind(hint.join(' ') + ' ' + o.name);
+      }
+      out.push(o);
     }
     return out;
   }
+  // Qué es un punto marcado en el GPX, por su icono, su tipo o su nombre: gasolinera, sitio para comer, mirador, aparcamiento…
+  function poiKind(t) {
+    t = String(t || '').toLowerCase();
+    if (/fuel|gas ?station|gasoliner|petrol|carburant|repsol|cepsa|moeve|galp|shell|\bbp\b|ballenoil|plenoil|petroprix|estaci[oó]n de servicio|\be\.?s\.? /.test(t)) return 'fuel';
+    if (/restaur|food|caf[eé]|cafeter|\bbar\b|almuerz|comida|comer|mes[oó]n|\bventa\b|pub\b|fast_food|bocadill|desayun/.test(t)) return 'food';
+    if (/\bview\b|viewpoint|mirador|scenic|summit|peak|\bpuerto\b|\bcoll\b|photo|camera|vista/.test(t)) return 'view';
+    if (/parking|aparcamiento|\bpark\b/.test(t)) return 'park';
+    return 'poi';
+  }
+  var POI_NAME = { fuel: 'Gasolinera', food: 'Parada para comer', view: 'Mirador', park: 'Aparcamiento', poi: 'Punto marcado' };
   // Lee un GPX (de OsmAnd, Calimoto, Kurviger, un GPS…) y lo deja como ruta a seguir:
   //   coords = el trazado tal cual viene (trk); wps = las paradas (rte, o wpt, o principio y final).
+  //   pois = puntos marcados aparte (wpt): gasolineras, sitios para comer, miradores… [lat, lon, nombre, tipo].
   //   route = true si el archivo solo trae unos pocos puntos sueltos y hay que calcular la carretera entre ellos.
   //   timed = true si es un recorrido grabado (lleva horas).
   function gpxToPlan(text) {
@@ -231,23 +290,28 @@ var RGLib = (function () {
     var nm = /<metadata>[\s\S]*?<name>([\s\S]*?)<\/name>[\s\S]*?<\/metadata>/.exec(text) || /<(?:trk|rte)>\s*<name>([\s\S]*?)<\/name>/.exec(text);
     var name = nm ? xmlText(nm[1]) : '';
     var asStop = function (p) { return [p.lat, p.lon, p.name || '']; };
+    var asPoi = function (p) { return [p.lat, p.lon, p.name || POI_NAME[p.kind || 'poi'], p.kind || 'poi']; };
     var track = trk.length >= 2 ? trk : (rte.length >= 50 ? rte : null);
     if (!track) {
       if (rte.length < 2 && wpt.length < 2) throw new Error('El archivo no trae ninguna ruta.');
-      return { name: name, coords: [], wps: (rte.length >= 2 ? rte : wpt).map(asStop), timed: false, route: true };
+      return { name: name, coords: [], wps: (rte.length >= 2 ? rte : wpt).map(asStop), pois: rte.length >= 2 ? wpt.map(asPoi) : [], timed: false, route: true };
     }
     var coords = [], prev = null;
     track.forEach(function (p) { if (!prev || prev.lat !== p.lat || prev.lon !== p.lon) coords.push([p.lon, p.lat]); prev = p; });
     if (coords.length < 2) throw new Error('El archivo no trae ninguna ruta.');
-    var stops;
-    if (track === trk && rte.length >= 2 && rte.length <= 60) stops = rte.map(asStop);
-    else if (wpt.length >= 2 && wpt.length <= 60) {
-      var line = makeLine(coords);
-      stops = wpt.map(function (p) { return { p: p, a: project(p, line, 0, 0).along }; }).sort(function (a, b) { return a.a - b.a; }).map(function (x) { return asStop(x.p); });
-    } else stops = [[coords[0][1], coords[0][0], 'Salida'], [coords[coords.length - 1][1], coords[coords.length - 1][0], 'Llegada']];
+    // Paradas: los puntos de la ruta (rte). Lo que venga marcado aparte (wpt) son puntos de interés, salvo que el archivo
+    // no traiga rte y todos los wpt sean puntos «sin más»: entonces son las paradas, en el orden del recorrido.
+    var stops, pois = [], line = makeLine(coords);
+    var plain = wpt.length >= 2 && wpt.length <= 60 && wpt.every(function (p) { return p.kind === 'poi'; });
+    if (track === trk && rte.length >= 2 && rte.length <= 60) { stops = rte.map(asStop); pois = wpt; }
+    else if (plain) stops = wpt.map(function (p) { return { p: p, a: project(p, line, 0, 0).along }; }).sort(function (a, b) { return a.a - b.a; }).map(function (x) { return asStop(x.p); });
+    else { stops = [[coords[0][1], coords[0][0], 'Salida'], [coords[coords.length - 1][1], coords[coords.length - 1][0], 'Llegada']]; pois = wpt; }
     if (stops.every(function (w) { return /^\d\d /.test(w[2]); })) stops.forEach(function (w) { w[2] = w[2].slice(3); });   // «01 Nombre» de nuestro propio GPX
+    // Un punto marcado que es la misma parada (nuestro GPX los escribe dos veces) no se repite.
+    pois = pois.filter(function (p) { return !stops.some(function (w) { return dist(p.lat, p.lon, w[0], w[1]) < 40; }); })
+      .map(function (p) { return { p: p, a: project(p, line, 0, 0).along }; }).sort(function (a, b) { return a.a - b.a; }).map(function (x) { return asPoi(x.p); }).slice(0, 200);
     var timed = track.filter(function (p) { return p.time; }).length > track.length / 2;
-    return { name: name, coords: coords, wps: stops, timed: timed, route: false };
+    return { name: name, coords: coords, wps: stops, pois: pois, timed: timed, route: false };
   }
   // Puntos de paso repartidos por el trazado (uno cada «every» metros), para pedir las indicaciones de giro.
   function viaPoints(line, every) {
@@ -293,7 +357,8 @@ var RGLib = (function () {
   }
 
   /* Seguimiento: se le pasan las posiciones y dice por dónde vas, el siguiente giro, si te has salido y qué decir.
-     opts: { offDist (m, 60), offSecs (8), backSecs (4) } */
+     opts: { offDist (m, 60), offSecs (8), backSecs (4), fromStart } — con fromStart la ruta solo «empieza» en su punto de
+     salida: aunque pases antes junto a otro tramo (rutas circulares, o que cruzan tu pueblo), no la da por empezada ahí. */
   function Tracker(coords, steps, opts) {
     opts = opts || {};
     var line = makeLine(coords), st = placeSteps(steps, line);
@@ -303,8 +368,12 @@ var RGLib = (function () {
       // Primero busca cerca de por donde ibas: en rutas circulares o que pasan dos veces por el mismo sitio,
       // el punto «más cercano» de toda la ruta puede ser el final. Solo si ahí no estás, mira el resto.
       var ev = [], acc = Math.min(fix.acc || 0, 40), lim = OFF + acc;
-      var pr = project(fix, line, s.along, 300, s.along + 1500 + (fix.v || 0) * 10);
-      if (!pr || pr.d > lim) { var far = project(fix, line, s.along); if (far && (!pr || far.d < pr.d)) pr = far; }
+      var pr;
+      if (opts.fromStart && !s.started) pr = project(fix, line, 0, 0, Math.min(line.total, 400));
+      else {
+        pr = project(fix, line, s.along, 300, s.along + 1500 + (fix.v || 0) * 10);
+        if (!pr || pr.d > lim) { var far = project(fix, line, s.along); if (far && (!pr || far.d < pr.d)) pr = far; }
+      }
       s.off = pr.d;
       if (pr.d <= lim) {
         s.offSince = null;
@@ -335,6 +404,6 @@ var RGLib = (function () {
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
   return { dist: dist, findMapsUrl: findMapsUrl, parseMapsUrl: parseMapsUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
-    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
+    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, poiKind: poiKind, LEVELS: LEVELS, LEVEL_HINT: LEVEL_HINT, paceScore: paceScore, riderScore: riderScore, makeGroups: makeGroups, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = RGLib;

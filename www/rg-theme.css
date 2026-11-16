@@ -159,7 +159,7 @@ th{letter-spacing:0;text-transform:none}
 .rg-wide{display:flex}.rg-wide button{flex:1}
 .rg-form{display:flex;flex-direction:column;gap:14px}
 .rg-form label{display:block;font-size:13.5px;font-weight:650;color:var(--color-text-2)}
-.rg-form input,.rg-form textarea{display:block;width:100%;margin-top:6px;border:1.5px solid var(--color-line);border-radius:14px;background:var(--color-surface);padding:14px;font-size:16px;font-weight:500;color:var(--color-text);outline:none}
+.rg-form input,.rg-form textarea,.rg-form select{display:block;width:100%;margin-top:6px;border:1.5px solid var(--color-line);border-radius:14px;background:var(--color-surface);padding:14px;font-size:16px;font-weight:500;color:var(--color-text);outline:none}
 .rg-form input:focus,.rg-form textarea:focus{border-color:var(--color-accent)}
 .rg-form textarea{min-height:120px;resize:vertical}
 .rg-form .btn{width:100%;margin-top:4px}
@@ -317,3 +317,39 @@ body.rg-rec #followCard{display:none}
 .rg-alarm .btn.big{min-height:64px;font-size:19px;background:#fff;color:#111;border:0}
 .rg-alarm #alMap{background:rgba(255,255,255,.18);color:#fff}
 @media (prefers-reduced-motion:reduce){.rg-alarm.sos,.rider-marker.alert{animation:none}}
+
+/* ---------- 0.7: puntos marcados, ventanas de grupos y llamadas, ficha de motero ---------- */
+.poi-marker{width:26px;height:26px;border-radius:8px;background:#0E141B;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.poi-marker svg{width:16px;height:16px}
+.poi-marker.fuel{background:#F5A524;color:#231400}
+.poi-marker.food{background:#3DDC84;color:#04210F}
+.poi-marker.view{background:#8E6BFF}
+.poi-marker.park{background:#2F7CF6}
+.rg-pop{z-index:3900;background:#0E141B;color:#fff;overflow:auto;align-items:flex-start;padding-top:max(28px,env(safe-area-inset-top))}
+.rg-pop.call{align-items:center;background:#0B5D34}
+.rg-pop-kind{font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+.rg-pop .btn.big.primary{background:#fff;color:#0B5D34}
+.rg-pop.call .btn.big:not(.primary){background:rgba(255,255,255,.16);color:#fff}
+.rg-groups{display:flex;flex-direction:column;gap:8px;text-align:left;margin:4px 0 6px}
+.rg-grp{background:rgba(127,127,127,.14);border-radius:14px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rg-grp.me{background:#3DDC84;color:#04210F}
+.rg-grp span{flex:0 0 100%;font-family:var(--font-display);font-weight:700;font-size:15px}
+.rg-grp i{font-style:normal;font-size:14px;background:rgba(127,127,127,.18);border-radius:999px;padding:3px 10px}
+.rg-grp.me i{background:rgba(0,0,0,.12)}
+.rg-grp i.guide{font-weight:700;outline:1.5px solid currentColor}
+.rg-grp i small{opacity:.7;font-size:12px}
+.rg-step{display:flex;align-items:center;gap:10px;margin:10px 0}
+.rg-step span{flex:1;font-weight:600}
+.rg-step b{font-family:var(--font-display);font-size:24px;min-width:34px;text-align:center}
+.rg-step .btn.small{width:44px;min-height:44px;font-size:22px}
+.rg-alarm.quiet{background:#1B2430;animation:none}
+.rg-alarm.quiet .rg-alarm-kind{font-size:38px}
+.rg-alarm.quiet b{font-size:28px}
+.rg-alarm .rg-call,.rg-sheet-in a.rg-call{background:#3DDC84;color:#04210F;min-height:64px;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;text-decoration:none;border-radius:16px}
+.rg-alarm-small{font-size:14px;opacity:.8;margin:0}
+.rg-level{appearance:none;border:0;width:100%;text-align:left;background:var(--color-surface-2,rgba(127,127,127,.12));color:var(--color-text);border-radius:14px;padding:10px 14px;margin:10px 0;display:flex;flex-direction:column;gap:2px;cursor:pointer}
+.rg-level span{font-family:var(--font-display);font-weight:700;font-size:17px}
+.rg-level small{color:var(--color-text-2);font-size:12.5px}
+.ev-start{width:100%;margin:8px 0 2px}
+.plan-actions .btn.on{color:var(--color-accent)}
+.rg-form select{width:100%}

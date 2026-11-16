@@ -7,7 +7,7 @@
   var sb = Cl.sb, esc = Cl.esc, $ = function (s, r) { return (r || document).querySelector(s); }, $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var C = window.Capacitor, native = !!(C && C.isNativePlatform && C.isNativePlatform()), P = native ? (C.Plugins || {}) : {};
   var box = $('#clubBody');
-  var S = { user: null, list: [], cid: null, tab: 'events', loaded: false, missing: false, names: {} };
+  var S = { user: null, list: [], cid: null, tab: 'events', loaded: false, missing: false, names: {}, evAdmins: {} };
   try { S.cid = localStorage.getItem('rg.club') || null; } catch (e) {}
 
   function cur() { for (var i = 0; i < S.list.length; i++) if (S.list[i].id === S.cid) return S.list[i]; return S.list[0] || null; }
@@ -53,16 +53,18 @@
     var c = cur();
     if (!c) { renderJoin(); return; }
     box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><button class="btn small" id="clInvite" type="button">Invitar</button></div>' +
-      (S.list.length > 1 ? '<div class="pills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '</div>' : '') +
+      '<div class="pills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button></div>' +
       '<div class="seg rg-wide" id="clTabs">' + [['events', 'Eventos'], ['board', 'Tablón'], ['pages', 'Info'], ['members', 'Miembros']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
     $('#clInvite').addEventListener('click', invite);
+    $('#clOther').addEventListener('click', renderJoin);
     $$('[data-cid]', box).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); render(); }); });
     $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.t; render(); }); });
     ({ events: paneEvents, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
   }
   function renderJoin() {
-    box.innerHTML = '<div class="club-card"><b>Unirme a una comunidad</b><p class="muted">Escribe el código que te ha pasado el organizador.</p><div class="plan-link"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="clJoin" type="button">Unirme</button></div></div>' +
+    box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Unirme a ' + (S.list.length ? 'otra' : 'una') + ' comunidad</b><p class="muted">Escribe el código que te ha pasado el organizador.</p><div class="plan-link"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="clJoin" type="button">Unirme</button></div></div>' +
       '<div class="club-card"><b>Crear una comunidad</b><p class="muted">Serás su administrador: podrás crear eventos, publicar avisos e invitar a la gente.</p><input type="text" id="clName" maxlength="60" placeholder="Nombre de la comunidad"><button class="btn" id="clCreate" type="button" style="margin-top:10px;width:100%">Crear comunidad</button></div>';
+    if ($('#clBack')) $('#clBack').addEventListener('click', render);
     $('#clJoin').addEventListener('click', function (ev) { var code = $('#clCode').value.trim(); if (code.length < 4) { A.toast('Escribe el código.', 'warn'); return; }
       Cl.busy(ev.currentTarget, function () { return sb.rpc('join_community', { p_code: code }).then(function (r) { if (r.error) throw new Error(/no válido/i.test(r.error.message) ? 'Ese código no existe. Revísalo con el organizador.' : r.error.message); setCid(r.data); A.toast('¡Dentro!', 'ok'); return load().then(render); }); }); });
     $('#clCreate').addEventListener('click', function (ev) { var name = $('#clName').value.trim(); if (name.length < 2) { A.toast('Ponle un nombre.', 'warn'); return; }
@@ -82,7 +84,11 @@
     return sb.from('events').select('*').eq('community_id', c.id).gte('starts_at', since).order('starts_at').limit(40).then(function (r) {
       var evs = ok(r), ids = evs.map(function (e) { return e.id; });
       return (ids.length ? sb.from('event_attendees').select('event_id,user_id,status,companion').in('event_id', ids) : Promise.resolve({ data: [] })).then(function (a) {
-        var att = ok(a); return names(att.map(function (x) { return x.user_id; })).then(function () { drawEvents(c, evs, att); });
+        var att = ok(a);
+        return (ids.length ? sb.from('event_admins').select('event_id,user_id').in('event_id', ids) : Promise.resolve({ data: [] })).then(function (ad) {
+          S.evAdmins = {}; (ad.data || []).forEach(function (x) { (S.evAdmins[x.event_id] = S.evAdmins[x.event_id] || []).push(x.user_id); });
+          return names(att.map(function (x) { return x.user_id; })).then(function () { drawEvents(c, evs, att); });
+        }, function () { S.evAdmins = {}; return names(att.map(function (x) { return x.user_id; })).then(function () { drawEvents(c, evs, att); }); });
       });
     });
   }
@@ -91,13 +97,17 @@
     pane.innerHTML = (isAdmin() ? '<button class="btn primary club-add" id="evNew" type="button">+ Nuevo evento o ruta</button>' : '') + (evs.length ? evs.map(function (e) {
       var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
       var people = going.length + going.filter(function (x) { return x.companion; }).length, iGo = mine && mine.status === 'going';
+      var routeAdm = (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0, canRun = isAdmin() || routeAdm;
       return '<div class="club-card ev" data-ev="' + e.id + '"><span class="ev-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b>' +
         (e.meet_name ? '<span class="muted">Salida: ' + esc(e.meet_name) + '</span>' : '') + (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
         (e.route ? '<div class="ev-route"><span><svg><use href="#i-route"/></svg>' + esc(e.route.name || 'Ruta') + ' · ' + String(e.route.dist || 0).replace('.', ',') + ' km</span><button class="btn small" data-act="route" type="button">Cargar ruta</button></div>' : '') +
+        (canRun && e.route ? '<button class="btn primary ev-start" data-act="start" type="button">Iniciar la ruta para los apuntados</button>' : '') +
+        (routeAdm && !isAdmin() ? '<span class="muted rg-small">Eres administrador de esta ruta.</span>' : '') +
         '<div class="ev-go"><button class="btn small' + (iGo ? ' primary' : '') + '" data-act="go" type="button">' + (iGo ? 'Voy ✓' : 'Voy') + '</button>' + (iGo ? '<button class="btn small" data-act="comp" type="button" aria-pressed="' + !!mine.companion + '">Con acompañante</button>' : '') + (iGo ? '<button class="btn small" data-act="no" type="button">No voy</button>' : '') +
         (e.luma_url ? '<button class="btn small" data-act="luma" type="button">Apuntarse en Luma</button>' : '') + '</div>' +
         '<button class="link" data-act="who" type="button">' + (going.length ? going.length + (going.length === 1 ? ' moto' : ' motos') + (people > going.length ? ' · ' + people + ' personas' : '') : 'Nadie apuntado todavía') + '</button>' +
-        (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="edit" type="button">Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div>';
+        (iGo && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
+        (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">Administradores de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</button><button class="link" data-act="edit" type="button">Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div>';
     }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
     if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
     $$('.ev', pane).forEach(function (card) {
@@ -107,14 +117,53 @@
         var act = b.dataset.act;
         if (act === 'go') set('going', mine && mine.companion); else if (act === 'no') set('no', false); else if (act === 'comp') set('going', !(mine && mine.companion));
         else if (act === 'luma') openUrl(e.luma_url); else if (act === 'route') loadRoute(e);
+        else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
         else if (act === 'who') whoGoes(e, att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }));
         else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); return paneEvents(c); }).catch(fail); });
       }); });
     });
   }
+  // El administrador (de la comunidad o solo de esta ruta) inicia la ruta: se crea el grupo sin códigos, se le carga la ruta,
+  // empieza a grabar y a los apuntados les sale «¿Vienes?» en la app.
+  function startEvent(e, btn) {
+    if (!window.RGGroup) return;
+    armed(btn, '¿Empezamos? Toca otra vez', function () {
+      Cl.busy(btn, function () { return sb.rpc('event_start', { p_event: e.id }).then(function (r) {
+        if (r.error) throw r.error;
+        return RGGroup.enter(r.data, { start: true }).then(function () { A.toast('Ruta iniciada. A los apuntados les sale el aviso para unirse.', 'ok'); });
+      }); });
+    });
+  }
+  function enterEvent(e, btn) {
+    if (!window.RGGroup) return;
+    Cl.busy(btn, function () { return sb.rpc('ride_calls').then(function (r) {
+      if (r.error) throw r.error;
+      var c = (r.data || []).filter(function (x) { return x.event_id === e.id; })[0];
+      if (!c) { A.toast(RGGroup.state.s && RGGroup.state.s.eventId === e.id ? 'Ya estás dentro de esta ruta.' : 'Todavía no la ha iniciado ningún administrador.', 'warn'); return; }
+      return sb.rpc('ride_join_event', { p_id: c.id }).then(function (q) { if (q.error) throw q.error; return RGGroup.enter(q.data, { start: true }); });
+    }); });
+  }
+  // Administradores solo de esta ruta: pueden iniciarla, reciben los avisos y reparten los grupos, sin serlo de la comunidad.
+  function eventAdmins(c, e) {
+    sb.from('community_members').select('user_id,role').eq('community_id', c.id).then(function (r) {
+      var ms = ok(r); return names(ms.map(function (m) { return m.user_id; })).then(function () {
+        var cur = S.evAdmins[e.id] || [];
+        Cl.sheet('<div class="head"><h1>Administradores de esta ruta</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">' + esc(e.title) + '. Quien marques podrá iniciar esta ruta, recibirá los avisos de SOS, avería y gasolina y podrá repartir los grupos. No será administrador de la comunidad ni de otras rutas.</p><div class="rg-list">' +
+          ms.map(function (m) { var on = cur.indexOf(m.user_id) >= 0; return '<div class="club-person" data-u="' + m.user_id + '"><span class="rg-ava">' + esc(who(m.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(m.user_id)) + '</b><span class="muted">' + (m.role === 'admin' ? 'Administrador de la comunidad' : esc(bike(m.user_id))) + '</span></div>' +
+            (m.role === 'admin' ? '<span class="mstatus ok">Ya puede</span>' : '<button class="btn small' + (on ? ' primary' : '') + '" type="button">' + (on ? 'Admin de la ruta ✓' : 'Hacer admin') + '</button>') + '</div>'; }).join('') + '</div>');
+        $('#clX').addEventListener('click', function () { Cl.closeSheet(); paneEvents(c); });
+        $$('#rgSheet [data-u] .btn').forEach(function (b) { b.addEventListener('click', function () {
+          var uid = b.parentNode.dataset.u, on = (S.evAdmins[e.id] || []).indexOf(uid) >= 0;
+          (on ? sb.from('event_admins').delete().eq('event_id', e.id).eq('user_id', uid) : sb.from('event_admins').insert({ event_id: e.id, user_id: uid })).then(function (q) {
+            ok(q); S.evAdmins[e.id] = (S.evAdmins[e.id] || []).filter(function (x) { return x !== uid; }); if (!on) S.evAdmins[e.id].push(uid); eventAdmins(c, e);
+          }).catch(fail);
+        }); });
+      });
+    }).catch(fail);
+  }
   function loadRoute(e) {
     var r = e.route; if (!r || !r.coords || r.coords.length < 2) { A.toast('Este evento no tiene ruta.', 'warn'); return; }
-    var p = { id: parseInt(e.id.replace(/-/g, '').slice(0, 12), 16), name: r.name || e.title, wps: r.wps || [], coords: r.coords, dist: r.dist || 0, dur: r.dur || 0, routed: true, steps: r.steps || [], created: Date.now(), eventId: e.id };
+    var p = { id: parseInt(e.id.replace(/-/g, '').slice(0, 12), 16), name: r.name || e.title, wps: r.wps || [], pois: r.pois || [], coords: r.coords, dist: r.dist || 0, dur: r.dur || 0, routed: true, steps: r.steps || [], created: Date.now(), eventId: e.id };
     A.usePlan(p).then(function () { A.toast('Ruta cargada. Pulsa «Iniciar ruta» cuando salgáis.', 'ok'); });
   }
   function whoGoes(e, going) {
@@ -138,7 +187,7 @@
       ev.preventDefault();
       var row = { community_id: c.id, title: $('#evTitle').value.trim(), starts_at: new Date($('#evWhen').value).toISOString(), meet_name: $('#evMeet').value.trim(), description: $('#evDesc').value.trim(), luma_url: $('#evLuma').value.trim() || null };
       var sel = $('#evRoute').value;
-      if (sel !== 'keep') { var p = plans.filter(function (x) { return String(x.id) === sel; })[0]; row.route = p ? { name: p.name, wps: p.wps, coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } : null; }
+      if (sel !== 'keep') { var p = plans.filter(function (x) { return String(x.id) === sel; })[0]; row.route = p ? { name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } : null; }
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
         return (e ? sb.from('events').update(row).eq('id', e.id) : sb.from('events').insert(row)).then(function (r) { ok(r); Cl.closeSheet(); A.toast(e ? 'Evento actualizado.' : 'Evento publicado.', 'ok'); return paneEvents(c); });
       });

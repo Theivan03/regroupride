@@ -26,7 +26,7 @@
     return '<svg viewBox="0 0 32 32"><g transform="rotate(' + a + ' 16 16)"><path d="M16 27V6m0 0-7.5 7.5M16 6l7.5 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
   }
 
-  var nav = { active: false, planId: null, tr: null, rejoin: null, rejoinAt: 0, rejoinBusy: false, last: null, notified: false };
+  var nav = { active: false, planId: null, tr: null, rejoin: null, rejoinAt: 0, rejoinBusy: false, last: null, notified: false, toStart: false, asked: false };
   function plan() { return A.activePlan(); }
   function sync() {
     var p = plan(), on = !!(p && A.isRec() && p.coords && p.coords.length > 1);
@@ -34,7 +34,7 @@
     if (info) info.textContent = p ? (fmtKm((p.dist || 0) * 1000) + (p.dur ? ' · ' + fmtMin(p.dur) : '')) : '';
     if (ride) ride.textContent = p ? 'Iniciar ruta' : 'Grabar ruta';
     if (on && (!nav.active || nav.planId !== p.id)) {
-      nav.active = true; nav.planId = p.id; nav.tr = L.Tracker(p.coords, p.steps || []); nav.rejoin = null; nav.rejoinAt = 0; nav.last = null; nav.notified = false;
+      nav.active = true; nav.planId = p.id; nav.tr = L.Tracker(p.coords, p.steps || []); nav.rejoin = null; nav.rejoinAt = 0; nav.last = null; nav.notified = false; nav.toStart = false; nav.asked = false;
       askNotif();
       var f = A.lastFix(); if (f) onFix(f); else renderBanner(null);
     } else if (!on && nav.active) {
@@ -47,6 +47,7 @@
   }
   function onFix(fix) {
     if (!nav.active || !nav.tr) { if (window.RGGroup) RGGroup.onFix(fix, null); return; }
+    if (!nav.asked) askStart(fix);
     var now = Date.now(), r = nav.tr.update(fix, now), i;
     nav.last = r;
     for (i = 0; i < r.events.length; i++) {
@@ -67,6 +68,24 @@
     renderBanner(r);
     if (window.RGGroup) RGGroup.onFix(fix, r);
   }
+  // Al empezar lejos del punto de salida, cada uno elige: ir primero a la salida (el punto de encuentro) o entrar en la
+  // ruta por donde le pille más cerca. Mientras no conteste, se le lleva al punto más cercano, como hasta ahora.
+  function askStart(fix) {
+    var p = plan(); nav.asked = true;
+    if (!p || !p.coords || !p.coords.length) return;
+    var d0 = L.dist(fix.lat, fix.lon, p.coords[0][1], p.coords[0][0]);
+    if (d0 < 300) return;
+    var name = ((p.wps && p.wps[0] && p.wps[0][2]) || '').split(',')[0];
+    sheet('<div class="head"><h1>¿Por dónde empiezas?</h1></div><p>Estás a <b>' + L.fmtDist(d0) + '</b> del punto de salida' + (name ? ' (' + esc(name) + ')' : '') + '.</p>' +
+      '<button class="btn big primary" id="tsStart" type="button">Ir al punto de salida</button><button class="btn big" id="tsNear" type="button">Entrar por el punto más cercano</button>' +
+      '<p class="muted rg-small" style="text-align:left">«Ir al punto de salida» te lleva hasta donde empieza la ruta y, al llegar, sigue con ella.</p>');
+    $('#tsNear').addEventListener('click', closeSheet);
+    $('#tsStart').addEventListener('click', function () {
+      closeSheet(); var q = plan(); if (!nav.active || !q || q.id !== p.id) return;
+      nav.toStart = true; nav.tr = L.Tracker(q.coords, q.steps || [], { fromStart: true }); nav.rejoin = null; nav.rejoinAt = 0; drawRejoin();
+      var f = A.lastFix(); if (f) onFix(f);
+    });
+  }
   function offAlert(d) {
     buzz([500, 200, 500, 200, 500]);
     say('Te has salido de la ruta. Te marco cómo volver.');
@@ -79,14 +98,15 @@
   function askNotif() { if (P.LocalNotifications) { try { P.LocalNotifications.requestPermissions(); } catch (e) {} } }
   function makeRejoin(fix, announce) {
     var p = plan(); if (!p || !nav.tr || nav.rejoinBusy) return;
-    var t = L.rejoinTarget(fix, nav.tr.line, nav.tr.state.along);
+    var going = nav.toStart && !nav.tr.state.started;      // aún de camino a la salida
+    var t = going ? { lat: p.coords[0][1], lon: p.coords[0][0], off: L.dist(fix.lat, fix.lon, p.coords[0][1], p.coords[0][0]) } : L.rejoinTarget(fix, nav.tr.line, nav.tr.state.along);
     nav.rejoinAt = Date.now(); nav.rejoinBusy = true;
     var straight = function () { return { coords: [[fix.lon, fix.lat], [t.lon, t.lat]], steps: [], dist: t.off }; };
     var url = 'https://router.project-osrm.org/route/v1/driving/' + fix.lon.toFixed(5) + ',' + fix.lat.toFixed(5) + ';' + t.lon.toFixed(5) + ',' + t.lat.toFixed(5) + '?overview=full&geometries=geojson&steps=true';
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctrl) setTimeout(function () { ctrl.abort(); }, 8000);
     var job = (navigator.onLine === false) ? Promise.resolve(straight()) : fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { return r.json(); }).then(function (j) {
       if (!j.routes || !j.routes[0]) throw new Error('sin ruta');
-      var st = L.stepsFromOsrm(j.routes[0]); if (st.length && st[st.length - 1].icon === 'arrive') st[st.length - 1].text = 'vuelves a la ruta';
+      var st = L.stepsFromOsrm(j.routes[0]); if (st.length && st[st.length - 1].icon === 'arrive') st[st.length - 1].text = going ? 'llegas al punto de salida' : 'vuelves a la ruta';
       return { coords: j.routes[0].geometry.coordinates, steps: st, dist: j.routes[0].distance };
     }).catch(straight);
     job.then(function (x) {
@@ -95,7 +115,7 @@
       var tr = L.Tracker(x.coords, x.steps, { offDist: 70 });
       nav.rejoin = { coords: x.coords, tr: tr, dist: x.dist, last: tr.update(fix, Date.now()) };
       drawRejoin(); renderBanner(nav.last);
-      if (!announce && nav.last && !nav.last.started) say('Te llevo a la ruta. ' + L.cap(L.spokenDist(x.dist)) + '.');
+      if (!announce && nav.last && !nav.last.started) say((going ? 'Te llevo al punto de salida. ' : 'Te llevo a la ruta. ') + L.cap(L.spokenDist(x.dist)) + '.');
     });
   }
   function drawRejoin() {
@@ -114,8 +134,8 @@
         cls = r.offRoute ? 'off' : 'to';
         nx = rj && rj.next;
         if (nx && nx.dist < 2500 && !rj.offRoute) { ico = nx.icon; dist = L.fmtDist(nx.dist); text = L.cap(nx.text); }
-        else { ico = r.offRoute ? 'off' : 'straight'; dist = L.fmtDist(rj ? rj.remaining : r.off); text = r.offRoute ? 'para volver a la ruta' : 'hasta la ruta'; }
-        sub = r.offRoute ? 'Te has salido de la ruta' : 'Yendo a la ruta';
+        else { ico = r.offRoute ? 'off' : 'straight'; dist = L.fmtDist(rj ? rj.remaining : r.off); text = r.offRoute ? 'para volver a la ruta' : (nav.toStart ? 'hasta la salida' : 'hasta la ruta'); }
+        sub = r.offRoute ? 'Te has salido de la ruta' : (nav.toStart ? 'Yendo al punto de salida' : 'Yendo a la ruta');
       } else if (r.finished) { ico = 'arrive'; text = 'Has llegado'; sub = 'Fin de la ruta'; cls = 'ok'; }
       else {
         nx = r.next;
@@ -132,7 +152,7 @@
   /* ---- paradas de la ruta en el mapa (todas, sin límite) ---- */
   var stopMk = [], stopKey = '';
   function drawStops() {
-    var m = A.map(), p = plan(), key = p ? p.id + ':' + (p.wps || []).length : '';
+    var m = A.map(), p = plan(), key = p ? p.id + ':' + (p.wps || []).length + ':' + (p.pois || []).length : '';
     if (!m || typeof maplibregl === 'undefined') return;
     if (key === stopKey) return; stopKey = key;
     stopMk.forEach(function (x) { x.remove(); }); stopMk = [];
@@ -143,7 +163,21 @@
       el.addEventListener('click', function (e) { e.stopPropagation(); A.toast((i + 1) + '. ' + ((w[2] || '').split(',')[0] || (i === 0 ? 'Salida' : (last ? 'Llegada' : 'Punto ' + (i + 1)))), 'ok'); });
       stopMk.push(new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([w[1], w[0]]).addTo(m));
     });
+    // Puntos marcados aparte en la ruta: gasolineras, sitios para comer, miradores…
+    (p.pois || []).forEach(function (q) {
+      var el = document.createElement('div'), kind = POI[q[3]] ? q[3] : 'poi';
+      el.className = 'poi-marker ' + kind; el.innerHTML = POI[kind][1];
+      el.addEventListener('click', function (e) { e.stopPropagation(); A.toast(POI[kind][0] + (q[2] && q[2] !== POI[kind][0] ? ': ' + q[2] : ''), 'ok'); });
+      stopMk.push(new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([q[1], q[0]]).addTo(m));
+    });
   }
+  var POI = {
+    fuel: ['Gasolinera', '<svg viewBox="0 0 24 24"><path d="M5 20V6a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v14M4 20h11M7.5 8.5h4M14 11h1.5a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 0 3 0V9l-2.5-2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
+    food: ['Parada para comer', '<svg viewBox="0 0 24 24"><path d="M7 3v8M4.5 3v4.5a2.5 2.5 0 0 0 5 0V3M7 11v10M17 21V3c-2 1.2-3 3.4-3 6.5V13h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
+    view: ['Mirador', '<svg viewBox="0 0 24 24"><path d="M3 19 9.5 8l4 6 2.5-3.5L21 19z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="17" cy="6" r="1.6" fill="currentColor"/></svg>'],
+    park: ['Aparcamiento', '<svg viewBox="0 0 24 24"><path d="M8 20V4h5a4.5 4.5 0 0 1 0 9H8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
+    poi: ['Punto marcado', '<svg viewBox="0 0 24 24"><path d="M12 21s6-5.6 6-10.5A6 6 0 0 0 6 10.500C6 15.400 12 21 12 21z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="10.500" r="2" fill="currentColor"/></svg>']
+  };
   /* ---- Google Maps como opción secundaria, por tramos de 9 paradas ---- */
   function openMaps(wps) {
     var legs = L.mapsLegs(wps || []);
@@ -185,13 +219,13 @@
   function gpxAsPlan(g) {
     var simp = Geo.simplify(g.coords.map(function (c) { return [0, c[1], c[0]]; }), 8).map(function (p) { return [p[2], p[1]]; });
     var line = L.makeLine(simp), km = Math.round(line.total / 100) / 10;
-    var plan = { id: Date.now(), name: g.name.slice(0, 60), wps: g.wps, coords: simp, dist: km, dur: Math.round(line.total / 15), routed: true, steps: [], created: Date.now(), gpx: true };
+    var plan = { id: Date.now(), name: g.name.slice(0, 60), wps: g.wps, pois: g.pois || [], coords: simp, dist: km, dur: Math.round(line.total / 15), routed: true, steps: [], created: Date.now(), gpx: true };
     A.toast('Leyendo la ruta del archivo…');
     return gpxSteps(line).then(function (r) {
       plan.steps = r.steps; if (r.ok) plan.dur = Math.round(r.dur);
       var total = r.ok + r.bad, part = total ? r.ok / total : 0;
       return A.usePlan(plan).then(function () {
-        var d = String(km).replace('.', ',') + ' km, ' + g.wps.length + ' paradas. ';
+        var np = (g.pois || []).length, d = String(km).replace('.', ',') + ' km, ' + g.wps.length + ' paradas' + (np ? ' y ' + np + (np === 1 ? ' punto marcado' : ' puntos marcados') + ' (gasolineras, paradas…)' : '') + '. ';
         A.toast('Ruta importada: ' + d + (part === 1 ? 'Con indicaciones de giro.' : (part >= 0.9 ? 'Con indicaciones de giro en casi todo el recorrido.' : (part > 0 ? 'Indicaciones de giro en parte del recorrido; en el resto, sigue la línea.' : 'Sin indicaciones de giro (no hay conexión): sigue la línea del mapa.'))), part > 0 ? 'ok' : 'warn');
       });
     }).catch(function (e) { A.toast('No se pudo importar: ' + (e && e.message || e), 'bad'); });
@@ -214,7 +248,79 @@
   }
   if ($('#planGpx')) $('#planGpx').addEventListener('click', function () { gpxMode = 'plan'; var f = $('#gpxFile'); f.value = ''; f.click(); });
 
-  window.RGNav = { gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx };
+  /* ---- medias de cada motero: se suman al guardar cada ruta, no se recalculan ---- */
+  function sentIds() { try { return JSON.parse(localStorage.getItem('rg.statsSent') || '{}'); } catch (e) { return {}; } }
+  function rideSum(list) {
+    var o = { n: 0, km: 0, s: 0, c: 0, lean: 0, max: 0 };
+    list.forEach(function (r) {
+      var peaks = (r.corners || []).map(function (c) { return Math.abs(c.peak || 0); }).filter(function (x) { return x >= 5 && x <= 70; });
+      o.n++; o.km += Math.min(r.dist || 0, 3000); o.s += r.movingS || 0; o.c += peaks.length; peaks.forEach(function (x) { o.lean += x; });
+      o.max = Math.max(o.max, Math.min(70, r.maxL || 0, 70), Math.min(70, r.maxR || 0));
+    });
+    return o;
+  }
+  // Envía las rutas que aún no se han contado (al guardar una, o todas las antiguas la primera vez que hay sesión).
+  function sendStats() {
+    if (!sb || !user || !A.rides) return;
+    var sent = sentIds(), todo = A.rides().filter(function (r) { return !sent[r.id] && !r.demo && !r.imported && !r.inProgress && (r.dist || 0) >= 2 && (r.movingS || 0) >= 300; });
+    if (!todo.length) return;
+    var o = rideSum(todo);
+    sb.rpc('stats_add', { p_rides: o.n, p_km: Math.round(o.km * 10) / 10, p_moving_s: Math.round(o.s), p_corners: o.c, p_lean_sum: Math.round(o.lean * 10) / 10, p_lean_max: Math.round(o.max * 10) / 10 }).then(function (r) {
+      if (r.error) return;
+      todo.forEach(function (x) { sent[x.id] = 1; }); try { localStorage.setItem('rg.statsSent', JSON.stringify(sent)); } catch (e) {}
+    }, function () {});
+  }
+  window.RGStats = { rideSaved: function () { setTimeout(sendStats, 1500); } };
+
+  /* ---- rutas públicas ---- */
+  function cloudRow(p) {
+    return { name: (p.name || 'Ruta').slice(0, 120), waypoints: p.wps || [], distance_m: Math.round((p.dist || 0) * 1000), duration_s: Math.round(p.dur || 0), visibility: 'public',
+      start_lat: p.coords[0][1], start_lon: p.coords[0][0], plan: { wps: p.wps || [], pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } };
+  }
+  // Pública: se sube y la ve cualquiera en «Explorar». Privada: se retira de ahí y se queda solo en tu móvil.
+  function togglePublic(p) {
+    if (!user) { A.toast('Entra en tu cuenta para publicar rutas.', 'warn'); openAuth(false); return Promise.resolve(); }
+    if (!p.coords || p.coords.length < 2) return Promise.resolve();
+    var job = p.cloudId ? sb.from('routes').delete().eq('id', p.cloudId).then(function (r) { if (r.error) throw r.error; delete p.cloudId; A.toast('Ruta privada: ya no sale en «Explorar».', 'ok'); })
+                        : sb.from('routes').insert(cloudRow(p)).select('id').single().then(function (r) { if (r.error) throw r.error; p.cloudId = r.data.id; A.toast('Ruta publicada: ya la puede ver y seguir cualquiera.', 'ok'); });
+    return job.then(function () { return A.updatePlan(p); }).catch(function (e) { A.toast(msg(e), 'bad'); });
+  }
+  function explore() {
+    if (!user) { A.toast('Entra en tu cuenta para ver las rutas de otros moteros.', 'warn'); openAuth(false); return; }
+    var fix = A.lastFix();
+    sheet('<div class="head"><h1>Rutas públicas</h1><button class="btn small icon" id="exX" type="button"><svg><use href="#i-close"/></svg></button></div><div id="exList"><div class="empty">Cargando…</div></div>');
+    $('#exX').addEventListener('click', closeSheet);
+    sb.rpc('routes_public', { p_lat: fix ? fix.lat : null, p_lon: fix ? fix.lon : null, p_limit: 60 }).then(function (r) {
+      var box = $('#exList'); if (!box) return;
+      if (r.error) { box.innerHTML = '<div class="notice">' + esc(msg(r.error)) + '</div>'; return; }
+      var list = r.data || [];
+      box.innerHTML = (fix ? '<p class="muted rg-small" style="text-align:left">Primero, las que salen más cerca de ti.</p>' : '') + (list.length ? list.map(function (x) {
+        var far = fix && x.lat != null ? L.dist(fix.lat, fix.lon, x.lat, x.lon) : null;
+        return '<div class="club-card ex" data-id="' + x.id + '"><b>' + esc(x.name) + '</b><span class="muted">' + fmtKm(x.m || 0) + (x.s ? ' · ' + fmtMin(x.s) : '') + ' · de ' + esc(x.mine ? 'ti' : x.by) + (far != null ? ' · sale a ' + L.fmtDist(far) : '') + '</span>' +
+          '<div class="rg-row"><button class="btn small primary" data-act="use" type="button">Guardar y seguir</button>' + (x.mine ? '' : '<button class="link" data-act="rep" type="button">Denunciar</button>') + '</div></div>';
+      }).join('') : '<div class="empty">Todavía no hay rutas públicas. Publica la primera desde Rutas → Planificadas.</div>');
+      [].forEach.call(box.querySelectorAll('.ex'), function (card) {
+        var x = list.filter(function (y) { return y.id === card.dataset.id; })[0];
+        card.querySelector('[data-act=use]').addEventListener('click', function (ev) {
+          busy(ev.currentTarget, function () {
+            return sb.from('routes').select('name,plan').eq('id', x.id).single().then(function (q) {
+              if (q.error || !q.data || !q.data.plan || !(q.data.plan.coords || []).length) throw (q.error || new Error('Esa ruta ya no está disponible.'));
+              var pl = q.data.plan, p = { id: parseInt(x.id.replace(/-/g, '').slice(0, 12), 16), name: q.data.name, wps: pl.wps || [], pois: pl.pois || [], coords: pl.coords, steps: pl.steps || [], dist: pl.dist || Math.round((x.m || 0) / 100) / 10, dur: pl.dur || x.s || 0, routed: true, created: Date.now(), from: x.by };
+              if (x.mine) p.cloudId = x.id;
+              closeSheet(); return A.usePlan(p).then(function () { A.toast('Ruta guardada en tus rutas planificadas.', 'ok'); });
+            });
+          });
+        });
+        var rep = card.querySelector('[data-act=rep]');
+        if (rep) rep.addEventListener('click', function () {
+          if (!rep.dataset.armed) { rep.dataset.armed = '1'; rep.textContent = '¿Denunciar esta ruta? Toca otra vez'; return; }
+          sb.from('feedback').insert({ kind: 'fallo', message: 'Ruta pública denunciada: «' + x.name + '» (' + x.id + '), de ' + x.by, app_version: A.version }).then(function (q) { A.toast(q.error ? msg(q.error) : 'Gracias. La revisaremos.', q.error ? 'bad' : 'ok'); rep.remove(); });
+        });
+      });
+    }, function () { var box = $('#exList'); if (box) box.innerHTML = '<div class="notice">Sin conexión.</div>'; });
+  }
+
+  window.RGNav = { togglePublic: togglePublic, explore: explore, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx };
 
   /* ================= importar enlace de Google Maps ================= */
   function readClipboard() {
@@ -291,7 +397,8 @@
       var s = sheet(LOGO + '<p class="muted rg-lead">Rutas en grupo, sin perder a nadie.</p>' +
         '<div class="seg rg-wide" id="rgMode"><button type="button" data-m="login" aria-pressed="' + (mode === 'login') + '">Entrar</button><button type="button" data-m="signup" aria-pressed="' + (mode === 'signup') + '">Crear cuenta</button></div>' +
         '<form id="rgAuth" class="rg-form" autocomplete="on">' +
-        (mode === 'signup' ? '<label>Tu nombre<input id="rgName" required maxlength="60" autocomplete="name" placeholder="Como te conoce la gente"></label>' : '') +
+        (mode === 'signup' ? '<label>Tu nombre<input id="rgName" required maxlength="60" autocomplete="name" placeholder="Como te conoce la gente"></label>' +
+          '<label>¿Cómo vas en moto?<select id="rgLevel">' + levelOptions(3) + '</select></label>' : '') +
         '<label>Correo<input id="rgEmail" type="email" required autocomplete="email" inputmode="email"></label>' +
         '<label>Contraseña<input id="rgPass" type="password" required minlength="6" autocomplete="' + (mode === 'login' ? 'current-password' : 'new-password') + '"></label>' +
         '<button class="btn big primary" type="submit">' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</button></form>' +
@@ -302,14 +409,15 @@
       $('#rgSkip').addEventListener('click', closeSheet);
       $('#rgAuth').addEventListener('submit', function (ev) {
         ev.preventDefault();
-        var email = $('#rgEmail').value.trim(), pass = $('#rgPass').value, name = mode === 'signup' ? $('#rgName').value.trim() : '';
+        var email = $('#rgEmail').value.trim(), pass = $('#rgPass').value, name = mode === 'signup' ? $('#rgName').value.trim() : '', lvl = mode === 'signup' ? +$('#rgLevel').value : 0;
         busy(ev.target.querySelector('button[type=submit]'), function () {
           if (!sb) throw new Error('No se ha podido cargar la conexión con el servidor.');
           var job = mode === 'login' ? sb.auth.signInWithPassword({ email: email, password: pass }) : sb.auth.signUp({ email: email, password: pass, options: { data: { name: name } } });
           return job.then(function (r) {
             if (r.error) throw r.error;
             if (!r.data.session) { A.toast('Cuenta creada. Confirma el correo que te hemos enviado y luego entra.', 'ok'); mode = 'login'; draw(); return; }
-            return refresh().then(function () { closeSheet(); A.toast(mode === 'login' ? 'Sesión iniciada.' : '¡Bienvenido, ' + (name || 'motero') + '!', 'ok'); });
+            var set = lvl ? sb.from('profiles').update({ level: lvl }).eq('id', r.data.session.user.id).then(function () {}, function () {}) : Promise.resolve();
+            return set.then(refresh).then(function () { closeSheet(); A.toast(mode === 'login' ? 'Sesión iniciada.' : '¡Bienvenido, ' + (name || 'motero') + '!', 'ok'); });
           });
         });
       });
@@ -325,8 +433,36 @@
     return sb.auth.getSession().then(function (r) {
       user = (r.data && r.data.session && r.data.session.user) || null; profile = null;
       if (!user) return;
-      return sb.from('profiles').select('name').eq('id', user.id).maybeSingle().then(function (p) { profile = p.data || null; });
-    }).catch(function () {}).then(renderAccount);
+      return sb.from('profiles').select('*').eq('id', user.id).maybeSingle().then(function (p) { profile = p.data || null; });
+    }).catch(function () {}).then(renderAccount).then(function () { if (user) setTimeout(sendStats, 4000); });
+  }
+  function levelOptions(cur) { var o = ''; for (var i = 5; i >= 1; i--) o += '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + esc(L.LEVELS[i] + ' — ' + L.LEVEL_HINT[i]) + '</option>'; return o; }
+  // Mi ficha de motero: nivel (para repartir grupos) y teléfono para las rutas (solo lo ven otros administradores y quien pida ayuda).
+  function openRider() {
+    if (!user) { openAuth(false); return; }
+    sb.from('profile_private').select('*').eq('id', user.id).maybeSingle().then(function (r) {
+      var priv = r.data || {}, hasPhone = 'ride_phone' in priv, lvl = profile && profile.level;
+      sheet('<div class="head"><h1>Mi ficha de motero</h1><button class="btn small icon" id="rdX" type="button"><svg><use href="#i-close"/></svg></button></div><form class="rg-form" id="rdForm">' +
+        '<label>¿Cómo vas en moto?<select id="rdLevel">' + (lvl ? '' : '<option value="" selected>Elige uno</option>') + levelOptions(lvl || 0) + '</select></label>' +
+        '<p class="muted rg-small" style="text-align:left">Sirve para repartir los grupos en las rutas. Solo lo ven los administradores de la ruta en la que vayas, junto con tus medias de velocidad e inclinación.</p>' +
+        '<label>Teléfono para las rutas (opcional)<input id="rdPhone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" value="' + esc(priv.ride_phone || '') + '" placeholder="600 000 000"' + (hasPhone ? '' : ' disabled') + '></label>' +
+        '<p class="muted rg-small" style="text-align:left">Solo se usa cuando eres administrador de una ruta: lo ven los demás administradores y quien pida ayuda, para poder llamarte.</p>' +
+        '<div id="rdStats" class="muted rg-small" style="text-align:left"></div><button class="btn big primary" type="submit">Guardar</button></form>');
+      $('#rdX').addEventListener('click', closeSheet);
+      sb.from('rider_stats').select('*').eq('user_id', user.id).maybeSingle().then(function (q) {
+        var st = q.data, el = $('#rdStats'); if (!el || !st || !st.rides) return;
+        el.textContent = 'Tus medias en ' + st.rides + (st.rides === 1 ? ' ruta' : ' rutas') + ': ' + (st.moving_s > 600 ? Math.round(st.km / (st.moving_s / 3600)) + ' km/h en movimiento' : 'velocidad sin datos') + (st.corners >= 5 ? ' · ' + Math.round(st.lean_sum / st.corners) + '° de media en curva' : '') + '.';
+      }, function () {});
+      $('#rdForm').addEventListener('submit', function (ev) {
+        ev.preventDefault(); var lv = +$('#rdLevel').value || null, ph = $('#rdPhone').value.trim();
+        busy(ev.target.querySelector('button[type=submit]'), function () {
+          return sb.from('profiles').update({ level: lv }).eq('id', user.id).then(function (a) {
+            if (a.error) throw a.error;
+            return hasPhone ? sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id) : { error: null };
+          }).then(function (b) { if (b.error) throw b.error; return refresh(); }).then(function () { closeSheet(); A.toast('Ficha guardada.', 'ok'); });
+        });
+      });
+    });
   }
   var authListeners = [];
   function renderAccount() {
@@ -334,8 +470,11 @@
     var box = $('#rgAccount'); if (!box) return;
     if (user) {
       var name = (profile && profile.name) || (user.user_metadata && user.user_metadata.name) || 'Tu cuenta';
+      var lv = profile && profile.level;
       box.innerHTML = '<div class="rg-acc"><span class="rg-ava">' + esc(name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(name) + '</b><span class="muted">' + esc(user.email || '') + '</span></div></div>' +
+        '<button class="rg-level" id="rgRider" type="button"><span>' + (lv ? esc(L.LEVELS[lv]) : 'Elige tu nivel de motero') + '</span><small>Mi ficha: nivel y teléfono para las rutas</small></button>' +
         '<div class="rg-row"><button class="btn small" id="rgFeedback" type="button">Sugerencias y fallos</button><button class="btn small" id="rgOut" type="button">Cerrar sesión</button></div>';
+      $('#rgRider').addEventListener('click', openRider);
       $('#rgOut').addEventListener('click', function () { sb.auth.signOut().then(function () { user = null; profile = null; renderAccount(); A.toast('Sesión cerrada.', 'ok'); }); });
     } else {
       box.innerHTML = '<div class="rg-acc"><span class="rg-ava">?</span><div><b>Sin cuenta</b><span class="muted">Entra para las rutas en grupo y para enviarnos sugerencias.</span></div></div>' +
@@ -462,6 +601,6 @@
   });
   if (sb) sb.auth.onAuthStateChange(function (ev, session) { var had = !!user; user = (session && session.user) || null; if (had !== !!user) renderAccount(); });
   sync();
-  window.RGCloud = { sb: sb, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
+  window.RGCloud = { sb: sb, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profile: function () { return profile; }, openRider: openRider, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
     onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, busy: busy, msg: msg, esc: esc };
 })();
