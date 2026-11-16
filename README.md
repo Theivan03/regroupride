@@ -15,6 +15,7 @@ El plan completo (funciones y fases) está en el documento «App para moteros �
 - **Rutas públicas o privadas** y «Explorar rutas públicas».
 - **GPX**: los puntos marcados aparte (gasolineras, paradas…) salen en el mapa.
 - Todo lo del servidor está en `supabase/04_rutas_niveles.sql` (hay que ejecutarlo).
+- **0.7.1** · Paradas con nombre: en los GPX de MyRouteApp o Garmin las paradas van como puntos de la ruta con nombre (`rtept`), mezcladas con puntos de relleno («#3»). Ahora las que tienen nombre se ven en el mapa con su nombre e icono y se anuncian al acercarse («En 500 metros, parada de reagrupación»), igual que las gasolineras y demás puntos marcados.
 
 ## Qué hay en la versión 0.6
 

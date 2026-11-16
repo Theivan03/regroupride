@@ -130,6 +130,38 @@ var RGLib = (function () {
     return { list: list, total: list.length, behind: list.filter(function (x) { return x.behind || x.off || x.stale; }).length, waiting: rows.length - live.length };
   }
 
+  /* ---- paradas con nombre y puntos marcados, como avisos durante la ruta ---- */
+  var STOP_SAY = { fuel: 'gasolinera', food: 'parada para comer', view: 'mirador', park: 'aparcamiento', stop: 'parada', poi: 'punto marcado' };
+  function calm(nm) { nm = String(nm || '').split(',')[0].trim(); return nm === nm.toUpperCase() ? nm.charAt(0) + nm.slice(1).toLowerCase() : nm; }   // «PARADA DE…» → «Parada de…»
+  // Dónde cae un punto en el trazado, buscando hacia delante desde «from» (en rutas circulares el más cercano de toda la ruta puede ser otro tramo).
+  function alongOf(p, line, from) {
+    var W = [15000, 60000, line.total];
+    for (var i = 0; i < W.length; i++) { var pr = project(p, line, from, 0, Math.min(line.total, from + W[i])); if (pr && pr.d <= 80) return pr; }
+    return null;
+  }
+  // Avisos de «parada» para el seguimiento: las paradas con nombre de la ruta (menos la salida y la llegada) y los puntos
+  // marcados que caen en el trazado. Se anuncian igual que un giro: «En 500 metros, parada de reagrupación».
+  function stopSteps(plan, line) {
+    var out = [], from = 0, wps = plan.wps || [];
+    wps.forEach(function (w, i) {
+      var pr = alongOf({ lat: w[0], lon: w[1] }, line, from); if (pr) from = pr.along;
+      if (!pr || !w[2] || i === 0 || i === wps.length - 1) return;
+      var nm = calm(w[2]), kind = w[3] || stopKind(w[2]), lead = STOP_SAY[kind] || 'parada';
+      out.push({ along: Math.round(pr.along), text: new RegExp('^' + lead.split(' ')[0], 'i').test(nm) ? nm.charAt(0).toLowerCase() + nm.slice(1) : lead + ': ' + nm, icon: 'stop', name: '', stop: true });
+    });
+    (plan.pois || []).forEach(function (q) {
+      var pr = alongOf({ lat: q[0], lon: q[1] }, line, 0); if (!pr) return;
+      var lead = STOP_SAY[q[3]] || STOP_SAY.poi, nm = calm(q[2]);
+      out.push({ along: Math.round(pr.along), text: nm && nm.toLowerCase() !== (POI_NAME[q[3]] || '').toLowerCase() ? lead + ': ' + nm : lead, icon: 'stop', name: '', stop: true });
+    });
+    return out.sort(function (a, b) { return a.along - b.along; });
+  }
+  // Giros de la ruta + avisos de parada, ya colocados y en orden, listos para el seguimiento.
+  function navSteps(plan) {
+    var line = makeLine(plan.coords), all = placeSteps(plan.steps || [], line).concat(stopSteps(plan, line));
+    return all.sort(function (a, b) { return a.along - b.along; });
+  }
+
   /* ================= nivel y grupos por ritmo ================= */
   var LEVELS = [null, 'Paseo dominguero', 'Voy a mi bola', 'Curveo alegre', 'Rozando estriberas', 'Voy folladísimo'];
   var LEVEL_HINT = [null, 'Tranquilo, mirando el paisaje.', 'Ritmo suave, sin prisa.', 'Me gusta enlazar curvas a buen ritmo.', 'Rápido y con oficio en curva.', 'A fuego. Los demás, por el retrovisor.'];
@@ -277,6 +309,8 @@ var RGLib = (function () {
     if (/parking|aparcamiento|\bpark\b/.test(t)) return 'park';
     return 'poi';
   }
+  // Una parada con nombre: si es una gasolinera, un bar… se marca como tal; si no, es una parada sin más (reagrupamiento, descanso).
+  function stopKind(name) { var k = poiKind(name); return k === 'poi' ? 'stop' : k; }
   var POI_NAME = { fuel: 'Gasolinera', food: 'Parada para comer', view: 'Mirador', park: 'Aparcamiento', poi: 'Punto marcado' };
   // Lee un GPX (de OsmAnd, Calimoto, Kurviger, un GPS…) y lo deja como ruta a seguir:
   //   coords = el trazado tal cual viene (trk); wps = las paradas (rte, o wpt, o principio y final).
@@ -289,7 +323,9 @@ var RGLib = (function () {
     var trk = gpxPts(text, 'trkpt'), rte = gpxPts(text, 'rtept'), wpt = gpxPts(text, 'wpt');
     var nm = /<metadata>[\s\S]*?<name>([\s\S]*?)<\/name>[\s\S]*?<\/metadata>/.exec(text) || /<(?:trk|rte)>\s*<name>([\s\S]*?)<\/name>/.exec(text);
     var name = nm ? xmlText(nm[1]) : '';
-    var asStop = function (p) { return [p.lat, p.lon, p.name || '']; };
+    // Nombres de relleno que ponen los programas («#3», «Via 2», «WP07»…) no son nombres: se quitan.
+    var real = function (nm) { nm = String(nm || '').trim(); return /^(#|via|shaping|punto|point|wpt?|waypoint|parada|stop)?[ _.#-]*\d*$/i.test(nm) ? '' : nm; };
+    var asStop = function (p) { var nm = real(p.name); return nm ? [p.lat, p.lon, nm, stopKind(nm)] : [p.lat, p.lon, '']; };
     var asPoi = function (p) { return [p.lat, p.lon, p.name || POI_NAME[p.kind || 'poi'], p.kind || 'poi']; };
     var track = trk.length >= 2 ? trk : (rte.length >= 50 ? rte : null);
     if (!track) {
@@ -306,7 +342,9 @@ var RGLib = (function () {
     if (track === trk && rte.length >= 2 && rte.length <= 60) { stops = rte.map(asStop); pois = wpt; }
     else if (plain) stops = wpt.map(function (p) { return { p: p, a: project(p, line, 0, 0).along }; }).sort(function (a, b) { return a.a - b.a; }).map(function (x) { return asStop(x.p); });
     else { stops = [[coords[0][1], coords[0][0], 'Salida'], [coords[coords.length - 1][1], coords[coords.length - 1][0], 'Llegada']]; pois = wpt; }
-    if (stops.every(function (w) { return /^\d\d /.test(w[2]); })) stops.forEach(function (w) { w[2] = w[2].slice(3); });   // «01 Nombre» de nuestro propio GPX
+    if (stops.every(function (w) { return /^\d\d /.test(w[2]); })) stops = stops.map(function (w) { return asStop({ lat: w[0], lon: w[1], name: w[2].slice(3) }); });   // «01 Nombre» de nuestro propio GPX
+    // Dos puntos seguidos en el mismo sitio (pasa al exportar desde algunos programas) son uno: se queda el que tiene nombre.
+    stops = stops.filter(function (w, i) { var b = stops[i + 1]; return !(b && dist(w[0], w[1], b[0], b[1]) < 15 && (!w[2] || b[2])) && !(i > 0 && !w[2] && stops[i - 1][2] && dist(w[0], w[1], stops[i - 1][0], stops[i - 1][1]) < 15); });
     // Un punto marcado que es la misma parada (nuestro GPX los escribe dos veces) no se repite.
     pois = pois.filter(function (p) { return !stops.some(function (w) { return dist(p.lat, p.lon, w[0], w[1]) < 40; }); })
       .map(function (p) { return { p: p, a: project(p, line, 0, 0).along }; }).sort(function (a, b) { return a.a - b.a; }).map(function (x) { return asPoi(x.p); }).slice(0, 200);
@@ -404,6 +442,6 @@ var RGLib = (function () {
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
   return { dist: dist, findMapsUrl: findMapsUrl, parseMapsUrl: parseMapsUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
-    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, poiKind: poiKind, LEVELS: LEVELS, LEVEL_HINT: LEVEL_HINT, paceScore: paceScore, riderScore: riderScore, makeGroups: makeGroups, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
+    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, poiKind: poiKind, stopKind: stopKind, stopSteps: stopSteps, navSteps: navSteps, LEVELS: LEVELS, LEVEL_HINT: LEVEL_HINT, paceScore: paceScore, riderScore: riderScore, makeGroups: makeGroups, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = RGLib;

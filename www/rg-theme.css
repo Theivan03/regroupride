@@ -353,3 +353,12 @@ body.rg-rec #followCard{display:none}
 .ev-start{width:100%;margin:8px 0 2px}
 .plan-actions .btn.on{color:var(--color-accent)}
 .rg-form select{width:100%}
+
+/* paradas con nombre: se ven con su icono y su nombre, no solo con un número */
+.stop-marker.named{width:auto;height:28px;border-radius:14px;padding:0 10px 0 3px;gap:5px;background:#fff;color:#0E141B;border:2.5px solid #0E141B;font-size:12.5px;white-space:nowrap;z-index:2}
+.stop-marker.named .ico{width:20px;height:20px;border-radius:50%;background:#0E141B;color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.stop-marker.named .ico svg{width:13px;height:13px}
+.stop-marker.named.fuel .ico{background:#F5A524;color:#231400}
+.stop-marker.named.food .ico{background:#0B8A4B}
+.stop-marker.named.view .ico{background:#8E6BFF}
+.stop-marker.named.park .ico{background:#2F7CF6}

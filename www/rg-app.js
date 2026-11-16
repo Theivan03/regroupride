@@ -21,6 +21,7 @@
   function icon(kind) {
     if (kind === 'arrive') return '<svg viewBox="0 0 32 32"><path d="M9 28V5m0 1h14l-3.5 5 3.5 5H9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     if (kind === 'roundabout') return '<svg viewBox="0 0 32 32"><circle cx="16" cy="15" r="6.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 29v-7.5M21 9l5-5m0 0h-5.5M26 4v5.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    if (kind === 'stop') return '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M12.500 11v10M19.500 11v10" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg>';
     if (kind === 'off') return '<svg viewBox="0 0 32 32"><path d="M16 5 3.5 26.5h25z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M16 13v6.5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="23" r="1.7" fill="currentColor"/></svg>';
     var a = ARROW[kind] == null ? 0 : ARROW[kind];
     return '<svg viewBox="0 0 32 32"><g transform="rotate(' + a + ' 16 16)"><path d="M16 27V6m0 0-7.5 7.5M16 6l7.5 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
@@ -34,7 +35,7 @@
     if (info) info.textContent = p ? (fmtKm((p.dist || 0) * 1000) + (p.dur ? ' · ' + fmtMin(p.dur) : '')) : '';
     if (ride) ride.textContent = p ? 'Iniciar ruta' : 'Grabar ruta';
     if (on && (!nav.active || nav.planId !== p.id)) {
-      nav.active = true; nav.planId = p.id; nav.tr = L.Tracker(p.coords, p.steps || []); nav.rejoin = null; nav.rejoinAt = 0; nav.last = null; nav.notified = false; nav.toStart = false; nav.asked = false;
+      nav.active = true; nav.planId = p.id; nav.tr = L.Tracker(p.coords, L.navSteps(p)); nav.rejoin = null; nav.rejoinAt = 0; nav.last = null; nav.notified = false; nav.toStart = false; nav.asked = false;
       askNotif();
       var f = A.lastFix(); if (f) onFix(f); else renderBanner(null);
     } else if (!on && nav.active) {
@@ -82,7 +83,7 @@
     $('#tsNear').addEventListener('click', closeSheet);
     $('#tsStart').addEventListener('click', function () {
       closeSheet(); var q = plan(); if (!nav.active || !q || q.id !== p.id) return;
-      nav.toStart = true; nav.tr = L.Tracker(q.coords, q.steps || [], { fromStart: true }); nav.rejoin = null; nav.rejoinAt = 0; drawRejoin();
+      nav.toStart = true; nav.tr = L.Tracker(q.coords, L.navSteps(q), { fromStart: true }); nav.rejoin = null; nav.rejoinAt = 0; drawRejoin();
       var f = A.lastFix(); if (f) onFix(f);
     });
   }
@@ -152,16 +153,18 @@
   /* ---- paradas de la ruta en el mapa (todas, sin límite) ---- */
   var stopMk = [], stopKey = '';
   function drawStops() {
-    var m = A.map(), p = plan(), key = p ? p.id + ':' + (p.wps || []).length + ':' + (p.pois || []).length : '';
+    var m = A.map(), p = plan(), key = p ? p.id + ':' + (p.wps || []).length + ':' + (p.pois || []).length + ':' + (p.wps || []).filter(function (w) { return w[2]; }).length : '';
     if (!m || typeof maplibregl === 'undefined') return;
     if (key === stopKey) return; stopKey = key;
     stopMk.forEach(function (x) { x.remove(); }); stopMk = [];
     if (!p) return;
     (p.wps || []).forEach(function (w, i) {
-      var el = document.createElement('div'), last = i === p.wps.length - 1;
-      el.className = 'stop-marker' + (i === 0 ? ' start' : (last ? ' end' : '')); el.textContent = String(i + 1);
-      el.addEventListener('click', function (e) { e.stopPropagation(); A.toast((i + 1) + '. ' + ((w[2] || '').split(',')[0] || (i === 0 ? 'Salida' : (last ? 'Llegada' : 'Punto ' + (i + 1)))), 'ok'); });
-      stopMk.push(new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([w[1], w[0]]).addTo(m));
+      var el = document.createElement('div'), last = i === p.wps.length - 1, nm = (w[2] || '').split(',')[0].trim(), kind = (i === 0 || last || !nm) ? '' : (POI[w[3]] ? w[3] : L.stopKind(nm));
+      // Las paradas con nombre (reagrupamiento, gasolinera, almuerzo…) se ven con su nombre; los puntos de paso, solo con su número.
+      if (kind) { el.className = 'stop-marker named ' + kind; el.innerHTML = '<span class="ico">' + POI[kind][1] + '</span><span class="lbl">' + esc(nm.length > 26 ? nm.slice(0, 25) + '…' : nm) + '</span>'; }
+      else { el.className = 'stop-marker' + (i === 0 ? ' start' : (last ? ' end' : '')); el.textContent = String(i + 1); }
+      el.addEventListener('click', function (e) { e.stopPropagation(); A.toast((i + 1) + '. ' + (nm || (i === 0 ? 'Salida' : (last ? 'Llegada' : 'Punto ' + (i + 1)))), 'ok'); });
+      stopMk.push(new maplibregl.Marker(kind ? { element: el, anchor: 'left', offset: [-15, 0] } : { element: el, anchor: 'center' }).setLngLat([w[1], w[0]]).addTo(m));
     });
     // Puntos marcados aparte en la ruta: gasolineras, sitios para comer, miradores…
     (p.pois || []).forEach(function (q) {
@@ -176,6 +179,7 @@
     food: ['Parada para comer', '<svg viewBox="0 0 24 24"><path d="M7 3v8M4.5 3v4.5a2.5 2.5 0 0 0 5 0V3M7 11v10M17 21V3c-2 1.2-3 3.4-3 6.5V13h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
     view: ['Mirador', '<svg viewBox="0 0 24 24"><path d="M3 19 9.5 8l4 6 2.5-3.5L21 19z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="17" cy="6" r="1.6" fill="currentColor"/></svg>'],
     park: ['Aparcamiento', '<svg viewBox="0 0 24 24"><path d="M8 20V4h5a4.5 4.5 0 0 1 0 9H8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
+    stop: ['Parada', '<svg viewBox="0 0 24 24"><path d="M6 21V4m0 1h11l-2.800 4 2.800 4H6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'],
     poi: ['Punto marcado', '<svg viewBox="0 0 24 24"><path d="M12 21s6-5.6 6-10.5A6 6 0 0 0 6 10.500C6 15.400 12 21 12 21z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="10.500" r="2" fill="currentColor"/></svg>']
   };
   /* ---- Google Maps como opción secundaria, por tramos de 9 paradas ---- */
@@ -225,7 +229,8 @@
       plan.steps = r.steps; if (r.ok) plan.dur = Math.round(r.dur);
       var total = r.ok + r.bad, part = total ? r.ok / total : 0;
       return A.usePlan(plan).then(function () {
-        var np = (g.pois || []).length, d = String(km).replace('.', ',') + ' km, ' + g.wps.length + ' paradas' + (np ? ' y ' + np + (np === 1 ? ' punto marcado' : ' puntos marcados') + ' (gasolineras, paradas…)' : '') + '. ';
+        var np = (g.pois || []).length, named = g.wps.filter(function (w, i) { return w[2] && w[3] && i > 0 && i < g.wps.length - 1; }).map(function (w) { return w[2].split(',')[0]; });
+        var d = String(km).replace('.', ',') + ' km, ' + g.wps.length + ' puntos' + (named.length ? ', ' + named.length + (named.length === 1 ? ' parada con nombre (' : ' paradas con nombre (') + named.slice(0, 3).join(', ') + (named.length > 3 ? '…' : '') + ')' : '') + (np ? ' y ' + np + (np === 1 ? ' punto marcado' : ' puntos marcados') : '') + '. ';
         A.toast('Ruta importada: ' + d + (part === 1 ? 'Con indicaciones de giro.' : (part >= 0.9 ? 'Con indicaciones de giro en casi todo el recorrido.' : (part > 0 ? 'Indicaciones de giro en parte del recorrido; en el resto, sigue la línea.' : 'Sin indicaciones de giro (no hay conexión): sigue la línea del mapa.'))), part > 0 ? 'ok' : 'warn');
       });
     }).catch(function (e) { A.toast('No se pudo importar: ' + (e && e.message || e), 'bad'); });

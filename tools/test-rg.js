@@ -162,11 +162,11 @@ t('GPX de OsmAnd: trazado completo, paradas del rte y sin horas', function () {
 t('GPX: el nuestro vuelve igual, con horas es grabado, solo puntos sueltos hay que calcularlo, y lo que no es GPX se rechaza', function () {
   var plan = { name: 'Prueba & cía', wps: [[38.1, -0.5, 'Salida <A>'], [38.2, -0.6, "L'Orxa"]], coords: [[-0.5, 38.1], [-0.55, 38.15], [-0.6, 38.2]] };
   var g = L.gpxToPlan(L.planToGpx(plan));
-  assert.equal(g.name, 'Prueba & cía'); assert.deepEqual(g.wps, plan.wps); assert.deepEqual(g.coords, plan.coords);
+  assert.equal(g.name, 'Prueba & cía'); assert.deepEqual(g.wps.map(function (w) { return w.slice(0, 3); }), plan.wps); assert.deepEqual(g.coords, plan.coords);
   var rec = '<gpx><trk><trkseg><trkpt lon="-0.5" lat="38.1"><time>2026-11-15T10:00:00Z</time></trkpt><trkpt lat="38.2" lon="-0.6"><time>2026-11-15T10:01:00Z</time></trkpt></trkseg></trk></gpx>';
   var r = L.gpxToPlan(rec); assert.equal(r.timed, true); assert.deepEqual(r.coords, [[-0.5, 38.1], [-0.6, 38.2]]); assert.equal(r.wps[0][2], 'Salida');
   var only = L.gpxToPlan('<gpx><rte><rtept lat="38.1" lon="-0.5"><name>Bar</name></rtept><rtept lat="38.2" lon="-0.6"/></rte></gpx>');
-  assert.equal(only.route, true); assert.deepEqual(only.wps, [[38.1, -0.5, 'Bar'], [38.2, -0.6, '']]);
+  assert.equal(only.route, true); assert.deepEqual(only.wps, [[38.1, -0.5, 'Bar', 'food'], [38.2, -0.6, '']]);
   assert.throws(function () { L.gpxToPlan('<html>hola</html>'); }, /No es un archivo GPX/);
   assert.throws(function () { L.gpxToPlan('<gpx></gpx>'); }, /ninguna ruta/);
 });
@@ -241,5 +241,33 @@ t('Grupos por ritmo: parejos, del más rápido al más tranquilo y con un admini
   assert.deepEqual(L.makeGroups(rows.slice(0, 6), 5).map(function (x) { return x.members.length; }), [3, 3], 'seis en grupos de cinco: dos de tres, no cinco y uno');
   assert.deepEqual(L.makeGroups(rows.slice(1, 4), 8).map(function (x) { return [x.members.length, x.guide]; }), [[3, null]]);
   assert.deepEqual(L.makeGroups([], 5), []);
+});
+// GPX con la forma del que exporta MyRouteApp: todo en una línea, rte con nombres («#1», o el que se le haya puesto) y
+// extensiones de Garmin (ViaPoint / ShapingPoint), sin wpt, y el trk con lon antes que lat.
+function myRouteAppGpx() {
+  var o = osmandGpx(), pts = o.pts, at = function (i) { return 'lat="' + pts[i][1] + '" lon="' + pts[i][0] + '"'; }, last = pts.length - 1;
+  var rte = [[0, '#1', 'ViaPoint'], [20, 'PARADA DE REAGRUPACIÓN', 'ShapingPoint'], [o.corner, '#3', 'ShapingPoint'], [o.corner, '#4', 'ShapingPoint'], [o.corner + 150, 'Repsol Ibi', 'ShapingPoint'], [last, '#6', 'ViaPoint']];
+  return { pts: pts, corner: o.corner, text: '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="MyRouteApp" xmlns="http://www.topografix.com/GPX/1/1" xmlns:trp="http://www.garmin.com/xmlschemas/TripExtensions/v1"><metadata><time>2026-11-15T19:48:31+00:00</time></metadata><rte><name>2026-11-15 Motorcycle 28 km</name>' +
+    rte.map(function (r) { return '<rtept ' + at(r[0]) + '><name>' + r[1] + '</name><extensions><trp:' + r[2] + '/></extensions></rtept>'; }).join('') + '</rte><trk><name>Track-2026-11-15 Motorcycle 28 km</name><trkseg>' +
+    pts.map(function (c) { return '<trkpt lon="' + c[0] + '" lat="' + c[1] + '"/>'; }).join('') + '</trkseg></trk></gpx>' };
+}
+t('GPX de MyRouteApp: las paradas con nombre se distinguen de los puntos de relleno («#3») y se avisan durante la ruta', function () {
+  var o = myRouteAppGpx(), g = L.gpxToPlan(o.text);
+  assert.equal(g.name, '2026-11-15 Motorcycle 28 km'); assert.equal(g.coords.length, o.pts.length); assert.equal(g.timed, false);
+  assert.deepEqual(g.wps.map(function (w) { return w[2] + '|' + (w[3] || ''); }), ['|', 'PARADA DE REAGRUPACIÓN|stop', '|', 'Repsol Ibi|fuel', '|'], 'sin «#N», sin el punto repetido, y cada parada con su tipo');
+  var line = L.makeLine(g.coords), st = L.stopSteps(g, line);
+  assert.deepEqual(st.map(function (x) { return x.text; }), ['parada de reagrupación', 'gasolinera: Repsol Ibi']);
+  assert.ok(Math.abs(st[0].along - line.cum[20]) < 30 && Math.abs(st[1].along - line.cum[o.corner + 150]) < 30);
+  // mezcladas con los giros, en orden, y el seguimiento las anuncia como un giro más
+  g.steps = [{ lat: 38.6, lon: -0.3, text: 'gira a la izquierda', icon: 'left', name: 'CV-70' }];
+  var all = L.navSteps(g); assert.deepEqual(all.map(function (x) { return x.icon; }), ['stop', 'left', 'stop']);
+  var tr = L.Tracker(g.coords, all), said = [], p0 = o.pts[0];
+  for (var i = 0; i <= 24; i++) tr.update({ lat: o.pts[i][1], lon: o.pts[i][0], v: 14, acc: 5 }, i * 3000).events.forEach(function (e) { if (e.type === 'say') said.push(e.text); });
+  assert.ok(/^En \d+ metros, parada de reagrupación$/.test(said[0]), said.join(' / ')); assert.equal(said[1], 'Parada de reagrupación');
+  // una gasolinera marcada aparte (wpt) junto al trazado también se anuncia; una que queda lejos, no
+  g.pois = [[o.pts[30][1], o.pts[30][0], 'Cepsa', 'fuel'], [39.5, -0.3, 'Lejos', 'fuel']];
+  assert.deepEqual(L.stopSteps(g, line).map(function (x) { return x.text; }), ['parada de reagrupación', 'gasolinera: Cepsa', 'gasolinera: Repsol Ibi']);
+  // nuestro GPX conserva nombres y tipos
+  var back = L.gpxToPlan(L.planToGpx(g)); assert.deepEqual(back.wps.map(function (w) { return w[2]; }), ['Salida', 'PARADA DE REAGRUPACIÓN', '', 'Repsol Ibi', 'Llegada']);
 });
 console.log('rg-lib: ' + n + ' pruebas correctas');
