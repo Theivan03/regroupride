@@ -384,3 +384,4 @@ body.rg-rec #followCard{display:none}
 .rg-advice b{font-family:var(--font-display)}
 .rg-advice span{font-size:13.500px;line-height:1.4}
 .rg-advice .btn{align-self:flex-start}
+#rgSyncBox .perm b{font-size:15px}

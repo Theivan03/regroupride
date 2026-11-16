@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.8.2';
+  var APP_VERSION = '0.9.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -307,8 +307,9 @@
 
   /* ---------- rutas planificadas ---------- */
   var plans = [], planMode = false, pl = { wps: [], markers: [], coords: [], dist: 0, dur: 0, routed: false, pending: false }, activePlan = null, routeTimer = null, routeSeq = 0;
-  function loadPlans() { return DB.get('plans', []).then(function (p) { plans = p || []; activePlan = settings.activePlanId ? plans.filter(function (x) { return x.id === settings.activePlanId; })[0] || null : null; drawPlan(); renderFollow(); }); }
+  function loadPlans() { return DB.get('plans', []).then(function (p) { plans = p || []; plans.forEach(function (x) { if (x.cloudId && x.pub === undefined) x.pub = true; }); activePlan = settings.activePlanId ? plans.filter(function (x) { return x.id === settings.activePlanId; })[0] || null : null; drawPlan(); renderFollow(); }); }
   function savePlans() { return DB.set('plans', plans); }
+  function syncSoon() { if (window.RGSync) RGSync.soon(5000); }      // copia en la cuenta
   function enterPlanMode() {
     if (rec) { toast('Para la grabación antes de planificar una ruta.', 'warn'); return; }
     if (parkOpen) closePark();
@@ -364,7 +365,7 @@
   $('#followSave').addEventListener('click', function () {
     var p = activePlan; if (!p || !p.preview) return;
     delete p.preview; plans = plans.filter(function (x) { return x.id !== p.id; }); plans.unshift(p);
-    savePlans().then(function () { settings.activePlanId = p.id; saveSettings(); renderFollow(); toast('Ruta guardada en tus rutas planificadas.', 'ok'); });
+    savePlans().then(function () { syncSoon(); settings.activePlanId = p.id; saveSettings(); renderFollow(); toast('Ruta guardada en tus rutas planificadas.', 'ok'); });
   });
   $('#btnPlan').addEventListener('click', function () { if (planMode) exitPlanMode(); else enterPlanMode(); });
   $('#planClose').addEventListener('click', exitPlanMode);
@@ -376,7 +377,7 @@
     var coords = Geo.simplify(pl.coords.map(function (c) { return [0, c[1], c[0]]; }), 8).map(function (p) { return [p[2], p[1]]; });
     var p = { id: Date.now(), name: $('#planName').value.trim() || ('Ruta planificada ' + (plans.length + 1)), wps: pl.wps.slice(), coords: coords, dist: Math.round(pl.dist * 10) / 10, dur: Math.round(pl.dur), routed: pl.routed, steps: pl.routed ? (pl.steps || []) : [], created: Date.now() };
     plans.unshift(p);
-    savePlans().then(function () { exitPlanMode(); followPlan(p, false); toast('Ruta guardada. Pulsa «Iniciar ruta» cuando salgas.', 'ok'); return setFlag('plan'); });
+    savePlans().then(function () { exitPlanMode(); followPlan(p, false); toast('Ruta guardada. Pulsa «Iniciar ruta» cuando salgas.', 'ok'); syncSoon(); return setFlag('plan'); });
   });
   $('#followStop').addEventListener('click', function () { followPlan(null, false); });
   $('#followGmaps').addEventListener('click', function () { if (activePlan) openInMaps(activePlan.wps); });
@@ -390,13 +391,13 @@
     plans.forEach(function (p) {
       var d = document.createElement('div'); d.className = 'plan';
       d.innerHTML = '<div class="thumb">' + planThumb(p) + '</div><div><div class="name">' + esc(p.name) + '</div><div class="muted">' + fmtKm(p.dist) + ' · ' + fmtDur(p.dur * 1000) + (p.routed ? ' por carretera' : ' en línea recta') + ' · ' + p.wps.length + ' puntos · ' + fmtDate(p.created) + '</div></div>' +
-        '<div class="plan-actions"><button class="btn small primary" type="button" data-act="follow">' + (activePlan && activePlan.id === p.id ? 'Seleccionada' : 'Seguir esta ruta') + '</button><button class="btn small' + (p.cloudId ? ' on' : '') + '" type="button" data-act="pub">' + (p.cloudId ? 'Pública ✓' : 'Privada · publicar') + '</button><button class="btn small" type="button" data-act="gpx"><svg><use href="#i-download"/></svg>Descargar GPX</button><button class="btn small" type="button" data-act="gmaps"><svg><use href="#i-gmaps"/></svg>Google Maps</button><button class="btn small danger" type="button" data-act="del">Borrar</button></div>';
+        '<div class="plan-actions"><button class="btn small primary" type="button" data-act="follow">' + (activePlan && activePlan.id === p.id ? 'Seleccionada' : 'Seguir esta ruta') + '</button><button class="btn small' + (p.pub ? ' on' : '') + '" type="button" data-act="pub">' + (p.pub ? 'Pública ✓' : 'Privada · publicar') + '</button><button class="btn small" type="button" data-act="gpx"><svg><use href="#i-download"/></svg>Descargar GPX</button><button class="btn small" type="button" data-act="gmaps"><svg><use href="#i-gmaps"/></svg>Google Maps</button><button class="btn small danger" type="button" data-act="del">Borrar</button></div>';
       d.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () {
         if (b.dataset.act === 'follow') { followPlan(p, true); showView('map'); }
         if (b.dataset.act === 'gmaps') openInMaps(p.wps);
         if (b.dataset.act === 'gpx' && window.RGNav) RGNav.exportGpx(p);
         if (b.dataset.act === 'pub' && window.RGNav) RGNav.togglePublic(p);
-        if (b.dataset.act === 'del') armOrRun(b, 'Borrar', 'Toca otra vez', function () { plans = plans.filter(function (x) { return x.id !== p.id; }); if (activePlan && activePlan.id === p.id) followPlan(null, false); savePlans().then(renderRides); });
+        if (b.dataset.act === 'del') armOrRun(b, 'Borrar', 'Toca otra vez', function () { if (window.RGSync) RGSync.planDeleted(p); plans = plans.filter(function (x) { return x.id !== p.id; }); if (activePlan && activePlan.id === p.id) followPlan(null, false); savePlans().then(renderRides); });
       }); });
       list.appendChild(d);
     });
@@ -473,7 +474,7 @@
     if (done.points.length > 1) { var st = Geo.stats(done.points); done.altMax = st.altMax; done.climb = Math.round(st.climb); if (!done.dist) done.dist = st.distKm; if (!done.movingS) done.movingS = st.movingS; if (!done.vMax) done.vMax = st.vMaxKmh; }
     var meta = recMeta(done); meta.inProgress = false; meta.altMax = done.altMax; meta.climb = done.climb;
     if (done.points.length < 2 && !done.corners.length) { toast('Ruta demasiado corta: no se ha guardado.', 'warn'); liveFeatures = []; drawLiveTrack(true); DB.deleteRide(done.id).catch(function () {}); render(); return; }
-    DB.putRide(meta).then(function () { return DB.putTrack(done.id, done.points); }).then(function () { return reloadRides(); }).then(function () { liveFeatures = []; drawLiveTrack(true); openDetail(done.id); if (window.RGStats) RGStats.rideSaved(); return checkAchievements(); });
+    DB.putRide(meta).then(function () { return DB.putTrack(done.id, done.points); }).then(function () { return reloadRides(); }).then(function () { liveFeatures = []; drawLiveTrack(true); openDetail(done.id); if (window.RGStats) RGStats.rideSaved(); syncSoon(); return checkAchievements(); });
   }
   function recoverRide() {
     var id = LS.get('inclina.recording', null); if (!id) return Promise.resolve();
@@ -763,7 +764,7 @@
   });
   function disarm(b, label) { b.classList.remove('armed'); b.dataset.armed = ''; b.textContent = label; if (b._t) clearTimeout(b._t); }
   function armOrRun(b, label, armedLabel, fn) { if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.classList.add('armed'); b.textContent = armedLabel; b._t = setTimeout(function () { disarm(b, label); }, 4000); return; } disarm(b, label); fn(); }
-  $('#btnDeleteRide').addEventListener('click', function () { armOrRun($('#btnDeleteRide'), 'Borrar esta ruta', 'Toca otra vez para borrar', function () { DB.deleteRide(detailId).then(reloadRides).then(function () { showView('rides'); }); }); });
+  $('#btnDeleteRide').addEventListener('click', function () { armOrRun($('#btnDeleteRide'), 'Borrar esta ruta', 'Toca otra vez para borrar', function () { if (window.RGSync) RGSync.rideDeleted(detailId); DB.deleteRide(detailId).then(reloadRides).then(function () { showView('rides'); }); }); });
   // fotos
   function renderPhotos(rideId) {
     DB.photosOf(rideId).then(function (ps) {
@@ -1200,11 +1201,14 @@
     recNow: function () { return rec ? { km: rec.dist || 0, movingS: rec.movingS || 0, peaks: rec.corners.map(function (c) { return Math.abs(c.peak || 0); }) } : null; },
     updatePlan: function (p) { plans = plans.map(function (x) { return x.id === p.id ? p : x; }); if (activePlan && activePlan.id === p.id) activePlan = p; return savePlans().then(function () { if (currentView === 'rides') renderRides(); }); },
     // guarda (o actualiza) una ruta planificada sin ponerse a seguirla
-    savePlan: function (p) { delete p.preview; plans = plans.filter(function (x) { return x.id !== p.id; }); plans.unshift(p); return savePlans().then(function () { if (currentView === 'rides') renderRides(); return setFlag('plan'); }); },
+    savePlan: function (p) { delete p.preview; plans = plans.filter(function (x) { return x.id !== p.id; }); plans.unshift(p); return savePlans().then(function () { syncSoon(); if (currentView === 'rides') renderRides(); return setFlag('plan'); }); },
+    // para la copia en la cuenta: añade las rutas recuperadas y guarda los cambios de las que ya estaban
+    mergePlans: function (local, fresh, changed) { fresh.forEach(function (f) { if (!plans.some(function (x) { return x.id === f.id; })) plans.push(f); }); if (!changed) return Promise.resolve(); return savePlans().then(function () { if (currentView === 'rides') renderRides(); }); },
+    reloadRides: function () { return reloadRides().then(function () { if (currentView === 'rides') renderRides(); }); },
     usePlan: function (p) {   // guarda (o actualiza) una ruta planificada y la deja lista para «Iniciar ruta»
       var i = -1; plans.forEach(function (x, k) { if (x.id === p.id) i = k; });
       if (i >= 0) plans[i] = p; else plans.unshift(p);
-      return savePlans().then(function () { if (planMode) exitPlanMode(); showView('map'); followPlan(p, true); });
+      return savePlans().then(function () { syncSoon(); if (planMode) exitPlanMode(); showView('map'); followPlan(p, true); });
     },
     setWaypoints: function (pts, name) {
       if (!planMode) enterPlanMode(); if (!planMode) return false;

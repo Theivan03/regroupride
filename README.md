@@ -4,6 +4,14 @@ App para rodar en grupo en moto. Parte del código de **Inclina** (mapa, grabaci
 
 El plan completo (funciones y fases) está en el documento «App para moteros — Documento de proyecto» de Claude.
 
+## Qué hay en la versión 0.9
+
+- **Copia de las rutas en la cuenta** (`www/rg-sync.js`, `supabase/05_copia_en_la_cuenta.sql`): las rutas planificadas y las grabadas se guardan también en la cuenta, no solo en el teléfono. Al iniciar sesión en un móvil nuevo se recuperan.
+  - Planificadas → tabla `routes` (privadas; «publicar» solo cambia quién las ve).
+  - Grabadas → tabla `rides` (la ficha completa: km, tiempos, inclinaciones, curvas…) y su trazado punto a punto, comprimido, en el almacén privado `rides`.
+  - Se copia sola al entrar, al guardar una ruta y al volver a la app; en ruta no. Lo que se borra en un móvil se borra de la cuenta, pero nunca se borra nada de otro móvil.
+  - Si otra persona inicia sesión en el mismo teléfono, sus rutas no se mezclan salvo que lo pida.
+
 ## Qué hay en la versión 0.8
 
 - **Permisos al abrir la app** (y al volver a ella y al iniciar una ruta): se piden los que falten —ubicación, notificaciones, cámara— y, si la ubicación del teléfono está apagada, sale la ventana del sistema para encenderla. Lo que Android ya no deja pedir se explica con un botón a los ajustes.

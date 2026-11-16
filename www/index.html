@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.webmanifest?v=0.8.2">
+<link rel="manifest" href="manifest.webmanifest?v=0.9.0">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
@@ -416,7 +416,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
-<link rel="stylesheet" href="rg-theme.css?v=0.8.2">
+<link rel="stylesheet" href="rg-theme.css?v=0.9.0">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -693,6 +693,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 <section class="view" id="view-settings" role="tabpanel" hidden>
   <h1>Ajustes</h1>
   <div class="rg-account" id="rgAccount"></div>
+  <div class="rg-account" id="rgSyncBox" hidden></div>
   <div class="rg-account" id="rgPerms" hidden></div>
   <div>
     <div class="field"><label for="setNavVoice">Indicaciones por voz<small>Dice los giros, las paradas y los avisos del grupo. Viene apagado.</small></label><span class="switch"><input type="checkbox" id="setNavVoice"><span></span></span></div>
@@ -777,17 +778,18 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 <div class="lightbox" id="lightbox" hidden><img id="lightboxImg" alt=""></div>
 
 <script data-cfasync="false" src="vendor/maplibre-gl.js"></script>
-<script data-cfasync="false" src="lean-core.js?v=0.8.2"></script>
-<script data-cfasync="false" src="geo.js?v=0.8.2"></script>
-<script data-cfasync="false" src="db.js?v=0.8.2"></script>
-<script data-cfasync="false" src="achievements.js?v=0.8.2"></script>
-<script data-cfasync="false" src="platform.js?v=0.8.2"></script>
-<script data-cfasync="false" src="rg-lib.js?v=0.8.2"></script>
+<script data-cfasync="false" src="lean-core.js?v=0.9.0"></script>
+<script data-cfasync="false" src="geo.js?v=0.9.0"></script>
+<script data-cfasync="false" src="db.js?v=0.9.0"></script>
+<script data-cfasync="false" src="achievements.js?v=0.9.0"></script>
+<script data-cfasync="false" src="platform.js?v=0.9.0"></script>
+<script data-cfasync="false" src="rg-lib.js?v=0.9.0"></script>
 <script data-cfasync="false" src="vendor/supabase.js"></script>
-<script data-cfasync="false" src="app.js?v=0.8.2"></script>
-<script data-cfasync="false" src="rg-app.js?v=0.8.2"></script>
-<script data-cfasync="false" src="rg-club.js?v=0.8.2"></script>
+<script data-cfasync="false" src="app.js?v=0.9.0"></script>
+<script data-cfasync="false" src="rg-app.js?v=0.9.0"></script>
+<script data-cfasync="false" src="rg-club.js?v=0.9.0"></script>
 <script data-cfasync="false" src="vendor/qrcode.js"></script>
-<script data-cfasync="false" src="rg-group.js?v=0.8.2"></script>
+<script data-cfasync="false" src="rg-group.js?v=0.9.0"></script>
+<script data-cfasync="false" src="rg-sync.js?v=0.9.0"></script>
 </body>
 </html>

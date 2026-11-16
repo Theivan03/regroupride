@@ -313,17 +313,16 @@
   }
 
   /* ---- rutas públicas ---- */
-  function cloudRow(p) {
-    return { name: (p.name || 'Ruta').slice(0, 120), waypoints: p.wps || [], distance_m: Math.round((p.dist || 0) * 1000), duration_s: Math.round(p.dur || 0), visibility: 'public',
-      start_lat: p.coords[0][1], start_lon: p.coords[0][0], plan: { wps: p.wps || [], pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } };
-  }
-  // Pública: se sube y la ve cualquiera en «Explorar». Privada: se retira de ahí y se queda solo en tu móvil.
+  // Todas las rutas planificadas se guardan en la cuenta. «Pública» solo cambia quién la ve: cualquiera, en «De otros moteros».
   function togglePublic(p) {
     if (!user) { A.toast('Entra en tu cuenta para publicar rutas.', 'warn'); openAuth(false); return Promise.resolve(); }
-    if (!p.coords || p.coords.length < 2) return Promise.resolve();
-    var job = p.cloudId ? sb.from('routes').delete().eq('id', p.cloudId).then(function (r) { if (r.error) throw r.error; delete p.cloudId; A.toast('Ruta privada: ya no sale en «Explorar».', 'ok'); })
-                        : sb.from('routes').insert(cloudRow(p)).select('id').single().then(function (r) { if (r.error) throw r.error; p.cloudId = r.data.id; A.toast('Ruta publicada: ya la puede ver y seguir cualquiera.', 'ok'); });
-    return job.then(function () { return A.updatePlan(p); }).catch(function (e) { A.toast(msg(e), 'bad'); });
+    if (!p.coords || p.coords.length < 2 || !window.RGSync) return Promise.resolve();
+    var want = !p.pub;
+    return RGSync.pushPlan(p).then(function () { return sb.from('routes').update({ visibility: want ? 'public' : 'private' }).eq('id', p.cloudId); }).then(function (r) {
+      if (r.error) throw r.error;
+      p.pub = want; A.toast(want ? 'Ruta publicada: ya la puede ver y seguir cualquiera.' : 'Ruta privada: ya no sale en «De otros moteros». Sigue guardada en tu cuenta.', 'ok');
+      return A.updatePlan(p);
+    }).catch(function (e) { A.toast(msg(e), 'bad'); });
   }
   // Rutas que otros moteros han hecho públicas. Se pintan dentro de Rutas → «De otros moteros» (o en una hoja).
   var pubBy = null;
@@ -331,7 +330,7 @@
     return sb.from('routes').select('name,plan').eq('id', x.id).single().then(function (q) {
       if (q.error || !q.data || !q.data.plan || !(q.data.plan.coords || []).length) throw (q.error || new Error('Esa ruta ya no está disponible.'));
       var pl = q.data.plan, p = { id: parseInt(x.id.replace(/-/g, '').slice(0, 12), 16), name: q.data.name, wps: pl.wps || [], pois: pl.pois || [], coords: pl.coords, steps: pl.steps || [], dist: pl.dist || Math.round((x.m || 0) / 100) / 10, dur: pl.dur || x.s || 0, routed: true, created: Date.now(), from: x.by };
-      if (x.mine) p.cloudId = x.id;
+      if (x.mine) { var own = A.plans().filter(function (y) { return y.cloudId === x.id; })[0]; if (own) p.id = own.id; p.cloudId = x.id; p.pub = true; }
       return p;
     });
   }
