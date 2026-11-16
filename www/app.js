@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.8.0';
+  var APP_VERSION = '0.8.1';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -1196,6 +1196,8 @@
     // Lo que llevo medido en la ruta en marcha: km, segundos en movimiento e inclinación máxima de cada curva.
     recNow: function () { return rec ? { km: rec.dist || 0, movingS: rec.movingS || 0, peaks: rec.corners.map(function (c) { return Math.abs(c.peak || 0); }) } : null; },
     updatePlan: function (p) { plans = plans.map(function (x) { return x.id === p.id ? p : x; }); if (activePlan && activePlan.id === p.id) activePlan = p; return savePlans().then(function () { if (currentView === 'rides') renderRides(); }); },
+    // guarda (o actualiza) una ruta planificada sin ponerse a seguirla
+    savePlan: function (p) { delete p.preview; plans = plans.filter(function (x) { return x.id !== p.id; }); plans.unshift(p); return savePlans().then(function () { if (currentView === 'rides') renderRides(); return setFlag('plan'); }); },
     usePlan: function (p) {   // guarda (o actualiza) una ruta planificada y la deja lista para «Iniciar ruta»
       var i = -1; plans.forEach(function (x, k) { if (x.id === p.id) i = k; });
       if (i >= 0) plans[i] = p; else plans.unshift(p);

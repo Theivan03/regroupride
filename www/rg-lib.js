@@ -183,6 +183,19 @@ var RGLib = (function () {
     var w = 0, t = 0; parts.forEach(function (x) { t += x[0] * x[1]; w += x[1]; });
     return { score: Math.round(t / w * 10) / 10, known: true };
   }
+  // ¿Cuadra el nivel que uno ha elegido con lo que dicen sus rutas? Solo opina con datos de sobra (3 rutas, 2 horas en
+  // movimiento y 40 curvas medidas) y cuando la diferencia es de un nivel entero o más.
+  // st = fila de rider_stats. Devuelve null o { dir: 'down' | 'up' | 'set', suggest (1-5), score, speed, lean, rides }.
+  function levelAdvice(level, st) {
+    if (!st || (st.rides || 0) < 3 || (st.moving_s || 0) < 7200 || (st.corners || 0) < 40) return null;
+    var speed = st.km / (st.moving_s / 3600), lean = st.lean_sum / st.corners, score = paceScore(speed, lean);
+    if (score == null) return null;
+    var suggest = clamp(Math.round(score), 1, 5), base = { suggest: suggest, score: Math.round(score * 10) / 10, speed: Math.round(speed), lean: Math.round(lean), rides: st.rides };
+    if (!level) { base.dir = 'set'; return base; }
+    if (level - score >= 1 && suggest < level) { base.dir = 'down'; return base; }
+    if (score - level >= 1 && suggest > level) { base.dir = 'up'; return base; }
+    return null;
+  }
   // Reparte a la gente en grupos de «size» por ritmo, del más rápido al más tranquilo. Si hay administradores, cada grupo
   // lleva uno de guía mientras alcancen. Los grupos quedan parejos (nunca uno suelto al final).
   // rows: [{user_id, name, admin, level, hr, hs, hl, pm, ps, pl}] → [{n, guide, members: [{id, name, score, known}]}]
@@ -442,6 +455,6 @@ var RGLib = (function () {
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
   return { dist: dist, findMapsUrl: findMapsUrl, parseMapsUrl: parseMapsUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
-    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, poiKind: poiKind, stopKind: stopKind, stopSteps: stopSteps, navSteps: navSteps, LEVELS: LEVELS, LEVEL_HINT: LEVEL_HINT, paceScore: paceScore, riderScore: riderScore, makeGroups: makeGroups, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
+    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, poiKind: poiKind, stopKind: stopKind, stopSteps: stopSteps, navSteps: navSteps, LEVELS: LEVELS, LEVEL_HINT: LEVEL_HINT, paceScore: paceScore, riderScore: riderScore, levelAdvice: levelAdvice, makeGroups: makeGroups, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = RGLib;

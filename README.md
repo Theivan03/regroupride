@@ -12,6 +12,8 @@ El plan completo (funciones y fases) está en el documento «App para moteros �
 - **Opciones del mapa**: fuera «seguirme», «orientar al rumbo» y «ver mis rutas». El botón de recentrar solo aparece al mover el mapa.
 - **Rutas de otros moteros** en una pestaña propia de Rutas, con «Ver en el mapa» antes de guardar y filtro por autor. Una ruta grabada se puede convertir en ruta para seguir y publicarla.
 
+- **0.8.1** · Al importar una ruta (GPX, o una grabada convertida) se elige entre «Guardar en mis rutas» y «Guardar y empezarla ahora»; ya no se pone a seguirla sola. · **Consejo de nivel**: si el nivel elegido y las rutas no cuadran por un nivel o más (con al menos 3 rutas, 2 horas y 40 curvas medidas), la app propone cambiarlo, con buenas palabras, al guardar una ruta o al entrar en Ajustes; si se dice que no, no insiste en un mes.
+
 ## Qué hay en la versión 0.7
 
 - **Ir al punto de salida**: al iniciar una ruta lejos de su comienzo, cada uno elige entre ir primero a la salida o entrar por el punto más cercano.

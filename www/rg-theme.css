@@ -377,3 +377,10 @@ body.rg-rec #followCard{display:none}
 #followSave{min-height:36px;padding:0 12px;flex:none}
 .club-card.ex{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
 .club-card.ex .rg-row{margin-top:6px;flex-wrap:wrap}
+
+/* consejo de nivel en la ficha */
+.rg-advice{margin:4px 0 10px;text-align:left}
+.rg-advice>div{display:flex;flex-direction:column;gap:6px}
+.rg-advice b{font-family:var(--font-display)}
+.rg-advice span{font-size:13.500px;line-height:1.4}
+.rg-advice .btn{align-self:flex-start}

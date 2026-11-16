@@ -270,4 +270,17 @@ t('GPX de MyRouteApp: las paradas con nombre se distinguen de los puntos de rell
   // nuestro GPX conserva nombres y tipos
   var back = L.gpxToPlan(L.planToGpx(g)); assert.deepEqual(back.wps.map(function (w) { return w[2]; }), ['Salida', 'PARADA DE REAGRUPACIÓN', '', 'Repsol Ibi', 'Llegada']);
 });
+t('Consejo de nivel: solo con datos de sobra y cuando la diferencia es de un nivel o más', function () {
+  var st = function (rides, hours, kmh, corners, lean) { return { rides: rides, km: kmh * hours, moving_s: hours * 3600, corners: corners, lean_sum: corners * lean }; };
+  assert.equal(L.levelAdvice(5, st(2, 10, 45, 300, 18)), null, 'dos rutas no bastan');
+  assert.equal(L.levelAdvice(5, st(8, 1.5, 45, 300, 18)), null, 'ni hora y media');
+  assert.equal(L.levelAdvice(5, st(8, 10, 45, 20, 18)), null, 'ni veinte curvas');
+  var down = L.levelAdvice(5, st(8, 10, 48, 300, 20));
+  assert.equal(down.dir, 'down'); assert.equal(down.suggest, 2); assert.equal(down.speed, 48); assert.equal(down.lean, 20); assert.equal(down.rides, 8);
+  assert.equal(L.levelAdvice(5, st(8, 10, 80, 300, 38)), null, 'el que va rápido de verdad se queda como está');
+  assert.equal(L.levelAdvice(4, st(8, 10, 70, 300, 33)), null, 'medio nivel de diferencia no se discute');
+  var up = L.levelAdvice(1, st(8, 10, 75, 300, 36)); assert.equal(up.dir, 'up'); assert.equal(up.suggest, 4);
+  var set = L.levelAdvice(null, st(8, 10, 60, 300, 27)); assert.equal(set.dir, 'set'); assert.equal(set.suggest, 3);
+  assert.equal(L.levelAdvice(3, null), null);
+});
 console.log('rg-lib: ' + n + ' pruebas correctas');

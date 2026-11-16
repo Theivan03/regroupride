@@ -228,12 +228,21 @@
     return gpxSteps(line).then(function (r) {
       plan.steps = r.steps; if (r.ok) plan.dur = Math.round(r.dur);
       var total = r.ok + r.bad, part = total ? r.ok / total : 0;
-      return A.usePlan(plan).then(function () {
-        var np = (g.pois || []).length, named = g.wps.filter(function (w, i) { return w[2] && w[3] && i > 0 && i < g.wps.length - 1; }).map(function (w) { return w[2].split(',')[0]; });
-        var d = String(km).replace('.', ',') + ' km, ' + g.wps.length + ' puntos' + (named.length ? ', ' + named.length + (named.length === 1 ? ' parada con nombre (' : ' paradas con nombre (') + named.slice(0, 3).join(', ') + (named.length > 3 ? '…' : '') + ')' : '') + (np ? ' y ' + np + (np === 1 ? ' punto marcado' : ' puntos marcados') : '') + '. ';
-        A.toast('Ruta importada: ' + d + (part === 1 ? 'Con indicaciones de giro.' : (part >= 0.9 ? 'Con indicaciones de giro en casi todo el recorrido.' : (part > 0 ? 'Indicaciones de giro en parte del recorrido; en el resto, sigue la línea.' : 'Sin indicaciones de giro (no hay conexión): sigue la línea del mapa.'))), part > 0 ? 'ok' : 'warn');
-      });
+      var np = (g.pois || []).length, named = g.wps.filter(function (w, i) { return w[2] && w[3] && i > 0 && i < g.wps.length - 1; }).map(function (w) { return w[2].split(',')[0]; });
+      var d = String(km).replace('.', ',') + ' km · ' + fmtMin(plan.dur) + ' · ' + g.wps.length + ' puntos' + (named.length ? ' · ' + named.length + (named.length === 1 ? ' parada con nombre (' : ' paradas con nombre (') + named.slice(0, 3).join(', ') + (named.length > 3 ? '…' : '') + ')' : '') + (np ? ' · ' + np + (np === 1 ? ' punto marcado' : ' puntos marcados') : '');
+      offerPlan(plan, d, part === 1 ? 'Con indicaciones de giro.' : (part >= 0.9 ? 'Con indicaciones de giro en casi todo el recorrido.' : (part > 0 ? 'Indicaciones de giro en parte del recorrido; en el resto, sigue la línea.' : 'Sin indicaciones de giro (no había conexión): se sigue la línea del mapa.')), g.title);
     }).catch(function (e) { A.toast('No se pudo importar: ' + (e && e.message || e), 'bad'); });
+  }
+  // Una ruta recién importada no se impone: se elige entre guardarla sin más o guardarla y empezarla ahora.
+  function offerPlan(plan, summary, note, title) {
+    sheet('<div class="head"><h1>' + (title || 'Ruta importada') + '</h1></div><form class="rg-form" id="ofForm"><label>Nombre<input id="ofName" maxlength="60" value="' + esc(plan.name) + '"></label></form>' +
+      '<p>' + esc(summary) + '</p>' + (note ? '<p class="muted rg-small" style="text-align:left">' + esc(note) + '</p>' : '') +
+      '<button class="btn big primary" id="ofSave" type="button">Guardar en mis rutas</button><button class="btn big" id="ofGo" type="button">Guardar y empezarla ahora</button><button class="btn rg-skip" id="ofNo" type="button">Descartar</button>');
+    var named = function () { plan.name = $('#ofName').value.trim().slice(0, 60) || plan.name; };
+    $('#ofForm').addEventListener('submit', function (e) { e.preventDefault(); });
+    $('#ofSave').addEventListener('click', function () { named(); closeSheet(); A.savePlan(plan).then(function () { A.toast('Guardada. La tienes en Rutas → Planificadas.', 'ok'); }); });
+    $('#ofGo').addEventListener('click', function () { named(); closeSheet(); A.usePlan(plan).then(function () { A.showView('map'); A.startRide(); }); });
+    $('#ofNo').addEventListener('click', function () { closeSheet(); A.toast('Ruta descartada.', 'warn'); });
   }
   function gpxPicked(text, fname) {
     var mode = gpxMode, g; gpxMode = null;
@@ -273,9 +282,35 @@
     sb.rpc('stats_add', { p_rides: o.n, p_km: Math.round(o.km * 10) / 10, p_moving_s: Math.round(o.s), p_corners: o.c, p_lean_sum: Math.round(o.lean * 10) / 10, p_lean_max: Math.round(o.max * 10) / 10 }).then(function (r) {
       if (r.error) return;
       todo.forEach(function (x) { sent[x.id] = 1; }); try { localStorage.setItem('rg.statsSent', JSON.stringify(sent)); } catch (e) {}
+      setTimeout(function () { levelNudge(false); }, 6000);
     }, function () {});
   }
   window.RGStats = { rideSaved: function () { setTimeout(sendStats, 1500); } };
+
+  /* ---- ¿cuadra tu nivel con tus rutas? Se dice con cariño, y solo de vez en cuando ---- */
+  function adviceText(adv, cur) {
+    var data = 'media de ' + adv.speed + ' km/h en movimiento y ' + adv.lean + '° en curva en ' + adv.rides + ' rutas', sug = '«' + L.LEVELS[adv.suggest] + '»';
+    if (adv.dir === 'set') return ['Ya te vamos conociendo', 'Aún no has elegido nivel. Por tus rutas (' + data + '), lo tuyo es ' + sug + '.'];
+    if (adv.dir === 'up') return ['Te estás quitando méritos', 'Tienes puesto «' + L.LEVELS[cur] + '», pero tus rutas (' + data + ') son más de ' + sug + '. No seas modesto: así el grupo que te toque irá a tu ritmo.'];
+    return ['Entre tú y yo…', 'Tienes puesto «' + L.LEVELS[cur] + '», y nadie te quita lo bailado, pero tus rutas (' + data + ') suenan más a ' + sug + '. No es ninguna deshonra: con el nivel bien puesto te toca un grupo en el que disfrutas en vez de sufrir por seguir el ritmo.'];
+  }
+  function setLevel(lv) { return sb.from('profiles').update({ level: lv }).eq('id', user.id).then(function (r) { if (r.error) throw r.error; return refresh(); }); }
+  // Después de guardar una ruta (o al entrar): si el nivel elegido y los datos no cuadran, se propone cambiarlo.
+  // Si dice que no, no se vuelve a sacar el tema en un mes, salvo que los datos cambien de nivel.
+  function levelNudge(force) {
+    if (!sb || !user || A.isRec() || !$('#rgSheet').hidden) return;
+    sb.from('rider_stats').select('*').eq('user_id', user.id).maybeSingle().then(function (q) {
+      var cur = profile && profile.level, adv = L.levelAdvice(cur, q.data); if (!adv || A.isRec() || !$('#rgSheet').hidden) return;
+      var mem = null; try { mem = JSON.parse(localStorage.getItem('rg.levelNudge') || 'null'); } catch (e) {}
+      if (!force && mem && mem.s === adv.suggest && mem.l === (cur || 0) && Date.now() - mem.at < 30 * 86400e3) return;
+      try { localStorage.setItem('rg.levelNudge', JSON.stringify({ s: adv.suggest, l: cur || 0, at: Date.now() })); } catch (e) {}
+      var t = adviceText(adv, cur);
+      sheet('<div class="head"><h1>' + t[0] + '</h1></div><p>' + esc(t[1]) + '</p><p class="muted rg-small" style="text-align:left">El nivel solo lo ven los administradores de las rutas a las que vas, y sirve para repartir los grupos.</p>' +
+        '<button class="btn big primary" id="lnYes" type="button">Cambiar a «' + esc(L.LEVELS[adv.suggest]) + '»</button><button class="btn" id="lnNo" type="button">' + (cur ? 'Lo dejo como está' : 'Ahora no') + '</button>');
+      $('#lnNo').addEventListener('click', closeSheet);
+      $('#lnYes').addEventListener('click', function (ev) { busy(ev.currentTarget, function () { return setLevel(adv.suggest).then(function () { closeSheet(); A.toast('Hecho: ahora eres «' + L.LEVELS[adv.suggest] + '».', 'ok'); }); }); });
+    }, function () {});
+  }
 
   /* ---- rutas públicas ---- */
   function cloudRow(p) {
@@ -320,7 +355,7 @@
       [].forEach.call(box.querySelectorAll('.ex'), function (card) {
         var x = list.filter(function (y) { return y.id === card.dataset.id; })[0];
         card.querySelector('[data-act=see]').addEventListener('click', function (ev) { busy(ev.currentTarget, function () { return fetchPlan(x).then(function (p) { if (inSheet) closeSheet(); A.previewPlan(p); A.toast('«' + p.name + '», de ' + (x.mine ? 'ti' : x.by) + '. Pulsa «Guardar» si te la quieres quedar.', 'ok'); }); }); });
-        card.querySelector('[data-act=use]').addEventListener('click', function (ev) { busy(ev.currentTarget, function () { return fetchPlan(x).then(function (p) { if (inSheet) closeSheet(); return A.usePlan(p).then(function () { A.toast('Ruta guardada en tus rutas planificadas.', 'ok'); }); }); }); });
+        card.querySelector('[data-act=use]').addEventListener('click', function (ev) { var b = ev.currentTarget; busy(b, function () { return fetchPlan(x).then(function (p) { return A.savePlan(p).then(function () { A.toast('Guardada. La tienes en Rutas → Planificadas.', 'ok'); }); }); }).then(function () { b.textContent = 'Guardada ✓'; b.disabled = true; }); });
         var by = card.querySelector('[data-act=by]'); if (by) by.addEventListener('click', function () { pubBy = x.by; renderPublic(box, inSheet); });
         var rep = card.querySelector('[data-act=rep]');
         if (rep) rep.addEventListener('click', function () {
@@ -337,8 +372,7 @@
   // Una ruta grabada, como ruta para seguir: el mismo camino que un GPX.
   function trackAsPlan(name, coords) {
     var a = coords[0], b = coords[coords.length - 1];
-    A.showView('map');
-    return gpxAsPlan({ name: name || 'Ruta grabada', coords: coords, wps: [[a[1], a[0], 'Salida'], [b[1], b[0], 'Llegada']], pois: [] });
+    return gpxAsPlan({ name: name || 'Ruta grabada', title: 'Ruta para seguir', coords: coords, wps: [[a[1], a[0], 'Salida'], [b[1], b[0], 'Llegada']], pois: [] });
   }
 
   window.RGNav = { togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx };
@@ -472,6 +506,13 @@
       $('#rdX').addEventListener('click', closeSheet);
       sb.from('rider_stats').select('*').eq('user_id', user.id).maybeSingle().then(function (q) {
         var st = q.data, el = $('#rdStats'); if (!el || !st || !st.rides) return;
+        var adv = L.levelAdvice(lvl, st);
+        if (adv) {     // en la ficha se dice siempre, con un botón para ponerlo
+          var tx = adviceText(adv, lvl), box = document.createElement('div'); box.className = 'notice rg-advice';
+          box.innerHTML = '<div><b>' + esc(tx[0]) + '</b><span>' + esc(tx[1]) + '</span><button class="btn small" type="button">Poner «' + esc(L.LEVELS[adv.suggest]) + '»</button></div>';
+          el.parentNode.insertBefore(box, el);
+          box.querySelector('button').addEventListener('click', function () { $('#rdLevel').value = String(adv.suggest); box.remove(); A.toast('Puesto. Pulsa «Guardar» para confirmarlo.', 'ok'); });
+        }
         el.textContent = 'Tus medias en ' + st.rides + (st.rides === 1 ? ' ruta' : ' rutas') + ': ' + (st.moving_s > 600 ? Math.round(st.km / (st.moving_s / 3600)) + ' km/h en movimiento' : 'velocidad sin datos') + (st.corners >= 5 ? ' · ' + Math.round(st.lean_sum / st.corners) + '° de media en curva' : '') + '.';
       }, function () {});
       $('#rdForm').addEventListener('submit', function (ev) {
@@ -670,6 +711,8 @@
   }
   window.RGPerm = { ensure: ensure, render: renderPerms };
   var tabSet = document.querySelector('.tab[data-view="settings"]'); if (tabSet) tabSet.addEventListener('click', renderPerms);
+  // El consejo de nivel sale al guardar una ruta y al entrar en Ajustes, nunca en mitad de otra cosa.
+  if (tabSet) tabSet.addEventListener('click', function () { setTimeout(function () { levelNudge(false); }, 900); });
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !$('#view-settings').hidden) renderPerms(); });
 
   // Indicaciones por voz
