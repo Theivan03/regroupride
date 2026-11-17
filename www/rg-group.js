@@ -29,7 +29,12 @@
       G.busy = false;
       if (r.error) { if (/no estás en este grupo/i.test(r.error.message || '')) { leaveLocal('Ya no estás en el grupo.'); } return; }
       var d = r.data || {};
-      if (d.ended) { leaveLocal('El grupo ha terminado.'); return; }
+      if (d.ended) {
+        var was = A.isRec();
+        leaveLocal(was ? null : 'El grupo ha terminado.');
+        if (was && A.stopRide) { A.stopRide(); setTimeout(function () { A.toast('Un administrador ha terminado la ruta para todos.', 'warn'); }, 400); }
+        return;
+      }
       G.skew = d.now ? d.now - Date.now() : 0;
       G.rows = d.positions || [];
       G.admin = d.admin != null ? !!d.admin : !!G.s.owner; G.groups = d.groups || null; G.groupsAt = d.groups_at || 0;
@@ -48,6 +53,39 @@
     sendPace();
     if (Date.now() - G.lastSync < pace()) return;
     call({ p_lat: fix.lat, p_lon: fix.lon, p_speed: fix.v == null ? null : Math.round(fix.v * 10) / 10, p_along: nav && nav.started ? Math.round(nav.along) : null, p_off: !!(nav && nav.offRoute) });
+  }
+  /* ---- tiempo real (www/rg-live.js): un canal por grupo; cualquier cambio se lee al momento ---- */
+  function ring(kind, extra) { if (window.RGLive && G.s) RGLive.send('rg-r-' + G.s.id, Object.assign({ kind: kind }, extra || {})); }
+  function onLive() {
+    if (!G.s) return;
+    if (G.busy) { setTimeout(onLive, 700); return; }
+    call();
+  }
+  // Un administrador para la ruta: ¿para todos o solo para él? Devuelve true si se encarga (la pregunta está en pantalla).
+  function askStop(done) {
+    if (!G.s || !amAdmin() || !sb) return false;
+    var others = (G.rows || []).filter(function (x) { return x.user_id !== me(); }).length;
+    if (!others) return false;
+    Cl.sheet('<span class="rg-pop-kind">Eres administrador</span><h1>¿Terminar la ruta?</h1><p>Puedes terminarla para todo el grupo (a los demás se les para y salen del grupo) o solo para ti.</p>' +
+      '<button class="btn big danger" id="stAll" type="button"><svg><use href="#i-stop"/></svg>Terminar para todos</button>' +
+      '<button class="btn big" id="stMe" type="button">Solo para mí</button>' +
+      '<button class="btn rg-skip" id="stNo" type="button">Seguir rodando</button>', 'win');
+    $('#stNo').addEventListener('click', Cl.closeSheet);
+    $('#stMe').addEventListener('click', function () { Cl.closeSheet(); done(); });
+    $('#stAll').addEventListener('click', function (ev) {
+      var id = G.s.id;
+      Cl.busy(ev.currentTarget, function () {
+        return sb.rpc('ride_end', { p_id: id }).then(function (r) {
+          if (r.error) {
+            if (/solo (quien|un administrador)/i.test(r.error.message || '')) throw new Error('Solo quien inició la ruta puede terminarla para todos. Para que lo pueda hacer cualquier administrador falta ejecutar supabase/10_tiempo_real.sql.');
+            throw r.error;
+          }
+          if (window.RGLive) RGLive.send('rg-r-' + id, { kind: 'end' });
+          Cl.closeSheet(); leaveLocal(); A.toast('Ruta terminada para todos.', 'ok'); done();
+        });
+      });
+    });
+    return true;
   }
   function amAdmin() { return !!(G.s && (G.admin || G.s.owner)); }
   function row(id) { return G.rows.filter(function (q) { return q.user_id === id; })[0] || null; }
@@ -90,10 +128,11 @@
     // Un administrador inicia a mano: se les inicia a los demás. (Si a mí me la ha iniciado otro, no la reenvío.)
     if (G.s && !G.wasRec && rec && !A.isDemo() && sb) {
       var auto = Date.now() - G.autoStart < 30000; G.autoStart = 0;
-      if (amAdmin() && !auto) sb.rpc('ride_start', { p_id: G.s.id }).then(function (r) { if (r && r.error) console.warn('ride_start', r.error.message); }, noop);
+      if (amAdmin() && !auto) sb.rpc('ride_start', { p_id: G.s.id }).then(function (r) { if (r && r.error) console.warn('ride_start', r.error.message); else ring('start'); }, noop);
     }
     G.wasRec = rec;
     if (G.s && !G.timer) G.timer = setInterval(tick, 5000);
+    if (window.RGLive) RGLive.only('rg-r-', G.s ? ['rg-r-' + G.s.id] : [], onLive);
     if (!G.s && G.timer) { clearInterval(G.timer); G.timer = null; }
     var ab = $('#btnAlert'); if (ab) { ab.hidden = !G.s; ab.classList.toggle('on', !!(G.s && G.s.myAlert)); var abt = ab.querySelector('span'); if (abt) abt.textContent = (G.s && G.s.myAlert) ? 'Aviso enviado' : 'Avisar'; }
     if (!G.s && G.alarm) dismiss(false);
@@ -115,6 +154,7 @@
     var fix = A.lastFix();
     G.s.myAlert = kind; G.s.mySeen = false; G.s.alertPending = true; G.lastTry = Date.now(); save(); sync();
     sb.rpc('ride_alert', { p_id: G.s.id, p_kind: kind, p_lat: fix ? fix.lat : null, p_lon: fix ? fix.lon : null }).then(function (r) {
+      if (r && !r.error) ring('alert');
       if (!G.s) return;
       if (r.error) { G.s.myAlert = null; G.s.alertPending = false; save(); sync(); A.toast(Cl.msg(r.error), 'bad'); speak('No se ha podido enviar el aviso.'); return; }
       G.s.alertPending = false; save();
@@ -196,7 +236,7 @@
     try { if (navigator.vibrate) navigator.vibrate(0); } catch (e) {}
     if (!a || !how || !G.s) return;
     G.s.done = G.s.done || {}; G.s.done[a.key] = how === 'seen' ? 2 : 1; save();
-    if (how === 'seen' && sb) sb.rpc('ride_alert_seen', { p_id: G.s.id, p_user: a.user }).then(noop, noop);
+    if (how === 'seen' && sb) sb.rpc('ride_alert_seen', { p_id: G.s.id, p_user: a.user }).then(function () { ring('seen'); }, noop);
   }
   function openAlert() {
     if (!G.s) return;
@@ -253,9 +293,9 @@
       $('#ogSend').addEventListener('click', function (ev) {
         G.s.groupSize = size; save();
         var out = gs.map(function (g) { return { n: g.n, guide: g.guide, members: g.members.map(function (m) { return { id: m.id, name: m.name }; }) }; });
-        Cl.busy(ev.currentTarget, function () { return sb.rpc('ride_groups', { p_id: G.s.id, p_groups: out }).then(function (r) { if (r.error) throw r.error; Cl.closeSheet(); A.toast('Reparto enviado: a cada uno le sale su grupo.', 'ok'); G.busy = false; return call(); }); });
+        Cl.busy(ev.currentTarget, function () { return sb.rpc('ride_groups', { p_id: G.s.id, p_groups: out }).then(function (r) { if (r.error) throw r.error; ring('groups'); Cl.closeSheet(); A.toast('Reparto enviado: a cada uno le sale su grupo.', 'ok'); G.busy = false; return call(); }); });
       });
-      if ($('#ogClear')) $('#ogClear').addEventListener('click', function () { sb.rpc('ride_groups', { p_id: G.s.id, p_groups: null }).then(function (r) { if (r.error) { fail(r.error); return; } Cl.closeSheet(); A.toast('Reparto retirado.', 'ok'); G.busy = false; call(); }); });
+      if ($('#ogClear')) $('#ogClear').addEventListener('click', function () { sb.rpc('ride_groups', { p_id: G.s.id, p_groups: null }).then(function (r) { if (r.error) { fail(r.error); return; } ring('groups'); Cl.closeSheet(); A.toast('Reparto retirado.', 'ok'); G.busy = false; call(); }); });
     }
     draw();
   }
@@ -267,7 +307,7 @@
     $('#grX').addEventListener('click', function () { Cl.closeSheet(); });
     [].forEach.call(document.querySelectorAll('#rgSheet [data-u] .link'), function (b) { b.addEventListener('click', function () {
       var id = b.parentNode.dataset.u, x = row(id);
-      sb.rpc('ride_set_admin', { p_id: G.s.id, p_user: id, p_on: !(x && x.admin) }).then(function (r) { if (r.error) { fail(r.error); return; } G.busy = false; return call().then(openAdmins); });
+      sb.rpc('ride_set_admin', { p_id: G.s.id, p_user: id, p_on: !(x && x.admin) }).then(function (r) { if (r.error) { fail(r.error); return; } ring('admin'); G.busy = false; return call().then(openAdmins); });
     }); });
   }
   // Entrar en un grupo (por código, al iniciar la ruta de un evento o al decir «sí» a una llamada) y cargar su ruta.
@@ -301,7 +341,7 @@
     speak(c.by + ' ha iniciado la ruta ' + c.name + '. ¿Vienes?'); try { if (navigator.vibrate) navigator.vibrate([400, 200, 400]); } catch (e) {}
     if (RA) RA.alarm({ title: 'Empieza la ruta: ' + c.name, text: c.by + ' ha iniciado la ruta. ¿Vienes?', loud: false }).catch(noop);
   }
-  setInterval(function () { checkCalls(false); }, 20000);
+  setInterval(function () { checkCalls(false); }, 10000);      // por si el canal en directo no llega (red mala)
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(function () { checkCalls(false); }, 1200); });
 
   if (RA) RA.addListener('action', function (e) { var k = e && e.kind; if (KIND[k]) sendAlert(k); else if (k === 'cancel') sendAlert(null); else if (k === 'ack') dismiss(G.alarm && G.alarm.mode === 'alarm' ? 'seen' : 'ok'); });
@@ -360,7 +400,7 @@
     if ($('#grAdmins')) $('#grAdmins').addEventListener('click', function () { G.sheetOpen = false; openAdmins(); });
     $('#grShare').addEventListener('click', function () { share('Únete al grupo de la ruta «' + G.s.name + '» en ReGroupRide: en el mapa pulsa el botón de grupo y escribe el código ' + G.s.code + '.'); });
     $('#grLeave').addEventListener('click', function (ev) { arm(ev.currentTarget, '¿Seguro? Toca otra vez', function () { var id = G.s.id; leaveLocal(); close(); sb.rpc('ride_leave', { p_id: id }).then(function () { A.toast('Has salido del grupo.', 'ok'); }); }); });
-    if ($('#grEnd')) $('#grEnd').addEventListener('click', function (ev) { arm(ev.currentTarget, '¿Seguro? Se borran las posiciones de todos', function () { var id = G.s.id; sb.rpc('ride_end', { p_id: id }).then(function (r) { if (r.error) { fail(r.error); return; } leaveLocal(); close(); A.toast('Grupo terminado.', 'ok'); }); }); });
+    if ($('#grEnd')) $('#grEnd').addEventListener('click', function (ev) { arm(ev.currentTarget, '¿Seguro? Se borran las posiciones de todos', function () { var id = G.s.id; sb.rpc('ride_end', { p_id: id }).then(function (r) { if (r.error) { fail(r.error); return; } if (window.RGLive) RGLive.send('rg-r-' + id, { kind: 'end' }); leaveLocal(); close(); A.toast('Grupo terminado.', 'ok'); }); }); });
   }
   function arm(btn, label, run) { if (btn.dataset.armed) { run(); return; } btn.dataset.armed = '1'; var old = btn.innerHTML; btn.textContent = label; setTimeout(function () { delete btn.dataset.armed; btn.innerHTML = old; }, 3500); }
   function renderJoin() {
@@ -398,6 +438,6 @@
   var first = true;   // la primera llamada llega antes de saber si hay sesión guardada
   Cl.onChange(function (u) { if (u) setTimeout(function () { checkCalls(false); }, 2500); if (first) { first = false; return; } if (!u && G.s) { G.s = null; G.rows = []; G.rank = null; save(); draw(); } sync(); if (u && G.s) call(); });
   document.addEventListener('visibilitychange', tick);
-  window.RGGroup = { onFix: onFix, sync: sync, redraw: redraw, open: open, openAlert: openAlert, enter: enter, checkCalls: checkCalls, state: G };
+  window.RGGroup = { onFix: onFix, sync: sync, redraw: redraw, open: open, openAlert: openAlert, enter: enter, checkCalls: checkCalls, askStop: askStop, state: G };
   sync();
 })();

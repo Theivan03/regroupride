@@ -697,3 +697,16 @@ a.btn.rg-av{text-decoration:none}
 #hudCard .hud{margin-bottom:var(--e-3)}
 #hudCard .hud-actions #btnHudInfo.btn{background:var(--marca-suave)!important;color:var(--marca)}
 #hudCard .hud-actions #btnHudInfo.btn svg{color:var(--marca)!important}
+
+/* ---- 0.19 ---- */
+/* Miniaturas con mapa de verdad */
+.thumb.rg-mapthumb{padding:0;overflow:hidden}
+.thumb.rg-mapthumb img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.row .thumb{width:64px;height:64px;flex:none;overflow:hidden;border-radius:var(--r-m)}
+.club-card.ex .ex-thumb{height:140px;margin:calc(-1 * var(--e-1)) 0 var(--e-2);border-radius:var(--r-m);background:var(--mapa-fondo,#F2EFE9);color:var(--ruta);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.club-card.ex .ex-thumb>svg{width:100%;height:100%}
+.club-card.ex .ex-thumb>svg use{color:var(--marca)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .club-card.ex .ex-thumb{background:#1E2226}}
+:root[data-theme="dark"] .club-card.ex .ex-thumb{background:#1E2226}
+.ev-admin .link svg{width:18px;height:18px}
+.club-card.ex .ex-thumb>svg.ex-pin{width:40px;height:40px;color:var(--marca)}

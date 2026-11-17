@@ -192,3 +192,12 @@ Para comparar con las láminas: `scripts/pantallas.py` y `scripts/otras.sh` saca
 - **Renombrar rutas planificadas** (también las importadas): botón del lápiz junto al nombre. El cambio sube a la cuenta.
 - **Rutas:** las fichas ya no van pegadas; la fila de filtros enseña un difuminado y una flecha cuando hay más opciones a un lado.
 - **En marcha:** «Avisar» queda separado de la tarjeta; el reloj, el botón de la inclinación y «Parar» ya no se pisan en pantallas estrechas. En un trayecto no se cuentan curvas.
+
+## 0.19 · entre personas, al momento; terminar para todos; mapas en las fichas; editar eventos
+
+- **Tiempo real** (`www/rg-live.js`). Canales en directo de Supabase (Realtime, «broadcast»; no hay que tocar el servidor): uno por comunidad y uno por grupo. Quien publica un evento, escribe en el tablón, cambia la info, se apunta o se va, inicia una ruta, avisa (SOS, avería…), reparte en grupos o termina la ruta toca el «timbre» y las apps de los demás se ponen al día **al instante**. Con la app delante sale el aviso en pantalla; en segundo plano, la notificación del teléfono. El timbre no lleva contenido: cada uno lo pide al servidor con su sesión.
+- **Con la app cerrada** el teléfono pregunta **cada minuto** (antes cada 10–15). Usa alarmas exactas (`USE_EXACT_ALARM`); con el teléfono en reposo profundo Android las espacia. Ahora también avisa de **«Empieza la ruta»** a los apuntados. Lo que ya se ha avisado no se repite.
+- **Terminar la ruta (administrador):** al pulsar «Parar» en una ruta en grupo, «Terminar para todos» (a los demás se les para y salen del grupo) o «Solo para mí».
+- **Editar eventos:** los administradores de la comunidad y, con el SQL 10, también los administradores de esa ruta.
+- **Mapas en las fichas:** grabadas, planificadas y de otros moteros llevan una miniatura con el mapa de verdad (se dibuja una vez y se guarda en el móvil; sin conexión, el dibujo de siempre).
+- SQL: **`supabase/10_tiempo_real.sql`** (terminar para todos por cualquier administrador, editar por administradores de la ruta, «Empieza la ruta» con la app cerrada y trazado de las rutas públicas).

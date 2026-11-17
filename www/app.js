@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.18.0';
+  var APP_VERSION = '0.19.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -452,6 +452,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
         if (b.dataset.act === 'del') armOrRun(b, 'Borrar', 'Toca otra vez', function () { if (window.RGSync) RGSync.planDeleted(p); plans = plans.filter(function (x) { return x.id !== p.id; }); if (activePlan && activePlan.id === p.id) followPlan(null, false); savePlans().then(renderRides); });
       }); });
       list.appendChild(d);
+      if (window.RGThumbs) RGThumbs.attach(d.querySelector('.thumb'), 'p' + p.id, p.coords);
     });
   }
 
@@ -563,7 +564,8 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   }
   function askAndStart(trip) { trip = trip === true; if (window.RGPerm) RGPerm.ensure().then(function (ok) { if (ok) startRide(false, trip); }); else startRide(false, trip); }
   $('#btnRide').addEventListener('click', askAndStart);
-  $('#btnStop').addEventListener('click', stopRide);
+  // En una ruta en grupo, un administrador elige si la termina para todos o solo para él.
+  $('#btnStop').addEventListener('click', function () { if (window.RGGroup && RGGroup.askStop && RGGroup.askStop(stopRide)) return; stopRide(); });
   window.addEventListener('pagehide', function () { if (rec) persistRec(); });
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && rec) Platform.keepAwake(true); });
 
@@ -688,6 +690,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
         '<span class="sub">' + fmtKm(r.dist) + ' · ' + fmtDur((r.movingS || 0) * 1000) + (r.trip ? '' : ' · ' + r.corners.length + ' curvas') + ' · ' + (r.vMax || 0) + ' km/h máx</span>' +
         '<span class="chev"><svg><use href="#i-chev"/></svg></span>';
       b.addEventListener('click', function () { openDetail(r.id); });
+      if (window.RGThumbs && r.thumb && r.thumb.length > 1) RGThumbs.attach(b.querySelector('.thumb'), 'r' + r.id, r.thumb.map(function (p) { return [p[1], p[0]]; }));
       list.appendChild(b);
     });
   }
@@ -1279,6 +1282,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
 
   /* ---------- puente para los módulos de ReGroupRide (rg-app.js) ---------- */
   window.RGApp = {
+    stopRide: function () { if (rec) stopRide(); },
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, activePlan: function () { return planMode ? null : activePlan; },
     isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },

@@ -61,6 +61,53 @@
       else { S.missing = false; S.list = (r.data || []).filter(function (m) { return m.communities; }).map(function (m) { var c = m.communities; return { id: c.id, name: c.name, description: c.description, code: c.join_code, role: m.role }; }); }
       S.loaded = true; if (!cur()) S.cid = null; else S.cid = cur().id;
       if (!r.error) { try { localStorage.setItem('rg.club.list:' + S.user.id, JSON.stringify(S.list)); } catch (e) {} }
+      liveSync();
+    });
+  }
+  /* ---------- tiempo real (www/rg-live.js) ---------- */
+  // Un canal por comunidad: quien publica, se apunta o inicia una ruta toca el timbre y a los demás les llega al momento.
+  function liveSync() { if (window.RGLive) RGLive.only('rg-c-', S.user ? S.list.map(function (c) { return 'rg-c-' + c.id; }) : [], onLive); }
+  function ring(cid, p) { if (window.RGLive && cid) RGLive.send('rg-c-' + cid, p); }
+  function vis() { return document.visibilityState === 'visible'; }
+  function repaint(cid) {
+    var c = cur();
+    if (!c || c.id !== cid || $('#view-club').hidden || !vis()) return;
+    var f = ({ events: paneEvents, board: paneBoard, pages: panePages, members: paneMembers })[S.tab];
+    if (f) f(c, false).catch(function () {});
+  }
+  // Lo último publicado de ese tipo en esa comunidad (con mi sesión: solo lo que ya podría ver).
+  function latest(c, kind) {
+    var q = kind === 'event' ? sb.from('events').select('id,title,starts_at,created_by').eq('community_id', c.id).order('created_at', { ascending: false }).limit(1)
+      : kind === 'post' ? sb.from('community_posts').select('id,body,author_id').eq('community_id', c.id).order('created_at', { ascending: false }).limit(1)
+      : sb.from('community_pages').select('id,title').eq('community_id', c.id).order('updated_at', { ascending: false }).limit(1);
+    return q.then(function (r) {
+      var x = r && !r.error && r.data && r.data[0]; if (!x) return null;
+      if ((x.created_by || x.author_id) === S.user.id) return null;
+      return { kind: kind, id: x.id, community: c.name, title: kind === 'post' ? String(x.body || '').slice(0, 160) : x.title, starts_at: x.starts_at ? new Date(x.starts_at).getTime() : 0 };
+    }, function () { return null; });
+  }
+  function onLive(p, topic) {
+    var cid = topic.slice(5), c = S.list.filter(function (x) { return x.id === cid; })[0];
+    if (!c || !S.user) return;
+    var k = p.kind;
+    if (k === 'call') {
+      if (vis()) { if (window.RGGroup) RGGroup.checkCalls(true); return; }
+      // app en segundo plano: el aviso lo pone el teléfono ya
+      sb.rpc('ride_calls').then(function (r) {
+        var x = (r && r.data || []).filter(function (y) { return y.id === p.id; })[0] || (r && r.data || [])[0];
+        if (x && RA && RA.newsNow) RA.newsNow({ items: [{ kind: 'call', id: x.id, community: c.name, title: x.name, by: x.by }], silent: false }).catch(function () {});
+      }, function () {});
+      return;
+    }
+    if (k === 'att' || k === 'edit') { inbox(true); repaint(cid); return; }
+    if (k !== 'event' && k !== 'post' && k !== 'page') return;
+    if (k === 'event') inbox(true);
+    repaint(cid);
+    latest(c, k).then(function (it) {
+      if (!it) return;
+      var v = vis();
+      if (v) A.toast(c.name + ' · ' + (k === 'event' ? 'Nuevo evento: ' : k === 'post' ? 'Tablón: ' : 'Info: ') + it.title, 'ok');
+      if (RA && RA.newsNow) RA.newsNow({ items: [it], silent: v }).catch(function () {});
     });
   }
   function setCid(id) { S.cid = id; try { localStorage.setItem('rg.club', id); } catch (e) {} }
@@ -197,17 +244,18 @@
         (m.url ? '<div class="ev-meet"><button class="link" data-act="meet" type="button">' + ic('gmaps') + '<span>Salida: ' + esc(m.name || 'ver en Maps') + '</span></button>' + (m.lat != null ? '<button class="btn small" data-act="gomeet" type="button">' + ic('compass') + 'Ir al punto de salida</button>' : '') + '</div>'
           : (e.meet_name ? '<span class="muted">Salida: ' + esc(e.meet_name) + '</span>' : '')) + (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
         (e.route ? '<div class="ev-route"><span>' + ic('route') + esc(e.route.name || 'Ruta') + ' · ' + String(e.route.dist || 0).replace('.', ',') + ' km</span><button class="btn small" data-act="route" type="button">Cargar ruta</button></div>' : '') +
-        (routeAdm && !isAdmin() ? '<span class="muted rg-small">Eres administrador de esta ruta.</span>' : '') +
+        (routeAdm && !isAdmin() ? '<div class="ev-admin"><span class="muted rg-small">Eres administrador de esta ruta.</span><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button></div>' : '') +
         (st === 'offered' ? mineHtml + countHtml : countHtml + mineHtml) +
         (startBtn ? '<button class="btn big primary ev-start" data-act="start" type="button">' + ic('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
         ((iGo || st === 'offered') && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
-        (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
+        (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
     if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
     $$('.ev', pane).forEach(function (card) {
       var e = evs.filter(function (x) { return x.id === card.dataset.ev; })[0], mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
       var set = function (status, companion, said) {
         return setStatus(e, mine, status, companion).then(function (got) {
+          ring(c.id, { kind: 'att', eid: e.id });
           if (got === 'waiting' && (!mine || mine.status !== 'waiting')) A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn');
           else if (said) A.toast(said, 'ok');
           inbox(true); return paneEvents(c);
@@ -253,6 +301,7 @@
     armed(btn, '¿Empezamos? Toca otra vez', function () {
       Cl.busy(btn, function () { return sb.rpc('event_start', { p_event: e.id }).then(function (r) {
         if (r.error) throw r.error;
+        ring(e.community_id, { kind: 'call', id: r.data && r.data.id, eid: e.id });
         return RGGroup.enter(r.data, { start: true }).then(function () { A.toast('Ruta iniciada. A los apuntados les sale el aviso para unirse.', 'ok'); });
       }); });
     });
@@ -341,14 +390,19 @@
             if (pt.url && pt.lat == null) warn = 'El enlace se abrirá en Google Maps, pero no trae coordenadas: no podré marcar la salida en el mapa de la app.';
             if (pt.name && !row.meet_name) row.meet_name = pt.name;
           }
-          var save = function () { return (e ? sb.from('events').update(row).eq('id', e.id) : sb.from('events').insert(row)); };
+          var save = function () { return (e ? sb.from('events').update(row).eq('id', e.id).select('id') : sb.from('events').insert(row)); };
           return save().then(function (r) {
             if (r.error && pt && /capacity|meet_(url|lat|lon)/i.test(r.error.message || '')) {     // el servidor aún no tiene el 06
               S.v6 = false; delete row.capacity; delete row.meet_url; delete row.meet_lat; delete row.meet_lon; warn = 'Guardado sin plazas ni enlace de salida: falta ejecutar supabase/06_plazas_y_salida.sql.';
               return save();
             }
             return r;
-          }).then(function (r) { ok(r); Cl.closeSheet(); A.toast(warn || (e ? 'Evento actualizado.' : 'Evento publicado.'), warn ? 'warn' : 'ok'); inbox(true); return paneEvents(c); });
+          }).then(function (r) {
+            ok(r);
+            if (e && !isAdmin() && r.data && !r.data.length) throw new Error('No se ha podido guardar: para que los administradores de la ruta puedan editar el evento falta ejecutar supabase/10_tiempo_real.sql.');
+            Cl.closeSheet(); A.toast(warn || (e ? 'Evento actualizado.' : 'Evento publicado.'), warn ? 'warn' : 'ok');
+            ring(c.id, { kind: e ? 'edit' : 'event' }); inbox(true); return paneEvents(c);
+          });
         });
       });
     });
@@ -363,7 +417,7 @@
         var pane = $('#clPane'); if (!pane || S.tab !== 'board' || !cur() || cur().id !== c.id) return;
         pane.innerHTML = (isAdmin() ? '<div class="club-card"><span class="label">Aviso para la comunidad</span><textarea class="note" id="poBody" maxlength="4000" placeholder="Escribe un aviso para la comunidad"></textarea><button class="btn big primary" id="poSend" type="button">Publicar aviso</button></div>' : '') +
           (posts.length ? posts.map(function (p) { return '<div class="club-card" data-po="' + p.id + '"><span class="muted">' + esc(who(p.author_id)) + ' · ' + fmtWhen(p.created_at) + '</span><p>' + esc(p.body) + '</p>' + (isAdmin() ? '<button class="link danger" type="button"><svg><use href="#i-trash"/></svg>Borrar</button>' : '') + '</div>'; }).join('') : '<div class="empty">Aún no hay avisos.</div>');
-        if ($('#poSend')) $('#poSend').addEventListener('click', function (ev) { var t = $('#poBody').value.trim(); if (!t) return; Cl.busy(ev.currentTarget, function () { return sb.from('community_posts').insert({ community_id: c.id, body: t }).then(function (r) { ok(r); return paneBoard(c); }); }); });
+        if ($('#poSend')) $('#poSend').addEventListener('click', function (ev) { var t = $('#poBody').value.trim(); if (!t) return; Cl.busy(ev.currentTarget, function () { return sb.from('community_posts').insert({ community_id: c.id, body: t }).then(function (r) { ok(r); ring(c.id, { kind: 'post' }); return paneBoard(c); }); }); });
         $$('[data-po] .link', pane).forEach(function (b) { b.addEventListener('click', function () { armed(b, '¿Seguro? Toca otra vez', function () { sb.from('community_posts').delete().eq('id', b.parentNode.dataset.po).then(function (r) { ok(r); return paneBoard(c); }).catch(fail); }); }); });
       })(); }, useCache);
   }
@@ -401,7 +455,7 @@
       ev.preventDefault();
       var links = $$('.club-linkrow').map(function (row) { var o = {}; $$('input', row).forEach(function (i) { o[i.dataset.f] = i.value.trim(); }); return o; }).filter(function (l) { return l.url || l.code || l.label; });
       var row = { community_id: c.id, title: $('#pgTitle').value.trim(), body: $('#pgBody').value.trim(), links: links };
-      Cl.busy(ev.target.querySelector('button[type=submit]'), function () { return (p ? sb.from('community_pages').update(row).eq('id', p.id) : sb.from('community_pages').insert(row)).then(function (r) { ok(r); Cl.closeSheet(); A.toast('Página guardada.', 'ok'); return panePages(c); }); });
+      Cl.busy(ev.target.querySelector('button[type=submit]'), function () { return (p ? sb.from('community_pages').update(row).eq('id', p.id) : sb.from('community_pages').insert(row)).then(function (r) { ok(r); Cl.closeSheet(); A.toast('Página guardada.', 'ok'); ring(c.id, { kind: 'page' }); return panePages(c); }); });
     });
   }
 
@@ -477,7 +531,7 @@
       remTexts(e).forEach(function (x) {
         var at = e.starts_at - x[0]; if (at < now + 30000) return;
         want[nid(e.id, x[1])] = { key: key, n: { id: nid(e.id, x[1]), title: x[2], body: x[3], schedule: { at: new Date(at), allowWhileIdle: true }, actionTypeId: 'RG_EVENT', extra: { eventId: e.id, title: e.title, kind: 'remind' } },
-          nat: { id: nid(e.id, x[1]), at: at, title: x[2], body: x[3], kind: 'remind', key: e.key, eventId: e.id, eventTitle: e.title } };
+          nat: { id: nid(e.id, x[1]), at: at, title: x[2], body: x[3], kind: 'remind', key: e.key, eventId: e.id, eventTitle: e.title, cid: e.community_id } };
       });
     });
     if (nativeMode) {      // se manda siempre la lista entera: el teléfono quita lo que sobra y repone lo que falte
@@ -501,7 +555,7 @@
     if (!RA || !RA.eventWatch) return;
     var now = Date.now(), items = IN.events.filter(function (e) { return (e.status === 'waiting' || e.status === 'offered') && e.key && e.starts_at > now; }).map(function (e) {
       return { eventId: e.id, key: e.key, eventTitle: e.title, startsAt: e.starts_at, nid: nid(e.id, 2),
-        remind: remTexts(e).map(function (x) { return { id: nid(e.id, x[1]), at: e.starts_at - x[0], title: x[2], body: x[3], kind: 'remind', key: e.key, eventId: e.id, eventTitle: e.title }; }) };
+        remind: remTexts(e).map(function (x) { return { id: nid(e.id, x[1]), at: e.starts_at - x[0], title: x[2], body: x[3], kind: 'remind', key: e.key, eventId: e.id, eventTitle: e.title, cid: e.community_id }; }) };
     });
     var sig = JSON.stringify(items); if (sig === IN.watchSig) return; IN.watchSig = sig;
     if (items.length && !raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
@@ -532,7 +586,7 @@
       } else if (RA && e.key && !sn.notified) {
         sn.notified = 1; ch = true;
         if (!raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
-        try { RA.eventShow({ item: { id: nid(e.id, 2), at: 0, title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y te toca a ti. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', kind: 'offer', key: e.key, eventId: e.id, eventTitle: e.title, offeredAt: e.offered_at || 0 } }).catch(function () {}); } catch (x) {}
+        try { RA.eventShow({ item: { id: nid(e.id, 2), at: 0, title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y te toca a ti. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', kind: 'offer', key: e.key, eventId: e.id, eventTitle: e.title, offeredAt: e.offered_at || 0, cid: e.community_id } }).catch(function () {}); } catch (x) {}
       } else if (LN && !sn.notified) {
         sn.notified = 1; ch = true;
         try { LN.schedule({ notifications: [{ id: nid(e.id, 2), title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y te toca a ti. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', actionTypeId: 'RG_OFFER', extra: { eventId: e.id, title: e.title, kind: 'offer' } }] }).catch(function () {}); } catch (x) {}
@@ -597,7 +651,7 @@
 
   Cl.onChange(function (u) {
     var changed = (S.user && S.user.id) !== (u && u.id); S.user = u;
-    if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) forgetReminders(); else setTimeout(function () { nativePending(); inbox(true); }, 2000); if (!$('#view-club').hidden) show(); }
+    if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) { forgetReminders(); liveSync(); } else setTimeout(function () { nativePending(); inbox(true); if (!S.loaded) load().catch(function () {}); else liveSync(); }, 1500); if (!$('#view-club').hidden) show(); }
   });
   window.RGClub = { show: show, inbox: inbox, state: S, mine: function () { return IN.events.slice(); } };
 })();

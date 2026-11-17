@@ -649,6 +649,22 @@ public class RideAlertsPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Novedad recibida por el canal en directo: se avisa ya (o, con silent, solo se apunta para no repetirla). */
+    @PluginMethod
+    public void newsNow(PluginCall call) {
+        JSArray items = call.getArray("items");
+        final org.json.JSONArray list = items == null ? new org.json.JSONArray() : items;
+        final boolean silent = Boolean.TRUE.equals(call.getBoolean("silent", false));
+        final android.content.Context ctx = getContext();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                EventNotices.newsNow(ctx, list, silent);
+            }
+        }).start();
+        call.resolve();
+    }
+
     /** La app ya ha enseñado esa plaza ofrecida en pantalla. */
     @PluginMethod
     public void eventSeen(PluginCall call) {

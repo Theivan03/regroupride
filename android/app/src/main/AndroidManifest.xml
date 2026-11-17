@@ -47,6 +47,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Recordatorios de eventos: volver a programarlos al encender el teléfono. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Alarmas exactas: comprobar cada minuto si hay plaza libre, novedades o una ruta que empieza, con la app cerrada.
+         USE_EXACT_ALARM se concede sola (Android 13+); en Android 12 vale SCHEDULE_EXACT_ALARM. La app no se publica en Google Play. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
     <!-- Cámara: solo para leer el QR de un grupo. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Alarma de SOS o avería de alguien del grupo: se abre por encima de la pantalla de bloqueo, como una llamada. -->

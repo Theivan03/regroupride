@@ -376,13 +376,16 @@
       box.innerHTML = (pubBy ? '<div class="rg-row" style="margin-bottom:8px"><b>Rutas de ' + esc(pubBy) + '</b><button class="link" id="pbAll" type="button">Ver todas</button></div>' : '<p class="muted rg-small" style="text-align:left;margin:0 0 8px">' + (all.length ? (fix ? 'Rutas públicas de otros moteros. Primero, las que salen más cerca de ti.' : 'Rutas públicas de otros moteros, de la más nueva a la más antigua.') : '') + '</p>') +
         (list.length ? list.map(function (x) {
           var far = fix && x.lat != null ? L.dist(fix.lat, fix.lon, x.lat, x.lon) : null;
-          return '<div class="club-card ex" data-id="' + x.id + '"><b>' + esc(x.name) + '</b><span class="muted">' + fmtKm(x.m || 0) + (x.s ? ' · ' + fmtMin(x.s) : '') + (far != null ? ' · sale a ' + L.fmtDist(far) : '') + '</span>' +
+          var ln = (x.line || []).filter(function (c) { return c && c.length > 1; });
+          return '<div class="club-card ex" data-id="' + x.id + '"><div class="thumb ex-thumb">' + (ln.length > 1 && window.Geo ? Geo.thumbSvg(ln.map(function (c) { return [0, c[1], c[0]]; }), 120, 'currentColor') : '<svg class="ex-pin"><use href="#i-gmaps"/></svg>') + '</div><b>' + esc(x.name) + '</b><span class="muted">' + fmtKm(x.m || 0) + (x.s ? ' · ' + fmtMin(x.s) : '') + (far != null ? ' · sale a ' + L.fmtDist(far) : '') + '</span>' +
             '<span class="muted">' + (x.mine ? 'La has publicado tú' : 'De <button class="link" data-act="by" type="button">' + esc(x.by) + '</button>') + '</span>' +
             '<div class="rg-row"><button class="btn small primary" data-act="see" type="button">Ver en el mapa</button><button class="btn small" data-act="use" type="button">Guardar en mis rutas</button>' + (x.mine ? '' : '<button class="link" data-act="rep" type="button">Denunciar</button>') + '</div></div>';
         }).join('') : '<div class="empty">Todavía no hay rutas públicas. Publica la primera: en «Planificadas», botón «Privada · publicar».</div>');
       if (box.querySelector('#pbAll')) box.querySelector('#pbAll').addEventListener('click', function () { pubBy = null; renderPublic(box, inSheet); });
       [].forEach.call(box.querySelectorAll('.ex'), function (card) {
         var x = list.filter(function (y) { return y.id === card.dataset.id; })[0];
+        var ln = (x.line || []).filter(function (c) { return c && c.length > 1; });
+        if (window.RGThumbs) RGThumbs.attach(card.querySelector('.ex-thumb'), 'u' + x.id, ln.length > 1 ? ln : (x.lon != null ? [[x.lon, x.lat]] : null));
         card.querySelector('[data-act=see]').addEventListener('click', function (ev) { busy(ev.currentTarget, function () { return fetchPlan(x).then(function (p) { if (inSheet) closeSheet(); A.previewPlan(p); A.toast('«' + p.name + '», de ' + (x.mine ? 'ti' : x.by) + '. Pulsa «Guardar» si te la quieres quedar.', 'ok'); }); }); });
         card.querySelector('[data-act=use]').addEventListener('click', function (ev) { var b = ev.currentTarget; busy(b, function () { return fetchPlan(x).then(function (p) { return A.savePlan(p).then(function () { A.toast('Guardada. La tienes en Rutas → Planificadas.', 'ok'); }); }); }).then(function () { b.textContent = 'Guardada ✓'; b.disabled = true; }); });
         var by = card.querySelector('[data-act=by]'); if (by) by.addEventListener('click', function () { pubBy = x.by; renderPublic(box, inSheet); });

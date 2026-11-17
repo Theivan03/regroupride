@@ -38,7 +38,9 @@ import java.util.Iterator;
  * push), así que el teléfono lo pregunta: cada 10 minutos consulta al servidor, con la clave de cada evento en el que se
  * está en espera (supabase/08), y si hay plaza ofrecida pone el aviso con «Sí, voy» y «No puedo».
  *
- * Novedades de la comunidad (evento, mensaje del tablón o página de info nuevos): igual, sin push. Cada 15 minutos el
+ * Con la app abierta o en segundo plano, todo llega al instante por el canal en directo (www/rg-live.js) y la app pone
+ * el aviso aquí con newsNow(); lo que ya se ha avisado no se repite (se recuerdan los últimos).
+ * Novedades de la comunidad (evento, mensaje del tablón, página de info o «empieza la ruta»): igual, sin push. Cada minuto el
  * teléfono pregunta con la clave de novedades de la cuenta (supabase/09) qué hay desde la última vez y pone un aviso
  * por cada cosa. Lo que publica uno mismo no se le avisa.
  *
@@ -50,8 +52,10 @@ final class EventNotices {
     static final String ACTION_SHOW = "com.regroupride.app.EVENT_SHOW";
     static final String ACTION_DO = "com.regroupride.app.EVENT_DO";
     static final String ACTION_CHECK = "com.regroupride.app.EVENT_CHECK";
-    private static final long CHECK_EVERY = 10 * 60000L;
-    private static final long NEWS_EVERY = 15 * 60000L;
+    // Cada minuto: lo mínimo que Android deja con la app cerrada. Con el teléfono en reposo profundo (Doze), el propio
+    // sistema las espacia (unos 9 minutos) hasta que se vuelve a usar el teléfono.
+    private static final long CHECK_EVERY = 60000L;
+    private static final long NEWS_EVERY = 60000L;
     private static final String CH = "rg_events";
     private static final String CH_NEWS = "rg_news";
     private static final String PREFS = "rg_events";
@@ -138,10 +142,17 @@ final class EventNotices {
         AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
         long at = System.currentTimeMillis() + delay;
+        PendingIntent pi = broadcast(c, ACTION_CHECK, 1, "check");
         try {
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, broadcast(c, ACTION_CHECK, 1, "check"));
+            if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
+            else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
             prefs(c).edit().putLong("nextCheck", at).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception e) {
+            try {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
+                prefs(c).edit().putLong("nextCheck", at).apply();
+            } catch (Exception ignored) { }
+        }
     }
 
     private static void disarmCheck(Context c) {
@@ -195,46 +206,111 @@ final class EventNotices {
             }
             JSONArray items = r.optJSONArray("items");
             long last = since;
+            for (int n = 0; items != null && n < items.length(); n++) {
+                JSONObject it = items.optJSONObject(n);
+                if (it == null) continue;
+                long at = it.optLong("at", 0);
+                if (at > last) last = at;
+                notifyNews(c, it, false);
+            }
+            if (last > since) sp.edit().putLong("newsSince", last + 1).apply();
+        } catch (Exception e) {
+            if ("http 404".equals(e.getMessage())) sp.edit().remove("newsKey").apply();    // falta supabase/09: no se insiste
+        }
+    }
+
+    /** ¿Ya se ha avisado esto? (se recuerdan los últimos 100). Si no, queda apuntado. */
+    private static synchronized boolean firstTime(Context c, String k) {
+        try {
+            JSONArray seen = new JSONArray(prefs(c).getString("newsSeen", "[]"));
+            for (int i = 0; i < seen.length(); i++) if (k.equals(seen.optString(i))) return false;
+            JSONArray out = new JSONArray();
+            int from = Math.max(0, seen.length() - 99);
+            for (int i = from; i < seen.length(); i++) out.put(seen.optString(i));
+            out.put(k);
+            prefs(c).edit().putString("newsSeen", out.toString()).apply();
+        } catch (Exception ignored) { }
+        return true;
+    }
+
+    /** Un aviso de novedad: evento, tablón, info o «empieza la ruta». silent = solo apuntarlo (la app ya lo ha enseñado). */
+    static void notifyNews(Context c, JSONObject it, boolean silent) {
+        String kind = it.optString("kind"), key = kind + ":" + it.optString("id");
+        if (!firstTime(c, key) || silent) return;
+        String com = it.optString("community", "Tu comunidad"), title = it.optString("title", "");
+        String head, body, chId = CH_NEWS;
+        if ("call".equals(kind)) {
+            head = "Empieza la ruta: " + (title.isEmpty() ? com : title);
+            body = it.optString("by", "El organizador") + " ha iniciado la ruta. Toca para unirte.";
+            chId = CH;
+            channel(c);
+        } else {
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
                 NotificationChannel ch = new NotificationChannel(CH_NEWS, "Novedades de la comunidad", NotificationManager.IMPORTANCE_DEFAULT);
                 ch.setDescription("Avisa cuando se publica un evento, un mensaje en el tablón o una página de información.");
                 nm.createNotificationChannel(ch);
             }
-            java.text.SimpleDateFormat when = new java.text.SimpleDateFormat("EEE d MMM, HH:mm", new java.util.Locale("es", "ES"));
-            for (int n = 0; items != null && n < items.length(); n++) {
-                JSONObject it = items.optJSONObject(n);
-                if (it == null) continue;
-                long at = it.optLong("at", 0);
-                if (at > last) last = at;
-                String kind = it.optString("kind"), com = it.optString("community", "Tu comunidad"), title = it.optString("title", "");
-                String head, body;
-                if ("event".equals(kind)) {
-                    long st = it.optLong("starts_at", 0);
-                    head = com + " · Nuevo evento";
-                    body = title + (st > 0 ? " · " + when.format(new java.util.Date(st)) : "");
-                } else if ("post".equals(kind)) {
-                    head = com + " · Tablón";
-                    body = title;
-                } else {
-                    head = com + " · Info";
-                    body = title;
-                }
-                int id = -1 - (((kind + it.optString("id")).hashCode() & 0x7fffffff) % 1000000000);     // negativos: no chocan con los de eventos
-                NotificationCompat.Builder b = new NotificationCompat.Builder(c, CH_NEWS)
-                        .setSmallIcon(R.drawable.ic_stat_rg)
-                        .setContentTitle(head).setContentText(body)
-                        .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                        .setCategory(NotificationCompat.CATEGORY_SOCIAL)
-                        .setDefaults(NotificationCompat.DEFAULT_ALL)
-                        .setAutoCancel(true)
-                        .setContentIntent(openApp(c, id));
-                post(c, id, b.build());
+            if ("event".equals(kind)) {
+                long st = it.optLong("starts_at", 0);
+                java.text.SimpleDateFormat when = new java.text.SimpleDateFormat("EEE d MMM, HH:mm", new java.util.Locale("es", "ES"));
+                head = com + " · Nuevo evento";
+                body = title + (st > 0 ? " · " + when.format(new java.util.Date(st)) : "");
+            } else if ("post".equals(kind)) {
+                head = com + " · Tablón";
+                body = title;
+            } else {
+                head = com + " · Info";
+                body = title;
             }
-            if (last > since) sp.edit().putLong("newsSince", last + 1).apply();
-        } catch (Exception e) {
-            if ("http 404".equals(e.getMessage())) sp.edit().remove("newsKey").apply();    // falta supabase/09: no se insiste
+        }
+        int id = -1 - ((key.hashCode() & 0x7fffffff) % 1000000000);     // negativos: no chocan con los de eventos
+        NotificationCompat.Builder b = new NotificationCompat.Builder(c, chId)
+                .setSmallIcon(R.drawable.ic_stat_rg)
+                .setContentTitle(head).setContentText(body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority("call".equals(kind) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
+                .setCategory("call".equals(kind) ? NotificationCompat.CATEGORY_EVENT : NotificationCompat.CATEGORY_SOCIAL)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setAutoCancel(true)
+                .setContentIntent(openApp(c, id));
+        if ("call".equals(kind)) b.setTimeoutAfter(6 * 3600000L);
+        post(c, id, b.build());
+    }
+
+    /** La app (abierta o en segundo plano) ha recibido una novedad por el canal en directo. */
+    static void newsNow(Context c, JSONArray items, boolean silent) {
+        for (int n = 0; items != null && n < items.length(); n++) {
+            JSONObject it = items.optJSONObject(n);
+            if (it != null) notifyNews(c, it, silent);
+        }
+    }
+
+    /** Toca el timbre del canal en directo (por la web), para que las apps abiertas se pongan al día al momento. */
+    static void ping(Context c, String topic, JSONObject payload) {
+        SharedPreferences sp = prefs(c);
+        String url = sp.getString("url", ""), apikey = sp.getString("apikey", "");
+        if (url.isEmpty() || apikey.isEmpty()) return;
+        HttpURLConnection h = null;
+        try {
+            h = (HttpURLConnection) new URL(url + "/realtime/v1/api/broadcast").openConnection();
+            h.setRequestMethod("POST");
+            h.setConnectTimeout(6000);
+            h.setReadTimeout(6000);
+            h.setDoOutput(true);
+            h.setRequestProperty("Content-Type", "application/json");
+            h.setRequestProperty("apikey", apikey);
+            h.setRequestProperty("Authorization", "Bearer " + apikey);
+            JSONObject m = new JSONObject().put("topic", topic).put("event", "ping").put("payload", payload).put("private", false);
+            byte[] body = new JSONObject().put("messages", new JSONArray().put(m)).toString().getBytes(StandardCharsets.UTF_8);
+            OutputStream os = h.getOutputStream();
+            os.write(body);
+            os.close();
+            h.getResponseCode();
+        } catch (Exception ignored) {
+        } finally {
+            if (h != null) h.disconnect();
         }
     }
 
@@ -387,7 +463,7 @@ final class EventNotices {
             } catch (Exception ignored) { }
         }
         disarmCheck(c);
-        prefs(c).edit().remove("items").remove("pending").remove("watch").remove("newsKey").remove("newsSince").apply();
+        prefs(c).edit().remove("items").remove("pending").remove("watch").remove("newsKey").remove("newsSince").remove("newsSeen").apply();
     }
 
     /** Tras reiniciar el teléfono o actualizar la app, el sistema olvida las alarmas: se reponen. */
@@ -588,6 +664,12 @@ final class EventNotices {
             }
         }
         result(c, id, sent ? name : head, text, sent);
+        String cid = it.optString("cid", "");
+        if (sent && !cid.isEmpty()) {      // las apps abiertas de los demás se ponen al día al momento (plazas, lista de espera)
+            try {
+                ping(c, "rg-c-" + cid, new JSONObject().put("kind", "att").put("eid", eventId));
+            } catch (Exception ignored) { }
+        }
         try {
             RideAlertsPlugin.eventDone(new JSONObject().put("act", act).put("eventId", eventId).put("ok", sent).put("status", status));
         } catch (Exception ignored) { }
