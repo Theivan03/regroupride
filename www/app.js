@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.17.0';
+  var APP_VERSION = '0.18.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -413,6 +413,25 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   });
   $('#followStop').addEventListener('click', function () { followPlan(null, false); });
   $('#followGmaps').addEventListener('click', function () { if (activePlan) openInMaps(activePlan.wps); });
+  // Cambiar el nombre de una ruta planificada (también las importadas de Google Maps, GPX o de otro motero).
+  function renamePlan(p) {
+    var done = function (n) {
+      n = (n || '').trim().slice(0, 60); if (!n || n === p.name) return;
+      p.name = n; p.dirty = 1;
+      savePlans().then(function () {
+        renderRides(); if (activePlan && activePlan.id === p.id) followPlan(p, false);
+        if (window.RGSync) RGSync.pushPlan(p).then(function () { delete p.dirty; return savePlans(); }).catch(function () { RGSync.soon(4000); });
+        toast('Nombre cambiado.', 'ok');
+      });
+    };
+    if (!window.RGCloud) { done(window.prompt('Nombre de la ruta', p.name)); return; }
+    RGCloud.sheet('<div class="head"><h1>Nombre de la ruta</h1><button class="btn small icon" id="pnX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      '<form id="pnForm" class="rg-form"><label>Nombre<input id="pnName" type="text" maxlength="60" required autocomplete="off" value="' + esc(p.name) + '"></label>' +
+      '<button class="btn big primary" type="submit"><svg><use href="#i-check"/></svg>Guardar</button></form>');
+    var inp = $('#pnName'); setTimeout(function () { try { inp.focus(); inp.select(); } catch (e) {} }, 60);
+    $('#pnX').addEventListener('click', RGCloud.closeSheet);
+    $('#pnForm').addEventListener('submit', function (ev) { ev.preventDefault(); var n = inp.value; RGCloud.closeSheet(); done(n); });
+  }
   function renderPlans(list) {
     var top = document.createElement('div'); top.className = 'actions rg-plantop';
     top.innerHTML = '<button class="btn primary wide" type="button" id="btnNewPlan"><svg><use href="#i-route"/></svg>Planificar una ruta nueva</button><button class="btn wide" type="button" id="btnExplore"><svg><use href="#i-people"/></svg>Explorar rutas públicas de otros moteros</button>';
@@ -422,9 +441,10 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     if (!plans.length) { var e = document.createElement('div'); e.className = 'empty'; e.textContent = 'Aún no hay rutas planificadas. Crea una pegando un enlace de Google Maps o tocando el mapa, guárdala y pulsa «Iniciar ruta».'; list.appendChild(e); return; }
     plans.forEach(function (p) {
       var d = document.createElement('div'); d.className = 'plan';
-      d.innerHTML = '<div class="thumb">' + planThumb(p) + '</div><div><div class="name">' + esc(p.name) + '</div><div class="muted">' + fmtKm(p.dist) + ' · ' + fmtDur(p.dur * 1000) + (p.routed ? ' por carretera' : ' en línea recta') + ' · ' + p.wps.length + ' puntos · ' + fmtDate(p.created) + '</div></div>' +
+      d.innerHTML = '<div class="thumb">' + planThumb(p) + '</div><div><div class="name rg-pname"><span>' + esc(p.name) + '</span><button class="btn small icon" type="button" data-act="ren" title="Cambiar el nombre" aria-label="Cambiar el nombre"><svg><use href="#i-edit"/></svg></button></div><div class="muted">' + fmtKm(p.dist) + ' · ' + fmtDur(p.dur * 1000) + (p.routed ? ' por carretera' : ' en línea recta') + ' · ' + p.wps.length + ' puntos · ' + fmtDate(p.created) + '</div></div>' +
         '<div class="plan-actions"><button class="btn small primary" type="button" data-act="follow"><svg><use href="#i-play"/></svg>' + (activePlan && activePlan.id === p.id ? 'Seleccionada' : 'Seguir esta ruta') + '</button><button class="btn small' + (p.pub ? ' on' : '') + '" type="button" data-act="pub"><svg><use href="#i-' + (p.pub ? 'check' : 'lock') + '"/></svg>' + (p.pub ? 'Pública' : 'Privada · publicar') + '</button><button class="btn small" type="button" data-act="gpx"><svg><use href="#i-download"/></svg>Descargar GPX</button><button class="btn small" type="button" data-act="gmaps"><svg><use href="#i-gmaps"/></svg>Google Maps</button><button class="btn small danger" type="button" data-act="del"><svg><use href="#i-trash"/></svg>Borrar</button></div>';
       d.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () {
+        if (b.dataset.act === 'ren') renamePlan(p);
         if (b.dataset.act === 'follow') { followPlan(p, true); showView('map'); }
         if (b.dataset.act === 'gmaps') openInMaps(p.wps);
         if (b.dataset.act === 'gpx' && window.RGNav) RGNav.exportGpx(p);
@@ -569,7 +589,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       setText('#hudLastL', live.lastL ? Math.round(live.lastL) + '°' : '—'); setText('#hudLastR', live.lastR ? Math.round(live.lastR) + '°' : '—');
       setHTML('#hudMeta', '<b>' + fmtKm(rec.dist) + '</b> · ' + rec.corners.length + (rec.corners.length === 1 ? ' curva' : ' curvas') + (rec.paused ? ' · <span class="pause">en pausa</span>' : ''));
       setText('#rideTimer', fmtTime(Date.now() - rec.start)); setText('#hudTime', fmtTime(Date.now() - rec.start));
-      setHTML('#hudLine', fmtKm(rec.dist) + ' · ' + rec.corners.length + (rec.corners.length === 1 ? ' curva' : ' curvas') + (rec.paused ? ' · <span class="pause">en pausa</span>' : ''));
+      setHTML('#hudLine', fmtKm(rec.dist) + (rec.trip ? ' · trayecto' : ' · ' + rec.corners.length + (rec.corners.length === 1 ? ' curva' : ' curvas')) + (rec.paused ? ' · <span class="pause">en pausa</span>' : ''));
     }
     $('#rideTimer').hidden = !rec; $('#rideTimer').className = 'timer cifra' + (rec ? ' on' : '');
     $('#hudCard').hidden = !rec; $('#idleCard').hidden = !!rec || planMode || parkOpen;

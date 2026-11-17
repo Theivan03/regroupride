@@ -38,6 +38,10 @@ import java.util.Iterator;
  * push), así que el teléfono lo pregunta: cada 10 minutos consulta al servidor, con la clave de cada evento en el que se
  * está en espera (supabase/08), y si hay plaza ofrecida pone el aviso con «Sí, voy» y «No puedo».
  *
+ * Novedades de la comunidad (evento, mensaje del tablón o página de info nuevos): igual, sin push. Cada 15 minutos el
+ * teléfono pregunta con la clave de novedades de la cuenta (supabase/09) qué hay desde la última vez y pone un aviso
+ * por cada cosa. Lo que publica uno mismo no se le avisa.
+ *
  * Un aviso: { id, at (ms; 0 = ya), title, body, kind: "remind" | "offer", key, eventId, eventTitle, offeredAt }.
  * En espera: { eventId, key, eventTitle, startsAt, nid (id del aviso de plaza), remind: [avisos si se confirma] }.
  * Los ids van de cuatro en cuatro por evento (id % 4: 0 = día antes, 1 = hora antes, 2 = plaza ofrecida).
@@ -47,7 +51,9 @@ final class EventNotices {
     static final String ACTION_DO = "com.regroupride.app.EVENT_DO";
     static final String ACTION_CHECK = "com.regroupride.app.EVENT_CHECK";
     private static final long CHECK_EVERY = 10 * 60000L;
+    private static final long NEWS_EVERY = 15 * 60000L;
     private static final String CH = "rg_events";
+    private static final String CH_NEWS = "rg_news";
     private static final String PREFS = "rg_events";
 
     private EventNotices() { }
@@ -148,6 +154,90 @@ final class EventNotices {
         prefs(c).edit().remove("nextCheck").apply();
     }
 
+    /** Deja puesta la siguiente consulta: cada 10 min si hay lista de espera, cada 15 si solo hay novedades, o ninguna. */
+    private static void schedule(Context c) {
+        boolean waiting = watching(c).length() > 0, news = !prefs(c).getString("newsKey", "").isEmpty();
+        if (waiting) armCheck(c, CHECK_EVERY);
+        else if (news) armCheck(c, NEWS_EVERY);
+        else disarmCheck(c);
+    }
+
+    /** Clave de novedades de la cuenta. Vacía = dejar de preguntar. La primera vez solo cuenta lo que se publique desde ahora. */
+    static synchronized void news(Context c, String key) {
+        SharedPreferences sp = prefs(c);
+        if (key == null || key.isEmpty()) {
+            sp.edit().remove("newsKey").remove("newsSince").apply();
+            schedule(c);
+            return;
+        }
+        boolean fresh = !key.equals(sp.getString("newsKey", ""));
+        SharedPreferences.Editor e = sp.edit().putString("newsKey", key);
+        if (fresh || sp.getLong("newsSince", 0) == 0) e.putLong("newsSince", System.currentTimeMillis());
+        e.apply();
+        long due = sp.getLong("nextCheck", 0), now = System.currentTimeMillis();
+        if (due < now - 60000L || due > now + NEWS_EVERY) armCheck(c, NEWS_EVERY);
+    }
+
+    /** Pregunta qué se ha publicado en mis comunidades desde la última vez y lo avisa. Fuera del hilo principal. */
+    private static void checkNews(Context c) {
+        SharedPreferences sp = prefs(c);
+        String key = sp.getString("newsKey", "");
+        if (key.isEmpty()) return;
+        long since = sp.getLong("newsSince", 0);
+        if (since == 0) since = System.currentTimeMillis();
+        try {
+            java.text.SimpleDateFormat iso = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US);
+            iso.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            JSONObject r = rpc(c, "community_news", new JSONObject().put("p_key", key).put("p_since", iso.format(new java.util.Date(since))));
+            if (!r.optBoolean("ok", false)) {
+                if ("clave".equals(r.optString("error"))) sp.edit().remove("newsKey").apply();
+                return;
+            }
+            JSONArray items = r.optJSONArray("items");
+            long last = since;
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                NotificationChannel ch = new NotificationChannel(CH_NEWS, "Novedades de la comunidad", NotificationManager.IMPORTANCE_DEFAULT);
+                ch.setDescription("Avisa cuando se publica un evento, un mensaje en el tablón o una página de información.");
+                nm.createNotificationChannel(ch);
+            }
+            java.text.SimpleDateFormat when = new java.text.SimpleDateFormat("EEE d MMM, HH:mm", new java.util.Locale("es", "ES"));
+            for (int n = 0; items != null && n < items.length(); n++) {
+                JSONObject it = items.optJSONObject(n);
+                if (it == null) continue;
+                long at = it.optLong("at", 0);
+                if (at > last) last = at;
+                String kind = it.optString("kind"), com = it.optString("community", "Tu comunidad"), title = it.optString("title", "");
+                String head, body;
+                if ("event".equals(kind)) {
+                    long st = it.optLong("starts_at", 0);
+                    head = com + " · Nuevo evento";
+                    body = title + (st > 0 ? " · " + when.format(new java.util.Date(st)) : "");
+                } else if ("post".equals(kind)) {
+                    head = com + " · Tablón";
+                    body = title;
+                } else {
+                    head = com + " · Info";
+                    body = title;
+                }
+                int id = -1 - (((kind + it.optString("id")).hashCode() & 0x7fffffff) % 1000000000);     // negativos: no chocan con los de eventos
+                NotificationCompat.Builder b = new NotificationCompat.Builder(c, CH_NEWS)
+                        .setSmallIcon(R.drawable.ic_stat_rg)
+                        .setContentTitle(head).setContentText(body)
+                        .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                        .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+                        .setDefaults(NotificationCompat.DEFAULT_ALL)
+                        .setAutoCancel(true)
+                        .setContentIntent(openApp(c, id));
+                post(c, id, b.build());
+            }
+            if (last > since) sp.edit().putLong("newsSince", last + 1).apply();
+        } catch (Exception e) {
+            if ("http 404".equals(e.getMessage())) sp.edit().remove("newsKey").apply();    // falta supabase/09: no se insiste
+        }
+    }
+
     /** Eventos en los que estoy en lista de espera (la lista entera cada vez). Vacía = no hay nada que preguntar. */
     static synchronized void watch(Context c, JSONArray wanted) {
         JSONObject old = watching(c), next = new JSONObject();
@@ -162,7 +252,7 @@ final class EventNotices {
             }
         } catch (Exception ignored) { }
         prefs(c).edit().putString("watch", next.toString()).apply();
-        if (next.length() == 0) { disarmCheck(c); return; }
+        if (next.length() == 0) { schedule(c); return; }
         long due = prefs(c).getLong("nextCheck", 0), now = System.currentTimeMillis();
         if (due < now - 60000L || due > now + CHECK_EVERY) armCheck(c, CHECK_EVERY);   // si ya hay una consulta pendiente, no se retrasa
     }
@@ -186,7 +276,7 @@ final class EventNotices {
         long now = System.currentTimeMillis();
         ArrayList<String> drop = new ArrayList<>();
         ArrayList<JSONObject> offers = new ArrayList<>();
-        boolean unsupported = false;
+        boolean unsupported = false, offline = false;
         int asked = 0;
         for (Iterator<String> k = w.keys(); k.hasNext() && asked < 4; ) {
             String ev = k.next();
@@ -216,20 +306,23 @@ final class EventNotices {
                     drop.add(ev);                                                      // ya voy o ya no voy
                 }
             } catch (Exception ignored) {
+                offline = true;
                 break;      // sin conexión: no se insiste con los demás (el sistema da pocos segundos); se pregunta en la siguiente
             }
         }
         synchronized (EventNotices.class) {
             if (unsupported) {
                 prefs(c).edit().remove("watch").apply();
-                disarmCheck(c);
-                return;
+            } else {
+                JSONObject cur = watching(c);
+                for (String ev : drop) cur.remove(ev);
+                prefs(c).edit().putString("watch", cur.toString()).apply();
+                for (JSONObject o : offers) put(c, o);
             }
-            JSONObject cur = watching(c);
-            for (String ev : drop) cur.remove(ev);
-            prefs(c).edit().putString("watch", cur.toString()).apply();
-            for (JSONObject o : offers) put(c, o);
-            if (cur.length() > 0) armCheck(c, CHECK_EVERY); else disarmCheck(c);
+        }
+        if (!offline) checkNews(c);
+        synchronized (EventNotices.class) {
+            schedule(c);
         }
     }
 
@@ -294,12 +387,12 @@ final class EventNotices {
             } catch (Exception ignored) { }
         }
         disarmCheck(c);
-        prefs(c).edit().remove("items").remove("pending").remove("watch").apply();
+        prefs(c).edit().remove("items").remove("pending").remove("watch").remove("newsKey").remove("newsSince").apply();
     }
 
     /** Tras reiniciar el teléfono o actualizar la app, el sistema olvida las alarmas: se reponen. */
     static synchronized void rearm(Context c) {
-        if (watching(c).length() > 0) armCheck(c, 60000L);
+        if (watching(c).length() > 0 || !prefs(c).getString("newsKey", "").isEmpty()) armCheck(c, 60000L);
         JSONObject all = items(c);
         long now = System.currentTimeMillis();
         for (Iterator<String> k = all.keys(); k.hasNext(); ) {
@@ -387,10 +480,15 @@ final class EventNotices {
     }
 
     private static JSONObject call(Context c, String key, String act) throws Exception {
+        if (key == null || key.isEmpty()) throw new IllegalStateException("sin configurar");
+        return rpc(c, "event_action", new JSONObject().put("p_key", key).put("p_action", act));
+    }
+
+    private static JSONObject rpc(Context c, String fn, JSONObject args) throws Exception {
         SharedPreferences sp = prefs(c);
         String url = sp.getString("url", ""), apikey = sp.getString("apikey", "");
-        if (url.isEmpty() || apikey.isEmpty() || key == null || key.isEmpty()) throw new IllegalStateException("sin configurar");
-        HttpURLConnection h = (HttpURLConnection) new URL(url + "/rest/v1/rpc/event_action").openConnection();
+        if (url.isEmpty() || apikey.isEmpty()) throw new IllegalStateException("sin configurar");
+        HttpURLConnection h = (HttpURLConnection) new URL(url + "/rest/v1/rpc/" + fn).openConnection();
         try {
             h.setRequestMethod("POST");
             h.setConnectTimeout(8000);
@@ -399,7 +497,7 @@ final class EventNotices {
             h.setRequestProperty("Content-Type", "application/json");
             h.setRequestProperty("apikey", apikey);
             h.setRequestProperty("Authorization", "Bearer " + apikey);
-            byte[] body = new JSONObject().put("p_key", key).put("p_action", act).toString().getBytes(StandardCharsets.UTF_8);
+            byte[] body = args.toString().getBytes(StandardCharsets.UTF_8);
             OutputStream os = h.getOutputStream();
             os.write(body);
             os.close();
@@ -479,7 +577,7 @@ final class EventNotices {
                 if (e != null) {
                     w.remove(eventId);
                     prefs(c).edit().putString("watch", w.toString()).apply();
-                    if (w.length() == 0) disarmCheck(c);
+                    if (w.length() == 0) schedule(c);
                     JSONArray rem = "going".equals(status) ? e.optJSONArray("remind") : null;
                     long now = System.currentTimeMillis();
                     for (int n = 0; rem != null && n < rem.length(); n++) {

@@ -35,6 +35,27 @@
   var nav = { active: false, planId: null, tr: null, rejoin: null, rejoinAt: 0, rejoinBusy: false, last: null, notified: false, toStart: false, asked: false };
   // El cartel mide 60 px, pero una indicación muy larga lo hace crecer: los botones del mapa bajan con él.
   if (window.ResizeObserver && $('#navBanner')) new ResizeObserver(function () { var h = $('#navBanner').offsetHeight; if (h) document.documentElement.style.setProperty('--nav-h', h + 'px'); }).observe($('#navBanner'));
+  /* Filas de filtros que no caben (Rutas, logros…): se ve que siguen y hay una flecha para avanzar. */
+  function scrollHint(el) {
+    if (!el || el.parentNode.classList.contains('rg-hint')) return;
+    var box = document.createElement('div'); box.className = 'rg-hint'; el.parentNode.insertBefore(box, el); box.appendChild(el);
+    var mk = function (cls, label, dir) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'rg-hint-btn ' + cls; b.setAttribute('aria-label', label);
+      b.innerHTML = '<svg><use href="#i-chev"/></svg>'; b.addEventListener('click', function () { el.scrollBy({ left: dir * Math.max(140, el.clientWidth * 0.6), behavior: 'smooth' }); });
+      box.appendChild(b); return b;
+    };
+    mk('prev', 'Ver las opciones anteriores', -1); mk('next', 'Ver más opciones', 1);
+    var upd = function () {
+      var max = el.scrollWidth - el.clientWidth;
+      box.classList.toggle('more', max > 4 && el.scrollLeft < max - 4);
+      box.classList.toggle('less', el.scrollLeft > 4);
+    };
+    el.addEventListener('scroll', upd, { passive: true }); window.addEventListener('resize', upd);
+    if (window.ResizeObserver) new ResizeObserver(upd).observe(el);
+    if (window.MutationObserver) new MutationObserver(upd).observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    upd();
+  }
+  ['#ridesFilters', '#achFilter'].forEach(function (s) { scrollHint($(s)); });
   function plan() { return A.activePlan(); }
   function sync() {
     var p = plan(), on = !!(p && A.isRec() && !A.isTrip() && p.coords && p.coords.length > 1);

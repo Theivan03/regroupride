@@ -69,6 +69,7 @@
           used[c.id] = 1; n++;
           var pub = c.visibility === 'public';
           if (p.cloudId !== c.id || p.pub !== pub) { p.cloudId = c.id; p.pub = pub; changed = true; }
+          if (p.dirty) chain = chain.then(function () { return pushPlan(p).then(function () { delete p.dirty; changed = true; }); });        // renombrada sin conexión
           if (c.local_id == null) chain = chain.then(function () { return sb.from('routes').update({ local_id: p.id }).eq('id', c.id).then(function () {}, function () {}); });   // las publicadas antes de esta versión
         } else if (p.cloudId) {
           // Estaba en la cuenta y ya no: se borró desde otro móvil. Aquí se queda, pero no se vuelve a subir sola.

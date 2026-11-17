@@ -642,6 +642,13 @@ public class RideAlertsPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Clave de novedades de la cuenta: el teléfono pregunta cada 15 minutos si hay evento, tablón o info nuevos. */
+    @PluginMethod
+    public void newsWatch(PluginCall call) {
+        EventNotices.news(getContext(), call.getString("key", ""));
+        call.resolve();
+    }
+
     /** La app ya ha enseñado esa plaza ofrecida en pantalla. */
     @PluginMethod
     public void eventSeen(PluginCall call) {

@@ -185,3 +185,10 @@ Para comparar con las láminas: `scripts/pantallas.py` y `scripts/otras.sh` saca
 - **Aviso de plaza con la app cerrada (Android).** No hay notificaciones push, así que el teléfono pregunta: cada 10 minutos consulta al servidor, con la clave de cada evento en el que estás en lista de espera, si te han ofrecido la plaza. Si te toca, pone la notificación con **«Sí, voy»** y **«No puedo»**, que contestan sin abrir la app. Si confirmas, quedan puestos los dos recordatorios del evento. Hace falta ejecutar **`supabase/08_plaza_avisada.sql`** (añade la acción `status` a `event_action`); sin él todo sigue como antes (el aviso solo salta con la app abierta o en segundo plano).
 - Esa misma consulta hace avanzar la cola: si una plaza ofrecida caduca sin respuesta, pasa al siguiente aunque nadie abra la app.
 - **Lista de espera sin números.** Quien está en espera ve solo «En lista de espera»: ni su puesto ni cuántos hay. Cuántos esperan y quiénes solo lo ven los administradores de la comunidad o de la ruta.
+
+## 0.18 · aviso de novedades de la comunidad; renombrar planificadas; separaciones
+
+- **Aviso al publicar en la comunidad (Android).** Cuando alguien publica un evento, un mensaje en el tablón o una página de info, a los demás miembros les llega una notificación. No hay push: el teléfono pregunta cada 15 minutos con la clave de novedades de la cuenta. Hace falta ejecutar **`supabase/09_novedades.sql`**. A quien publica no se le avisa de lo suyo; cambiar el orden de las páginas no cuenta como novedad. Tiene su propio canal de notificaciones («Novedades de la comunidad»), que se puede silenciar aparte.
+- **Renombrar rutas planificadas** (también las importadas): botón del lápiz junto al nombre. El cambio sube a la cuenta.
+- **Rutas:** las fichas ya no van pegadas; la fila de filtros enseña un difuminado y una flecha cuando hay más opciones a un lado.
+- **En marcha:** «Avisar» queda separado de la tarjeta; el reloj, el botón de la inclinación y «Parar» ya no se pisan en pantallas estrechas. En un trayecto no se cuentan curvas.

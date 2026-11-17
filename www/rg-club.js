@@ -454,7 +454,7 @@
       IN.busy = false;
       if (r.error) { if (/could not find|schema cache|does not exist/i.test(r.error.message || '')) S.v6 = false; return; }
       S.v6 = true; IN.events = (r.data && r.data.events) || [];
-      remind(); watchWaiting(); offers(); drain();
+      remind(); watchWaiting(); newsWatch(); offers(); drain();
     }, function () { IN.busy = false; });
   }
   // Deja programados exactamente los recordatorios que tocan: quita los de eventos que ya no voy o que han cambiado de hora.
@@ -507,7 +507,17 @@
     if (items.length && !raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
     try { RA.eventWatch({ items: items }).catch(function () {}); } catch (x) {}
   }
-  function forgetReminders() { IN.watchSig = null; var had = jget('rg.remind'), ids = Object.keys(had).map(function (id) { return { id: +id }; }); if (LN && ids.length) { try { LN.cancel({ notifications: ids }).catch(function () {}); } catch (e) {} } if (RA) { try { RA.eventClear().catch(function () {}); } catch (e) {} } jset('rg.remind', {}); }
+  // Novedades de la comunidad (evento, mensaje del tablón o página de info nuevos). No hay push: en Android el teléfono
+  // pregunta cada 15 minutos con la clave de novedades de la cuenta (supabase/09) y pone el aviso aunque la app esté cerrada.
+  function newsWatch() {
+    if (!RA || !RA.newsWatch || !S.user || IN.newsOn) return; IN.newsOn = true;
+    sb.rpc('news_key').then(function (r) {
+      if (r.error || !r.data) return;                                              // falta supabase/09: sin avisos de novedades
+      if (!raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
+      try { RA.newsWatch({ key: r.data }).catch(function () {}); } catch (x) {}
+    }, function () {});
+  }
+  function forgetReminders() { IN.watchSig = null; IN.newsOn = false; var had = jget('rg.remind'), ids = Object.keys(had).map(function (id) { return { id: +id }; }); if (LN && ids.length) { try { LN.cancel({ notifications: ids }).catch(function () {}); } catch (e) {} } if (RA) { try { RA.eventClear().catch(function () {}); } catch (e) {} } jset('rg.remind', {}); }
   // Plaza ofrecida: una vez por oferta. En pantalla, pregunta; en segundo plano, notificación con «Sí, voy» / «No puedo».
   function offers() {
     var seen = jget('rg.offers'), now = Date.now(), ch = false;
