@@ -179,3 +179,9 @@ Para comparar con las láminas: `scripts/pantallas.py` y `scripts/otras.sh` saca
 - **Rodar en grupo sin ruta:** se puede crear el grupo sin tener ninguna ruta cargada; cada uno ve a los demás y a qué distancia están.
 - **Rutas:** los botones de «Planificadas» ya no se salen de la pantalla, hay aire debajo y se quita el filtro «Con inclinación».
 - **Ubicación al abrir:** el marcador sale en cuanto existe el mapa (antes esperaba a que cargaran las teselas), con la última posición conocida atenuada, luego la de red y luego el GPS.
+
+## 0.17 · «Hay una plaza para ti» con la app cerrada; la lista de espera, sin números
+
+- **Aviso de plaza con la app cerrada (Android).** No hay notificaciones push, así que el teléfono pregunta: cada 10 minutos consulta al servidor, con la clave de cada evento en el que estás en lista de espera, si te han ofrecido la plaza. Si te toca, pone la notificación con **«Sí, voy»** y **«No puedo»**, que contestan sin abrir la app. Si confirmas, quedan puestos los dos recordatorios del evento. Hace falta ejecutar **`supabase/08_plaza_avisada.sql`** (añade la acción `status` a `event_action`); sin él todo sigue como antes (el aviso solo salta con la app abierta o en segundo plano).
+- Esa misma consulta hace avanzar la cola: si una plaza ofrecida caduca sin respuesta, pasa al siguiente aunque nadie abra la app.
+- **Lista de espera sin números.** Quien está en espera ve solo «En lista de espera»: ni su puesto ni cuántos hay. Cuántos esperan y quiénes solo lo ven los administradores de la comunidad o de la ruta.

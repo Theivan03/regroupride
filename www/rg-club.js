@@ -178,11 +178,12 @@
       var taken = takenOf(att, e), queue = queueOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap;
       var st = mine ? mine.status : 'no', iGo = st === 'going', people = going.length + going.filter(function (x) { return x.companion; }).length;
       var routeAdm = (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0, canRun = isAdmin() || routeAdm, m = meetOf(e), pos = queue.map(function (x) { return x.user_id; }).indexOf(S.user.id) + 1, dl = deadlineOf(e, mine);
-      var count = cap ? taken.length + ' de ' + cap + (cap === 1 ? ' plaza' : ' plazas') + (queue.length ? ' · ' + queue.length + ' en lista de espera' : '')
+      // Cuántos hay en lista de espera solo lo ven los administradores; los demás saben si están en ella, nada más.
+      var count = cap ? taken.length + ' de ' + cap + (cap === 1 ? ' plaza' : ' plazas') + (queue.length && canRun ? ' · ' + queue.length + ' en lista de espera' : '')
         : (going.length ? going.length + (going.length === 1 ? ' moto' : ' motos') + (people > going.length ? ' · ' + people + ' personas' : '') : 'Nadie apuntado todavía');
       // Tarjeta de evento de la guía: la franja de arriba dice el estado (color, icono y texto) y debajo va lo demás.
       var ic = function (n) { return '<svg><use href="#i-' + n + '"/></svg>'; };
-      var strip = st === 'going' ? ['si', 'check', 'Estás apuntado'] : st === 'waiting' ? ['espera', 'clock', 'En lista de espera' + (pos ? ' · puesto ' + pos + ' de ' + queue.length : '')]
+      var strip = st === 'going' ? ['si', 'check', 'Estás apuntado'] : st === 'waiting' ? ['espera', 'clock', 'En lista de espera']
         : st === 'offered' ? ['plaza', 'clock', 'Plaza libre por confirmar'] : ['no', 'info', 'No estás apuntado'];
       var startBtn = canRun && e.route, mineHtml;
       if (st === 'offered') mineHtml = '<div class="ev-offer"><b>Ha quedado una plaza libre para ti</b><span>Confirma si vienes' + (dl ? ' antes del ' + fmtWhen(dl).toLowerCase() : '') + '. Si no puedes, pasa al siguiente de la lista.</span><div class="ev-go"><button class="btn small primary" data-act="confirm" type="button">Sí, voy</button><button class="btn small" data-act="no" type="button">No puedo</button></div></div>';
@@ -298,7 +299,7 @@
     var person = function (g, tag) { return '<div class="club-person"><span class="rg-ava">' + esc(who(g.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(g.user_id)) + (g.companion ? ' <span class="mstatus">+1</span>' : '') + (tag ? ' <span class="mstatus">' + tag + '</span>' : '') + '</b><span class="muted">' + esc(bike(g.user_id)) + '</span></div></div>'; };
     Cl.sheet('<div class="head"><h1>Quién viene</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + (e.capacity ? ' · ' + e.capacity + (e.capacity === 1 ? ' plaza' : ' plazas') : '') + '</p><div class="rg-list">' +
       (going.length || off.length ? going.map(function (g) { return person(g); }).join('') + off.map(function (g) { return person(g, 'por confirmar'); }).join('') : '<p class="muted">Nadie apuntado todavía.</p>') + '</div>' +
-      (queue.length ? '<h2 class="rg-h2">Lista de espera</h2><div class="rg-list">' + queue.map(function (g, i) { return person(g, 'puesto ' + (i + 1)); }).join('') + '</div>' : ''));
+      (queue.length && (isAdmin() || (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0) ? '<h2 class="rg-h2">Lista de espera</h2><p class="muted rg-small" style="text-align:left">Solo la ven los administradores.</p><div class="rg-list">' + queue.map(function (g, i) { return person(g, 'puesto ' + (i + 1)); }).join('') + '</div>' : ''));
     $('#clX').addEventListener('click', Cl.closeSheet);
   }
   function eventForm(c, e) {
@@ -436,7 +437,9 @@
        detrás, SIN abrir la app, con la clave de cada evento (supabase/07). Sin esa clave, o fuera de Android, se usan
        las notificaciones normales de Capacitor, cuyos botones sí abren la app;
      - si me han ofrecido una plaza, se me pregunta si voy (en pantalla, o con una notificación si la app está en segundo plano).
-     Lo que NO puede hacer sin notificaciones push: avisar de una plaza ofrecida con la app cerrada. */
+     - con la app cerrada no hay notificaciones push que avisen de la plaza; por eso, en Android, el teléfono pregunta
+       cada 10 minutos por los eventos en los que estoy en lista de espera (RideAlerts.eventWatch + supabase/08) y, si
+       me toca, pone el aviso con «Sí, voy» y «No puedo», que contestan sin abrir la app. */
   var LN = P.LocalNotifications || null, IN = { events: [], at: 0, busy: false, pending: [] };
   var RA = native && P.RideAlerts && P.RideAlerts.eventSync ? P.RideAlerts : null, raReady = false;
   function jget(k) { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } }
@@ -451,7 +454,7 @@
       IN.busy = false;
       if (r.error) { if (/could not find|schema cache|does not exist/i.test(r.error.message || '')) S.v6 = false; return; }
       S.v6 = true; IN.events = (r.data && r.data.events) || [];
-      remind(); offers(); drain();
+      remind(); watchWaiting(); offers(); drain();
     }, function () { IN.busy = false; });
   }
   // Deja programados exactamente los recordatorios que tocan: quita los de eventos que ya no voy o que han cambiado de hora.
@@ -471,8 +474,7 @@
     IN.events.forEach(function (e) {
       if (e.status !== 'going') return;
       var key = e.starts_at + '|' + e.title + '|' + (e.meet_name || '');
-      [[24 * 3600e3, 0, 'Mañana: ' + e.title, fmtWhen(e.starts_at) + (e.meet_name ? ' · Salida: ' + e.meet_name : '') + '. Si no puedes ir, desapúntate y tu plaza pasa a otro.'],
-       [3600e3, 1, 'En 1 hora: ' + e.title, 'Sales a las ' + hhmm(e.starts_at) + (e.meet_name ? ' desde ' + e.meet_name : '') + '. ¿No llegas? Desapúntate.']].forEach(function (x) {
+      remTexts(e).forEach(function (x) {
         var at = e.starts_at - x[0]; if (at < now + 30000) return;
         want[nid(e.id, x[1])] = { key: key, n: { id: nid(e.id, x[1]), title: x[2], body: x[3], schedule: { at: new Date(at), allowWhileIdle: true }, actionTypeId: 'RG_EVENT', extra: { eventId: e.id, title: e.title, kind: 'remind' } },
           nat: { id: nid(e.id, x[1]), at: at, title: x[2], body: x[3], kind: 'remind', key: e.key, eventId: e.id, eventTitle: e.title } };
@@ -489,7 +491,23 @@
     var next = {}; Object.keys(want).forEach(function (id) { next[id] = want[id].key; });
     Promise.resolve(drop.length ? LN.cancel({ notifications: drop }) : null).catch(function () {}).then(function () { return add.length ? LN.schedule({ notifications: add }) : null; }).then(function () { jset('rg.remind', next); }, function () {});
   }
-  function forgetReminders() { var had = jget('rg.remind'), ids = Object.keys(had).map(function (id) { return { id: +id }; }); if (LN && ids.length) { try { LN.cancel({ notifications: ids }).catch(function () {}); } catch (e) {} } if (RA) { try { RA.eventClear().catch(function () {}); } catch (e) {} } jset('rg.remind', {}); }
+  // Los dos recordatorios de un evento: [antelación, n.º, título, texto].
+  function remTexts(e) {
+    return [[24 * 3600e3, 0, 'Mañana: ' + e.title, fmtWhen(e.starts_at) + (e.meet_name ? ' · Salida: ' + e.meet_name : '') + '. Si no puedes ir, desapúntate y tu plaza pasa a otro.'],
+            [3600e3, 1, 'En 1 hora: ' + e.title, 'Sales a las ' + hhmm(e.starts_at) + (e.meet_name ? ' desde ' + e.meet_name : '') + '. ¿No llegas? Desapúntate.']];
+  }
+  // En lista de espera: se le dice al teléfono qué eventos vigilar. Si me toca plaza con la app cerrada, él pone el aviso.
+  function watchWaiting() {
+    if (!RA || !RA.eventWatch) return;
+    var now = Date.now(), items = IN.events.filter(function (e) { return (e.status === 'waiting' || e.status === 'offered') && e.key && e.starts_at > now; }).map(function (e) {
+      return { eventId: e.id, key: e.key, eventTitle: e.title, startsAt: e.starts_at, nid: nid(e.id, 2),
+        remind: remTexts(e).map(function (x) { return { id: nid(e.id, x[1]), at: e.starts_at - x[0], title: x[2], body: x[3], kind: 'remind', key: e.key, eventId: e.id, eventTitle: e.title }; }) };
+    });
+    var sig = JSON.stringify(items); if (sig === IN.watchSig) return; IN.watchSig = sig;
+    if (items.length && !raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
+    try { RA.eventWatch({ items: items }).catch(function () {}); } catch (x) {}
+  }
+  function forgetReminders() { IN.watchSig = null; var had = jget('rg.remind'), ids = Object.keys(had).map(function (id) { return { id: +id }; }); if (LN && ids.length) { try { LN.cancel({ notifications: ids }).catch(function () {}); } catch (e) {} } if (RA) { try { RA.eventClear().catch(function () {}); } catch (e) {} } jset('rg.remind', {}); }
   // Plaza ofrecida: una vez por oferta. En pantalla, pregunta; en segundo plano, notificación con «Sí, voy» / «No puedo».
   function offers() {
     var seen = jget('rg.offers'), now = Date.now(), ch = false;
@@ -500,13 +518,14 @@
       if (document.visibilityState === 'visible') {
         if (sn.asked || A.isRec() || !$('#rgSheet').hidden) return;
         sn.asked = 1; ch = true; offerSheet(e);
+        if (RA && RA.eventSeen) { try { RA.eventSeen({ eventId: e.id, offeredAt: e.offered_at || 0 }).catch(function () {}); } catch (x) {} }
       } else if (RA && e.key && !sn.notified) {
         sn.notified = 1; ch = true;
         if (!raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
-        try { RA.eventShow({ item: { id: nid(e.id, 2), at: 0, title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y eres el siguiente. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', kind: 'offer', key: e.key, eventId: e.id, eventTitle: e.title } }).catch(function () {}); } catch (x) {}
+        try { RA.eventShow({ item: { id: nid(e.id, 2), at: 0, title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y te toca a ti. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', kind: 'offer', key: e.key, eventId: e.id, eventTitle: e.title, offeredAt: e.offered_at || 0 } }).catch(function () {}); } catch (x) {}
       } else if (LN && !sn.notified) {
         sn.notified = 1; ch = true;
-        try { LN.schedule({ notifications: [{ id: nid(e.id, 2), title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y eres el siguiente. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', actionTypeId: 'RG_OFFER', extra: { eventId: e.id, title: e.title, kind: 'offer' } }] }).catch(function () {}); } catch (x) {}
+        try { LN.schedule({ notifications: [{ id: nid(e.id, 2), title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y te toca a ti. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', actionTypeId: 'RG_OFFER', extra: { eventId: e.id, title: e.title, kind: 'offer' } }] }).catch(function () {}); } catch (x) {}
       }
     });
     if (ch) jset('rg.offers', seen);
@@ -514,7 +533,7 @@
   function offerSheet(e) {
     Cl.sheet('<span class="rg-plaza"><i></i>Plaza libre</span><h1>Hay una plaza para ti</h1><p class="rg-win-t">' + esc(e.title) + '</p>' +
       '<p class="rg-small">' + fmtWhen(e.starts_at) + (e.meet_name ? ' · Salida: ' + esc(e.meet_name) : '') + '</p>' +
-      '<p>Alguien se ha desapuntado y eres el siguiente de la lista de espera. ¿Vas a venir?</p>' +
+      '<p>Alguien se ha desapuntado y te toca a ti. ¿Vas a venir?</p>' +
       '<button class="btn big primary" id="ofYes" type="button"><svg><use href="#i-check"/></svg>Sí, voy</button><button class="btn big" id="ofNo" type="button">No puedo, que pase al siguiente</button>' +
       '<p class="rg-small">Si no contestas antes del ' + fmtWhen(e.deadline).toLowerCase() + ', la plaza pasa al siguiente y tú vuelves a la lista.</p>', 'win');
     $('#ofYes').addEventListener('click', function (ev) { Cl.busy(ev.currentTarget, function () { return answer(e.id, e.title, true).then(Cl.closeSheet); }); });

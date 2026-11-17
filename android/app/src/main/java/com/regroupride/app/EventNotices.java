@@ -34,12 +34,19 @@ import java.util.Iterator;
  * Cada aviso lleva la clave del evento para esa persona (supabase/07): con ella basta, no hace falta la sesión.
  * Lo programado se guarda en el teléfono para poder reponerlo tras reiniciarlo o actualizar la app.
  *
- * Un aviso: { id, at (ms; 0 = ya), title, body, kind: "remind" | "offer", key, eventId, eventTitle }.
+ * Lista de espera: mientras la app está cerrada nadie avisa al teléfono de que le ha tocado plaza (no hay notificaciones
+ * push), así que el teléfono lo pregunta: cada 10 minutos consulta al servidor, con la clave de cada evento en el que se
+ * está en espera (supabase/08), y si hay plaza ofrecida pone el aviso con «Sí, voy» y «No puedo».
+ *
+ * Un aviso: { id, at (ms; 0 = ya), title, body, kind: "remind" | "offer", key, eventId, eventTitle, offeredAt }.
+ * En espera: { eventId, key, eventTitle, startsAt, nid (id del aviso de plaza), remind: [avisos si se confirma] }.
  * Los ids van de cuatro en cuatro por evento (id % 4: 0 = día antes, 1 = hora antes, 2 = plaza ofrecida).
  */
 final class EventNotices {
     static final String ACTION_SHOW = "com.regroupride.app.EVENT_SHOW";
     static final String ACTION_DO = "com.regroupride.app.EVENT_DO";
+    static final String ACTION_CHECK = "com.regroupride.app.EVENT_CHECK";
+    private static final long CHECK_EVERY = 10 * 60000L;
     private static final String CH = "rg_events";
     private static final String PREFS = "rg_events";
 
@@ -112,6 +119,120 @@ final class EventNotices {
         } catch (Exception ignored) { }
     }
 
+    /* ---------- lista de espera: preguntar si ya me toca ---------- */
+    private static JSONObject watching(Context c) {
+        try {
+            return new JSONObject(prefs(c).getString("watch", "{}"));
+        } catch (Exception e) {
+            return new JSONObject();
+        }
+    }
+
+    private static void armCheck(Context c, long delay) {
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        long at = System.currentTimeMillis() + delay;
+        try {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, broadcast(c, ACTION_CHECK, 1, "check"));
+            prefs(c).edit().putLong("nextCheck", at).apply();
+        } catch (Exception ignored) { }
+    }
+
+    private static void disarmCheck(Context c) {
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        if (am != null) {
+            try {
+                am.cancel(broadcast(c, ACTION_CHECK, 1, "check"));
+            } catch (Exception ignored) { }
+        }
+        prefs(c).edit().remove("nextCheck").apply();
+    }
+
+    /** Eventos en los que estoy en lista de espera (la lista entera cada vez). Vacía = no hay nada que preguntar. */
+    static synchronized void watch(Context c, JSONArray wanted) {
+        JSONObject old = watching(c), next = new JSONObject();
+        try {
+            for (int n = 0; n < wanted.length(); n++) {
+                JSONObject it = wanted.getJSONObject(n);
+                String ev = it.optString("eventId", "");
+                if (ev.isEmpty() || it.optString("key", "").isEmpty()) continue;
+                JSONObject o = old.optJSONObject(ev);
+                if (o != null && o.has("seen")) it.put("seen", o.optLong("seen"));     // esa oferta ya se avisó
+                next.put(ev, it);
+            }
+        } catch (Exception ignored) { }
+        prefs(c).edit().putString("watch", next.toString()).apply();
+        if (next.length() == 0) { disarmCheck(c); return; }
+        long due = prefs(c).getLong("nextCheck", 0), now = System.currentTimeMillis();
+        if (due < now - 60000L || due > now + CHECK_EVERY) armCheck(c, CHECK_EVERY);   // si ya hay una consulta pendiente, no se retrasa
+    }
+
+    /** La app ha enseñado esta oferta en pantalla: no hace falta avisarla otra vez. */
+    static synchronized void seen(Context c, String eventId, long offeredAt) {
+        try {
+            JSONObject w = watching(c), e = w.optJSONObject(eventId);
+            if (e == null) return;
+            e.put("seen", offeredAt);
+            prefs(c).edit().putString("watch", w.toString()).apply();
+        } catch (Exception ignored) { }
+    }
+
+    /** Pregunta al servidor por cada evento en espera. Se ejecuta fuera del hilo principal. */
+    static void check(Context c) {
+        JSONObject w;
+        synchronized (EventNotices.class) {
+            w = watching(c);
+        }
+        long now = System.currentTimeMillis();
+        ArrayList<String> drop = new ArrayList<>();
+        ArrayList<JSONObject> offers = new ArrayList<>();
+        boolean unsupported = false;
+        int asked = 0;
+        for (Iterator<String> k = w.keys(); k.hasNext() && asked < 4; ) {
+            String ev = k.next();
+            JSONObject it = w.optJSONObject(ev);
+            if (it == null) { drop.add(ev); continue; }
+            long starts = it.optLong("startsAt", 0);
+            if (starts > 0 && starts < now) { drop.add(ev); continue; }                // el evento ya ha empezado
+            asked++;
+            try {
+                JSONObject r = call(c, it.optString("key", ""), "status");
+                if (!r.optBoolean("ok", false)) {
+                    if ("accion".equals(r.optString("error"))) { unsupported = true; break; }   // falta supabase/08: no se insiste
+                    drop.add(ev);                                                      // clave caducada o ya no estoy apuntado
+                    continue;
+                }
+                String st = r.optString("status", "");
+                if ("offered".equals(st)) {
+                    long dl = r.optLong("deadline", 0);
+                    String until = dl > 0 ? " Contesta antes de las " + new java.text.SimpleDateFormat("HH:mm 'del' d/M", new java.util.Locale("es", "ES")).format(new java.util.Date(dl)) + "." : "";
+                    String name = it.optString("eventTitle", r.optString("title", "la ruta"));
+                    offers.add(new JSONObject().put("id", it.optInt("nid")).put("at", 0).put("kind", "offer")
+                            .put("title", "Hay una plaza para ti: " + name)
+                            .put("body", "Alguien se ha desapuntado y te toca a ti. ¿Vienes?" + until)
+                            .put("key", it.optString("key", "")).put("eventId", ev).put("eventTitle", name)
+                            .put("offeredAt", r.optLong("offered_at", 0)));
+                } else if (!"waiting".equals(st)) {
+                    drop.add(ev);                                                      // ya voy o ya no voy
+                }
+            } catch (Exception ignored) {
+                break;      // sin conexión: no se insiste con los demás (el sistema da pocos segundos); se pregunta en la siguiente
+            }
+        }
+        synchronized (EventNotices.class) {
+            if (unsupported) {
+                prefs(c).edit().remove("watch").apply();
+                disarmCheck(c);
+                return;
+            }
+            JSONObject cur = watching(c);
+            for (String ev : drop) cur.remove(ev);
+            prefs(c).edit().putString("watch", cur.toString()).apply();
+            for (JSONObject o : offers) put(c, o);
+            if (cur.length() > 0) armCheck(c, CHECK_EVERY); else disarmCheck(c);
+        }
+    }
+
     /** Deja programados exactamente estos recordatorios: quita los que sobran y pone los nuevos o cambiados. */
     static synchronized void sync(Context c, JSONArray wanted) {
         JSONObject all = items(c), next = new JSONObject();
@@ -148,6 +269,15 @@ final class EventNotices {
     static synchronized void put(Context c, JSONObject it) {
         try {
             int id = it.getInt("id");
+            if ("offer".equals(it.optString("kind"))) {          // una misma oferta solo suena una vez, la avise la app o el teléfono
+                long off = it.optLong("offeredAt", 0);
+                JSONObject w = watching(c), e = w.optJSONObject(it.optString("eventId", ""));
+                if (off > 0 && e != null) {
+                    if (e.optLong("seen", 0) == off) return;
+                    e.put("seen", off);
+                    prefs(c).edit().putString("watch", w.toString()).apply();
+                }
+            }
             JSONObject all = items(c);
             all.put(String.valueOf(id), it);
             save(c, all);
@@ -163,11 +293,13 @@ final class EventNotices {
                 disarm(c, Integer.parseInt(k.next()));
             } catch (Exception ignored) { }
         }
-        prefs(c).edit().remove("items").remove("pending").apply();
+        disarmCheck(c);
+        prefs(c).edit().remove("items").remove("pending").remove("watch").apply();
     }
 
     /** Tras reiniciar el teléfono o actualizar la app, el sistema olvida las alarmas: se reponen. */
     static synchronized void rearm(Context c) {
+        if (watching(c).length() > 0) armCheck(c, 60000L);
         JSONObject all = items(c);
         long now = System.currentTimeMillis();
         for (Iterator<String> k = all.keys(); k.hasNext(); ) {
@@ -338,6 +470,23 @@ final class EventNotices {
                 JSONObject all = items(c);
                 all.remove(String.valueOf(id));
                 save(c, all);
+            }
+        }
+        if (sent && ("no".equals(act) || "leave".equals(act) || "going".equals(status))) {
+            // Contestado: ya no se está en espera. Si se ha confirmado la plaza, quedan puestos sus dos recordatorios.
+            synchronized (EventNotices.class) {
+                JSONObject w = watching(c), e = w.optJSONObject(eventId);
+                if (e != null) {
+                    w.remove(eventId);
+                    prefs(c).edit().putString("watch", w.toString()).apply();
+                    if (w.length() == 0) disarmCheck(c);
+                    JSONArray rem = "going".equals(status) ? e.optJSONArray("remind") : null;
+                    long now = System.currentTimeMillis();
+                    for (int n = 0; rem != null && n < rem.length(); n++) {
+                        JSONObject r = rem.optJSONObject(n);
+                        if (r != null && r.optLong("at", 0) > now + 30000L) put(c, r);
+                    }
+                }
             }
         }
         result(c, id, sent ? name : head, text, sent);

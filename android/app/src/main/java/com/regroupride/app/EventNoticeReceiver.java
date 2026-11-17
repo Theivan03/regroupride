@@ -18,6 +18,20 @@ public class EventNoticeReceiver extends BroadcastReceiver {
             EventNotices.rearm(c);
             return;
         }
+        if (EventNotices.ACTION_CHECK.equals(a)) {        // ¿me han ofrecido la plaza? Se pregunta en otro hilo
+            final PendingResult waiting = goAsync();
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        EventNotices.check(c);
+                    } finally {
+                        waiting.finish();
+                    }
+                }
+            }).start();
+            return;
+        }
         final int id = intent.getIntExtra("id", 0);
         if (id == 0) return;
         if (EventNotices.ACTION_SHOW.equals(a)) {

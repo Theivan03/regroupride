@@ -634,6 +634,22 @@ public class RideAlertsPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Eventos en los que se está en lista de espera: el teléfono pregunta cada 10 minutos si ya hay plaza. */
+    @PluginMethod
+    public void eventWatch(PluginCall call) {
+        JSArray items = call.getArray("items");
+        EventNotices.watch(getContext(), items == null ? new JSArray() : items);
+        call.resolve();
+    }
+
+    /** La app ya ha enseñado esa plaza ofrecida en pantalla. */
+    @PluginMethod
+    public void eventSeen(PluginCall call) {
+        Double off = call.getDouble("offeredAt", 0.0);
+        EventNotices.seen(getContext(), call.getString("eventId", ""), off == null ? 0L : off.longValue());
+        call.resolve();
+    }
+
     @PluginMethod
     public void eventClear(PluginCall call) {
         EventNotices.clear(getContext());
