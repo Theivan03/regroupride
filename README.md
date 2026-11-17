@@ -168,3 +168,14 @@ Se aplica el documento **«ReGroupRide · Pantallas y marca»** (78 láminas, 71
 - **Android.** Los tres botones de aviso de la notificación llevan los colores de la guía (rojo, ámbar y neutro), con versión de noche.
 
 Para comparar con las láminas: `scripts/pantallas.py` y `scripts/otras.sh` sacan todas las pantallas en día y en noche.
+
+## 0.16 · cada cuenta, lo suyo; «Iniciar ruta» y «Trayecto»; grupo sin ruta
+
+- **Cerrar sesión** sube lo pendiente, vacía el móvil y abre la pantalla de **Entrar / Crear cuenta**. Si falta algo por subir (sin conexión), avisa antes.
+- **Cada cuenta, lo suyo.** El móvil solo guarda la copia de la cuenta abierta. Al entrar con otra cuenta no queda nada de la anterior y se baja lo de la nueva (rutas, trazados, planificadas, garaje, logros, aparcamiento, foto de perfil y **fotos de las rutas**). Desaparece el aviso de «las rutas de este móvil son de otra cuenta». No hace falta tocar el servidor: los extras van en `user_backup.garage` y las fotos en el almacén `rides`, en `<cuenta>/photos/<ruta>/`.
+- **Nombre.** El del mapa y el perfil es el de la cuenta; cambiarlo en Perfil lo cambia en la cuenta.
+- **Teléfono obligatorio** al crear la cuenta; se guarda solo.
+- **Mapa en reposo:** «Iniciar ruta» y **«Trayecto»** (un desplazamiento corto: tiempo, km, velocidad máxima y media e inclinación máxima; suma los km a la moto, no guarda el recorrido ni las curvas, y va aparte en Rutas → «Trayectos»). El botón del inclinómetro solo sale en marcha.
+- **Rodar en grupo sin ruta:** se puede crear el grupo sin tener ninguna ruta cargada; cada uno ve a los demás y a qué distancia están.
+- **Rutas:** los botones de «Planificadas» ya no se salen de la pantalla, hay aire debajo y se quita el filtro «Con inclinación».
+- **Ubicación al abrir:** el marcador sale en cuanto existe el mapa (antes esperaba a que cargaran las teselas), con la última posición conocida atenuada, luego la de red y luego el GPS.

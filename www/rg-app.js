@@ -33,12 +33,14 @@
   }
 
   var nav = { active: false, planId: null, tr: null, rejoin: null, rejoinAt: 0, rejoinBusy: false, last: null, notified: false, toStart: false, asked: false };
+  // El cartel mide 60 px, pero una indicación muy larga lo hace crecer: los botones del mapa bajan con él.
+  if (window.ResizeObserver && $('#navBanner')) new ResizeObserver(function () { var h = $('#navBanner').offsetHeight; if (h) document.documentElement.style.setProperty('--nav-h', h + 'px'); }).observe($('#navBanner'));
   function plan() { return A.activePlan(); }
   function sync() {
-    var p = plan(), on = !!(p && A.isRec() && p.coords && p.coords.length > 1);
+    var p = plan(), on = !!(p && A.isRec() && !A.isTrip() && p.coords && p.coords.length > 1);
     var info = $('#followInfo'), ride = $('#btnRide');
     if (info) info.textContent = p ? (fmtKm((p.dist || 0) * 1000) + (p.dur ? ' · ' + fmtMin(p.dur) : '')) : '';
-    if (ride) { ride.textContent = p ? 'Iniciar ruta' : 'Grabar ruta'; ride.classList.toggle('rg-go', !!p); }
+    if (ride) { ride.textContent = 'Iniciar ruta'; ride.classList.add('rg-go'); }
     if (on && (!nav.active || nav.planId !== p.id)) {
       nav.active = true; nav.planId = p.id; nav.tr = L.Tracker(p.coords, L.navSteps(p)); nav.rejoin = null; nav.rejoinAt = 0; nav.last = null; nav.notified = false; nav.toStart = false; nav.asked = false;
       askNotif();
@@ -470,32 +472,34 @@
   function busy(btn, f) { var old = btn.innerHTML; btn.disabled = true; btn.textContent = 'Un momento…'; return Promise.resolve().then(f).catch(function (e) { A.toast(msg(e), 'bad'); }).then(function () { btn.disabled = false; btn.innerHTML = old; }); }
   var LOGO = '<div class="rg-logo"><img class="rg-sym" src="simbolo.svg" alt=""><b>ReGroup<i>Ride</i></b></div>';
 
-  function openAuth(first) {
-    var mode = first ? 'signup' : 'login';
+  function openAuth(first, mode0) {
+    var mode = mode0 || (first ? 'signup' : 'login');
     function draw() {
       var s = sheet(LOGO + '<p class="muted rg-lead">Rutas en grupo, sin perder a nadie.</p>' +
         '<div class="seg rg-wide" id="rgMode"><button type="button" data-m="login" aria-pressed="' + (mode === 'login') + '">Entrar</button><button type="button" data-m="signup" aria-pressed="' + (mode === 'signup') + '">Crear cuenta</button></div>' +
         '<form id="rgAuth" class="rg-form" autocomplete="on">' +
         (mode === 'signup' ? '<label>Tu nombre<input id="rgName" required maxlength="60" autocomplete="name" placeholder="Como te conoce la gente"></label>' +
+          '<label>Teléfono<input id="rgTel" type="tel" inputmode="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" placeholder="600 000 000" title="Tu número, con 9 cifras o más"></label>' +
           '<label>¿Cómo vas en moto?<select id="rgLevel">' + levelOptions(3) + '</select></label>' : '') +
         '<label>Correo<input id="rgEmail" type="email" required autocomplete="email" inputmode="email"></label>' +
         '<label>Contraseña<input id="rgPass" type="password" required minlength="6" autocomplete="' + (mode === 'login' ? 'current-password' : 'new-password') + '"></label>' +
         '<button class="btn big primary" type="submit">' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</button></form>' +
-        (mode === 'login' ? '<button class="link rg-center" id="rgForgot" type="button">He olvidado la contraseña</button>' : '<p class="muted rg-small">Necesitas tener al menos 16 años.</p>') +
+        (mode === 'login' ? '<button class="link rg-center" id="rgForgot" type="button">He olvidado la contraseña</button>' : '<p class="muted rg-small">El teléfono solo lo ven los administradores de tus rutas y quien pida ayuda. Necesitas tener al menos 16 años.</p>') +
         '<button class="btn rg-skip" id="rgSkip" type="button">' + (first ? 'Ahora no' : 'Cerrar') + '</button>' +
-        (first ? '<p class="muted rg-small">Puedes usar el mapa, grabar rutas y la inclinación sin cuenta. La cuenta hará falta para las rutas en grupo.</p>' : ''));
+        (first ? '<p class="muted rg-small">Sin cuenta puedes usar el mapa y grabar rutas, pero se quedan solo en este móvil. Con cuenta se guardan en ella y puedes rodar en grupo.</p>' : ''));
       s.querySelectorAll('#rgMode button').forEach(function (b) { b.addEventListener('click', function () { mode = b.dataset.m; draw(); }); });
-      $('#rgSkip').addEventListener('click', closeSheet);
+      $('#rgSkip').addEventListener('click', function () { try { localStorage.removeItem('rg.wall'); } catch (e) {} closeSheet(); });
       $('#rgAuth').addEventListener('submit', function (ev) {
         ev.preventDefault();
-        var email = $('#rgEmail').value.trim(), pass = $('#rgPass').value, name = mode === 'signup' ? $('#rgName').value.trim() : '', lvl = mode === 'signup' ? +$('#rgLevel').value : 0;
+        var email = $('#rgEmail').value.trim(), pass = $('#rgPass').value, name = mode === 'signup' ? $('#rgName').value.trim() : '', lvl = mode === 'signup' ? +$('#rgLevel').value : 0, tel = mode === 'signup' ? $('#rgTel').value.trim() : '';
         busy(ev.target.querySelector('button[type=submit]'), function () {
           if (!sb) throw new Error('No se ha podido cargar la conexión con el servidor.');
-          var job = mode === 'login' ? sb.auth.signInWithPassword({ email: email, password: pass }) : sb.auth.signUp({ email: email, password: pass, options: { data: { name: name } } });
+          var job = mode === 'login' ? sb.auth.signInWithPassword({ email: email, password: pass }) : sb.auth.signUp({ email: email, password: pass, options: { data: { name: name, phone: tel } } });
           return job.then(function (r) {
             if (r.error) throw r.error;
             if (!r.data.session) { A.toast('Cuenta creada. Confirma el correo que te hemos enviado y luego entra.', 'ok'); mode = 'login'; draw(); return; }
             var set = lvl ? sb.from('profiles').update({ level: lvl }).eq('id', r.data.session.user.id).then(function () {}, function () {}) : Promise.resolve();
+            try { localStorage.removeItem('rg.wall'); } catch (e) {}
             return set.then(refresh).then(function () { closeSheet(); A.toast(mode === 'login' ? 'Sesión iniciada.' : '¡Bienvenido, ' + (name || 'motero') + '!', 'ok'); });
           });
         });
@@ -512,7 +516,7 @@
     return sb.auth.getSession().then(function (r) {
       user = (r.data && r.data.session && r.data.session.user) || null; profile = null;
       if (!user) return;
-      return sb.from('profiles').select('*').eq('id', user.id).maybeSingle().then(function (p) { profile = p.data || null; }).then(loadPhone);
+      return sb.from('profiles').select('*').eq('id', user.id).maybeSingle().then(function (p) { profile = p.data || null; var n = (profile && profile.name) || (user.user_metadata && user.user_metadata.name) || ''; if (n && A.setProfileName) A.setProfileName(n); }).then(loadPhone);
     }).catch(function () {}).then(renderAccount).then(function () { if (user) setTimeout(sendStats, 4000); });
   }
   function levelOptions(cur) { var o = ''; for (var i = 5; i >= 1; i--) o += '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + esc(L.LEVELS[i] + ' — ' + L.LEVEL_HINT[i]) + '</option>'; return o; }
@@ -547,21 +551,50 @@
   var ridePhone = null;   // null = aún no se sabe · '' = sin teléfono
   function loadPhone() {
     if (!user) { ridePhone = null; return Promise.resolve(); }
-    return sb.from('profile_private').select('*').eq('id', user.id).maybeSingle().then(function (r) { var d = r.data || {}; ridePhone = 'ride_phone' in d ? (d.ride_phone || '') : null; }, function () { ridePhone = null; });
+    return sb.from('profile_private').select('*').eq('id', user.id).maybeSingle().then(function (r) {
+      var d = r.data || {}; ridePhone = 'ride_phone' in d ? (d.ride_phone || '') : null;
+      // El teléfono que se dio al crear la cuenta se guarda solo, la primera vez que hay sesión.
+      var tel = user && user.user_metadata && user.user_metadata.phone;
+      if (ridePhone === '' && tel) return sb.from('profile_private').update({ ride_phone: tel }).eq('id', user.id).then(function (b) { if (!b.error) ridePhone = tel; }, function () {});
+    }, function () { ridePhone = null; });
+  }
+  // Cambiar el nombre en Perfil cambia el de la cuenta.
+  function saveName(n) {
+    n = (n || '').trim(); if (!sb || !user || !n || (profile && profile.name === n)) return;
+    sb.from('profiles').update({ name: n }).eq('id', user.id).then(function (r) { if (!r.error) { if (profile) profile.name = n; renderAccount(); } }, function () {});
+  }
+  // Cerrar sesión: se sube lo pendiente, se vacía el móvil (cada cuenta, lo suyo) y se vuelve a la pantalla de entrada.
+  function signOut(force, btn) {
+    if (A.isRec()) { A.toast('Para la ruta antes de cerrar sesión.', 'warn'); return; }
+    var Sy = window.RGSync;
+    var job = function () {
+      return (force || !Sy ? Promise.resolve(true) : Sy.flush()).then(function (ok) {
+        if (!ok) {
+          sheet('<h1>No se ha podido subir todo</h1><p>Falta algo por guardar en tu cuenta' + (navigator.onLine === false ? ' porque no hay conexión' : '') + '. Si cierras sesión ahora, lo que no esté subido se borra de este móvil.</p>' +
+            '<button class="btn big primary" id="soRetry" type="button">Reintentar</button><button class="btn big danger" id="soForce" type="button">Cerrar sesión y perderlo</button><button class="btn rg-skip" id="soNo" type="button">Cancelar</button>', 'win');
+          $('#soRetry').addEventListener('click', function (ev) { signOut(false, ev.currentTarget); });
+          $('#soForce').addEventListener('click', function (ev) { signOut(true, ev.currentTarget); });
+          $('#soNo').addEventListener('click', closeSheet);
+          return;
+        }
+        return sb.auth.signOut().then(function () {}, function () {}).then(function () { return Sy ? Sy.wipeLocal() : null; }).then(function () { try { localStorage.setItem('rg.wall', '1'); } catch (e) {} location.reload(); });
+      });
+    };
+    if (btn) busy(btn, job); else job();
   }
   function openPhone() {
     if (!user) { openAuth(false); return; }
     sb.from('profile_private').select('*').eq('id', user.id).maybeSingle().then(function (r) {
       var priv = r.data || {}, hasPhone = 'ride_phone' in priv;
       sheet('<div class="head"><h1>Teléfono para las rutas</h1><button class="btn small icon" id="rdX" type="button"><svg><use href="#i-close"/></svg></button></div><form class="rg-form" id="rdForm">' +
-        '<label>Teléfono (opcional)<input id="rdPhone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" value="' + esc(priv.ride_phone || '') + '" placeholder="600 000 000"' + (hasPhone ? '' : ' disabled') + '></label>' +
-        '<p class="muted rg-small" style="text-align:left">Solo se usa cuando eres administrador de una ruta: lo ven los demás administradores y quien pida ayuda, para poder llamarte. Si lo dejas vacío no pasa nada.</p>' +
+        '<label>Teléfono<input id="rdPhone" type="tel" inputmode="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" value="' + esc(priv.ride_phone || '') + '" placeholder="600 000 000"' + (hasPhone ? '' : ' disabled') + '></label>' +
+        '<p class="muted rg-small" style="text-align:left">Lo ven los administradores de tus rutas y quien pida ayuda, para poder llamarte. Nadie más.</p>' +
         '<button class="btn big primary" type="submit"' + (hasPhone ? '' : ' disabled') + '>Guardar</button></form>');
       $('#rdX').addEventListener('click', closeSheet);
       $('#rdForm').addEventListener('submit', function (ev) {
         ev.preventDefault(); var ph = $('#rdPhone').value.trim(); if (!hasPhone) return;
         busy(ev.target.querySelector('button[type=submit]'), function () {
-          return sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id).then(function (b) { if (b.error) throw b.error; ridePhone = ph; renderAccount(); closeSheet(); A.toast(ph ? 'Teléfono guardado.' : 'Teléfono quitado.', 'ok'); });
+          return sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id).then(function (b) { if (b.error) throw b.error; ridePhone = ph; renderAccount(); closeSheet(); A.toast('Teléfono guardado.', 'ok'); });
         });
       });
     });
@@ -579,10 +612,10 @@
     if (user) {
       var name = (profile && profile.name) || (user.user_metadata && user.user_metadata.name) || 'Tu cuenta';
       box.innerHTML = '<div class="rg-acc"><span class="rg-ava">' + esc(name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(name) + '</b><span class="muted">' + esc(user.email || '') + '</span></div></div>' +
-        '<button class="rg-level" id="rgPhone" type="button"><span>' + (ridePhone ? esc(ridePhone) : 'Teléfono para las rutas') + '</span><small>' + (ridePhone ? 'Teléfono para las rutas (opcional) · tocar para cambiarlo' : 'Opcional · para que puedan llamarte si administras una ruta') + '</small></button>' +
+        '<button class="rg-level" id="rgPhone" type="button"><span>' + (ridePhone ? esc(ridePhone) : 'Teléfono para las rutas') + '</span><small>' + (ridePhone ? 'Teléfono para las rutas · tocar para cambiarlo' : 'Falta tu teléfono · para que puedan llamarte en una ruta') + '</small></button>' +
         '<div class="rg-row"><button class="btn small" id="rgFeedback" type="button"><svg><use href="#i-info"/></svg>Sugerencias y fallos</button><button class="btn small" id="rgOut" type="button"><svg><use href="#i-exit"/></svg>Cerrar sesión</button></div>';
       $('#rgPhone').addEventListener('click', openPhone);
-      $('#rgOut').addEventListener('click', function () { sb.auth.signOut().then(function () { user = null; profile = null; renderAccount(); A.toast('Sesión cerrada.', 'ok'); }); });
+      $('#rgOut').addEventListener('click', function (ev) { signOut(false, ev.currentTarget); });
     } else {
       box.innerHTML = '<div class="rg-acc"><span class="rg-ava">?</span><div><b>Sin cuenta</b><span class="muted">Entra para las rutas en grupo y para enviarnos sugerencias.</span></div></div>' +
         '<div class="rg-row"><button class="btn small primary" id="rgLogin" type="button">Entrar o crear cuenta</button><button class="btn small" id="rgFeedback" type="button">Sugerencias y fallos</button></div>';
@@ -772,10 +805,12 @@
   renderAccount();
   refresh().then(function () {
     var seen = false; try { seen = localStorage.getItem('rg.welcomed') === '1'; localStorage.setItem('rg.welcomed', '1'); } catch (e) {}
-    if (!user && !seen && sb) openAuth(true);
+    var wall = false; try { wall = !!localStorage.getItem('rg.wall'); } catch (e) {}
+    if (user) { try { localStorage.removeItem('rg.wall'); } catch (e) {} }
+    else if (sb && (!seen || wall)) openAuth(true, wall ? 'login' : 'signup');      // primera vez, o se acaba de cerrar sesión
   });
   if (sb) sb.auth.onAuthStateChange(function (ev, session) { var had = !!user; user = (session && session.user) || null; if (had !== !!user) renderAccount(); });
   sync();
-  window.RGCloud = { sb: sb, cfg: { url: SB_URL, key: SB_KEY }, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profile: function () { return profile; }, openRider: openRider, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
+  window.RGCloud = { sb: sb, cfg: { url: SB_URL, key: SB_KEY }, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profile: function () { return profile; }, openRider: openRider, saveName: saveName, signOut: signOut, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
     onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, busy: busy, msg: msg, esc: esc };
 })();

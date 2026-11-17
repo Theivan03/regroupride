@@ -60,6 +60,7 @@ var DB = (function () {
     // trazados
     getTrack: function (rideId) { return reqResult('tracks', 'readonly', function (s) { return s.get(rideId); }).then(function (t) { return t ? t.points : []; }); },
     putTrack: function (rideId, points) { return tx('tracks', 'readwrite', function (s) { s.put({ rideId: rideId, points: points }); }); },
+    delTrack: function (rideId) { return tx('tracks', 'readwrite', function (s) { s.delete(rideId); }); },
     // fotos
     photosOf: function (rideId) { return reqResult('photos', 'readonly', function (s) { return s.index('rideId').getAll(rideId); }).then(function (a) { return a || []; }); },
     putPhoto: function (p) { return tx('photos', 'readwrite', function (s) { s.put(p); }); },

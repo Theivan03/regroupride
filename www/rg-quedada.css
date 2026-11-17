@@ -257,7 +257,9 @@ h2{font:600 17px/22px var(--font-titulo);letter-spacing:0}
 .nav-banner.off{background:var(--aviso);color:var(--sobre-aviso)}
 .nav-banner.off .nav-ico{background:var(--sobre-aviso);color:var(--aviso)}
 .nav-banner.ok .nav-ico{background:var(--accion);color:var(--sobre-accion)}
-.nav-banner:not([hidden])~.map-ctrls{top:calc(max(12px,env(safe-area-inset-top,0px)) + 52px + 60px + 12px)}
+.nav-banner:not([hidden])~.map-ctrls{top:calc(max(12px,env(safe-area-inset-top,0px)) + 52px + var(--nav-h,60px) + 12px)}
+/* Una indicación muy larga puede ocupar tres líneas: el cartel crece y los botones bajan con él (--nav-h lo pone rg-app.js) */
+.nav-main span{-webkit-line-clamp:3}
 /* abajo: tarjeta de la acción, marcador, «Avisar» y «Parar» */
 .map-bottom{bottom:calc(76px + env(safe-area-inset-bottom,0px));padding:0 max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px));gap:var(--e-3)}
 .map-bottom .card{padding:var(--e-4);border-radius:var(--r-tarjeta);background:var(--superficie)}
@@ -274,8 +276,10 @@ h2{font:600 17px/22px var(--font-titulo);letter-spacing:0}
 #idleCard .cifra,.map-bottom .totals .cifra{color:var(--marca);font-size:36px;line-height:36px}
 #idleCard .unit{color:var(--texto);font:600 13px/17px var(--font-texto)}
 .idle-actions{gap:var(--e-2)}
-.idle-actions #btnLeanFull{width:var(--toque-ruta);min-height:var(--toque-ruta);border-radius:var(--r-boton);background:var(--marca)!important;color:var(--sobre-marca)!important}
-.idle-actions #btnLeanFull svg{color:inherit!important}
+.idle-actions{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
+.idle-actions .btn{min-width:0;padding:0 var(--e-3)}
+.idle-actions #btnTrip{background:var(--marca-suave);color:var(--texto)}
+.idle-actions #btnTrip svg{color:var(--marca)}
 /* mi posición */
 .pos-marker .arrow{fill:var(--marca);stroke:var(--ruta-filete)}
 .pos-marker .halo{fill:var(--marca);opacity:.18}
@@ -647,3 +651,21 @@ a.btn.rg-av{text-decoration:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .plan .thumb{background:#1E2226}}
 :root[data-theme="dark"] .plan .thumb{background:#1E2226}
 .lean-full .figures .fig .val .unit{font:600 13px/17px var(--font-texto);margin-left:3px}
+
+/* ---- 0.16 ---- */
+/* Rutas planificadas: los dos botones caben siempre en la pantalla (el texto baja de línea) y dejan aire debajo */
+.actions.rg-plantop{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--e-2);margin:0 0 var(--e-4)}
+.actions.rg-plantop .btn{width:100%;min-width:0;max-width:100%;white-space:normal;text-align:left;justify-content:flex-start;line-height:22px;padding:var(--e-2) var(--e-4)}
+.actions.rg-plantop .btn svg{flex:none}
+#ridesList>.btn,#ridesList .actions .btn{max-width:100%;min-width:0;white-space:normal}
+/* Posición aproximada (la última conocida) mientras llega el GPS */
+.pos-marker.approx{opacity:.55}
+/* Resumen de un trayecto */
+.rg-trip{display:grid;grid-template-columns:1fr 1fr;gap:var(--e-2);text-align:left}
+.rg-trip .fig{padding:var(--e-3);border-radius:var(--r-m);background:var(--superficie-2)}
+.rg-trip .fig .val{font:600 28px/32px var(--font-titulo)}
+.rg-trip .fig .val .unit{font:600 13px/17px var(--font-texto);margin-left:3px}
+.rg-trip .fig.l .val{color:var(--izquierda)}
+.rg-trip .fig.r .val{color:var(--derecha)}
+.btn.rg-skip.danger{color:var(--error-texto)}
+.rg-sheet .btn.rg-skip.danger,.rg-sheet.rg-win .btn.rg-skip.danger{color:var(--error-texto)}

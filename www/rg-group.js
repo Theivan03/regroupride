@@ -273,7 +273,7 @@
   // Entrar en un grupo (por código, al iniciar la ruta de un evento o al decir «sí» a una llamada) y cargar su ruta.
   function enter(d, opts) {
     opts = opts || {};
-    G.s = { id: d.id, code: d.code, name: d.name, owner: !!d.owner, eventId: d.event_id || null }; G.rows = []; G.rank = null; G.admin = !!d.owner; save(); sync();
+    G.s = { id: d.id, code: d.code, name: d.name, owner: !!d.owner, eventId: d.event_id || null, free: !(d.route && d.route.coords && d.route.coords.length > 1) }; G.rows = []; G.rank = null; G.admin = !!d.owner; save(); sync();
     var rt = d.route, job = Promise.resolve();
     if (rt && rt.coords && rt.coords.length > 1) job = A.usePlan({ id: parseInt(d.id.replace(/-/g, '').slice(0, 12), 16), name: rt.name || d.name, wps: rt.wps || [], pois: rt.pois || [], coords: rt.coords, dist: rt.dist || 0, dur: rt.dur || 0, routed: true, steps: rt.steps || [], created: Date.now(), groupId: d.id });
     return job.then(function () { G.busy = false; var c = call(); if (opts.start && !A.isRec()) A.startRide(); return c; });
@@ -341,10 +341,11 @@
     var r = G.rank, list = r ? r.list : [], waiting = G.rows.filter(function (x) { return x.lat == null; });
     Cl.sheet(head('Grupo') + '<p class="muted">' + esc(G.s.name) + '</p>' +
       '<div class="grp-code"><div class="grp-qr">' + qrSvg('regroupride:' + G.s.code) + '</div><div><span class="label">Código del grupo</span><b>' + esc(G.s.code) + '</b><button class="btn small primary" id="grShare" type="button"><svg><use href="#i-share"/></svg>Compartir</button></div></div>' +
-      '<span class="label">' + (list.length ? 'En ruta, de delante a atrás' : 'Nadie en marcha todavía') + '</span><div class="rg-list">' + list.map(function (x) {
+      '<span class="label">' + (list.length ? (G.s.free ? 'En marcha' : 'En ruta, de delante a atrás') : 'Nadie en marcha todavía') + '</span><div class="rg-list">' + list.map(function (x) {
         var al = alertOf(x.user_id);
         var tag = al ? '<span class="mstatus due"><svg><use href="#i-warn"/></svg>' + esc(KIND[al].t) + '</span>' : x.stale ? '<span class="mstatus due"><svg><use href="#i-sens"/></svg>sin señal ' + Math.round(x.age / 60000) + ' min</span>' : (x.off ? '<span class="mstatus soon"><svg><use href="#i-warn"/></svg>fuera de ruta</span>' : (x.behind ? '<span class="mstatus soon"><svg><use href="#i-warn"/></svg>se queda atrás</span>' : ''));
-        var gap = x.me ? 'tú' : (x.gap == null ? '' : (Math.abs(x.gap) < 150 ? 'contigo' : km(x.gap) + (x.gap > 0 ? ' por delante' : ' por detrás')));
+        var fx = A.lastFix && A.lastFix(), far = (x.gap == null || G.s.free) && fx && x.lat != null ? window.Geo.dist(fx.lat, fx.lon, x.lat, x.lon) : null;
+        var gap = x.me ? 'tú' : (far != null ? (far < 150 ? 'contigo' : 'a ' + km(far) + ' de ti') : (x.gap == null ? '' : (Math.abs(x.gap) < 150 ? 'contigo' : km(x.gap) + (x.gap > 0 ? ' por delante' : ' por detrás'))));
         var rw = row(x.user_id), adm = rw && rw.admin ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '';
         return '<div class="club-person"><span class="rg-ava' + (al || x.stale || x.off ? ' bad' : (x.behind ? ' warn' : '')) + '">' + esc(x.name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + adm + ' ' + tag + '</b><span class="muted">' + gap + '</span></div></div>';
       }).join('') + (waiting.length ? '<p class="muted">Sin iniciar la ruta: ' + waiting.map(function (x) { return esc(x.name); }).join(', ') + '.</p>' : '') + '</div>' +
@@ -367,7 +368,8 @@
     Cl.sheet(head('Rodar en grupo') + '<p class="muted">Todos los del grupo se ven en el mapa durante la ruta, y se sabe quién se ha quedado atrás o se ha salido.</p>' +
       '<div class="club-card"><b>Unirme a un grupo</b><p class="muted">Escribe el código que te pasen o escanea su QR. La ruta se carga sola.</p><div class="plan-link"><input type="text" id="grCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="grJoin" type="button">Unirme</button></div>' +
       (P.CapacitorBarcodeScanner ? '<button class="btn" id="grScan" type="button"><svg><use href="#i-qr"/></svg>Escanear QR</button>' : '') + '</div>' +
-      '<div class="club-card"><b>Crear un grupo</b>' + (p ? '<p class="muted">Para la ruta «' + esc(p.name) + '». Te dará un código y un QR para pasar a los demás.</p><button class="btn big primary" id="grCreate" type="button">Crear grupo para esta ruta</button>' : '<p class="muted">Primero elige la ruta: créala o cárgala y déjala seleccionada en el mapa. Luego vuelve aquí.</p>') + '</div>');
+      '<div class="club-card"><b>Crear un grupo</b>' + (p ? '<p class="muted">Para la ruta «' + esc(p.name) + '». Te dará un código y un QR para pasar a los demás.</p><button class="btn big primary" id="grCreate" type="button">Crear grupo para esta ruta</button><button class="btn rg-skip" id="grFree" type="button">Crear grupo sin ruta</button>'
+        : '<p class="muted">Sin ruta marcada: os veis todos en el mapa y cada uno sabe por dónde va. Te dará un código y un QR para pasar a los demás.</p><button class="btn big primary" id="grFree" type="button">Crear grupo</button>') + '</div>');
     $('#grX').addEventListener('click', close);
     var join = function (code, btn) {
       code = String(code || '').replace(/^regroupride:/i, '').trim(); if (code.length < 4) { A.toast('Escribe el código.', 'warn'); return; }
@@ -381,11 +383,14 @@
       var btn = ev.currentTarget;
       P.CapacitorBarcodeScanner.scanBarcode({ hint: 0, scanInstructions: 'Apunta al QR del grupo', scanButton: false, scanText: ' ', cameraDirection: 1, scanOrientation: 3 }).then(function (r) { if (r && r.ScanResult) join(r.ScanResult, btn); }, function () { A.toast('No se ha podido leer el QR. Escribe el código.', 'warn'); });
     });
-    if ($('#grCreate')) $('#grCreate').addEventListener('click', function (ev) {
-      Cl.busy(ev.currentTarget, function () { return sb.rpc('ride_create', { p_name: p.name, p_route: { name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } }).then(function (r) {
-        if (r.error) throw r.error; var d = r.data; G.s = { id: d.id, code: d.code, name: d.name, owner: true }; save(); sync(); renderSheet(); call(); A.toast('Grupo creado. Pasa el código o el QR.', 'ok');
+    var create = function (ev, free) {
+      var nm = free ? 'Salida de ' + (Cl.profileName() || 'grupo') : p.name;
+      Cl.busy(ev.currentTarget, function () { return sb.rpc('ride_create', { p_name: nm, p_route: free ? null : { name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } }).then(function (r) {
+        if (r.error) throw r.error; var d = r.data; G.s = { id: d.id, code: d.code, name: d.name, owner: true, free: !!free }; save(); sync(); renderSheet(); call(); A.toast('Grupo creado. Pasa el código o el QR.', 'ok');
       }); });
-    });
+    };
+    if ($('#grCreate')) $('#grCreate').addEventListener('click', function (ev) { create(ev, false); });
+    if ($('#grFree')) $('#grFree').addEventListener('click', function (ev) { create(ev, true); });
   }
 
   var btn = $('#btnGroup'); if (btn) btn.addEventListener('click', open);

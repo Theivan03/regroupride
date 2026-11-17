@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.15.0';
+  var APP_VERSION = '0.16.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -202,11 +202,11 @@
     if (!HAS_MAP || map) return;
     loadStyle().then(function (st) {
       var c0 = lastFix || quickFix || savedFix;
-      map = new maplibregl.Map({ container: 'map', style: st, center: c0 ? [c0.lon, c0.lat] : [-3.7, 40.4], zoom: lastFix ? 15 : (c0 ? 13 : 5), attributionControl: false, pitchWithRotate: false, touchPitch: false });
+      map = new maplibregl.Map({ container: 'map', style: st, center: c0 ? [c0.lon, c0.lat] : [-3.7, 40.4], zoom: c0 ? (c0.acc && c0.acc > 300 ? 12 : 15) : 5, attributionControl: false, pitchWithRotate: false, touchPitch: false });
       map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-left');
     // el crédito del mapa sale recogido (una «i» que se abre al tocarla) y fuera de la barra de pestañas
     function tidyAttrib() { var cr = document.querySelector('#map .maplibregl-ctrl-attrib'); if (cr) { cr.classList.remove('maplibregl-compact-show'); cr.removeAttribute('open'); } }
-      map.on('load', function () { mapReady = true; tidyAttrib(); map.once('idle', tidyAttrib); addTrackLayers(map, 'live'); addExtraLayers(map); drawLiveTrack(true); refreshMine(); drawPlan(); drawParking(); if (lastFix) { map.jumpTo({ center: [lastFix.lon, lastFix.lat], zoom: 15 }); updatePosition(lastFix); } else if (quickFix) showQuick(); });
+      map.on('load', function () { mapReady = true; tidyAttrib(); map.once('idle', tidyAttrib); addTrackLayers(map, 'live'); addExtraLayers(map); drawLiveTrack(true); refreshMine(); drawPlan(); drawParking(); if (lastFix) { if (mapFollow) map.jumpTo({ center: [lastFix.lon, lastFix.lat], zoom: 15 }); updatePosition(lastFix); } else showQuick(); });
       map.on('style.load', function () { if (mapReady) { addTrackLayers(map, 'live'); addExtraLayers(map); refreshMine(); drawPlan(); } });
       map.on('click', function (e) { if (planMode) addWaypoint(e.lngLat.lat, e.lngLat.lng); });
       map.on('dragstart', function () { setFollow(false); });
@@ -214,14 +214,19 @@
       var pe = document.createElement('div'); pe.className = 'pos-marker';
       pe.innerHTML = '<svg viewBox="0 0 34 34"><circle class="halo" cx="17" cy="17" r="15"/><path class="arrow" d="M17 5l8 20-8-5-8 5z" stroke-width="2.2" stroke-linejoin="round"/></svg>';
       posMarker = new maplibregl.Marker({ element: pe, rotationAlignment: 'map' });
+      // la posición sale ya (la exacta si ha llegado; si no, la última conocida, atenuada), sin esperar al dibujo del mapa
+      if (lastFix) updatePosition(lastFix); else showQuick();
     });
   }
   // Posición rápida (la última que conoce el teléfono, aunque sea aproximada): centra el mapa mientras llega el GPS bueno.
   var quickFix = null;
   function showQuick() {
-    if (!quickFix || lastFix || !map || !mapReady) return;
-    map.jumpTo({ center: [quickFix.lon, quickFix.lat], zoom: quickFix.acc && quickFix.acc > 300 ? 12 : 14 });
-    if (posMarker) { posMarker.setLngLat([quickFix.lon, quickFix.lat]); if (!posMarker._added) { posMarker.addTo(map); posMarker._added = true; } }
+    var q = quickFix || savedFix;
+    if (!q || lastFix || !map || !posMarker) return;
+    // mismo zoom que tendrá con el GPS (15), para no cargar dos veces el mapa; solo se aleja si la posición es muy imprecisa
+    var z = q.acc && q.acc > 300 ? 12 : 15, c = map.getCenter();
+    if (Math.abs(c.lat - q.lat) > 1e-5 || Math.abs(c.lng - q.lon) > 1e-5 || Math.abs(map.getZoom() - z) > 0.01) map.jumpTo({ center: [q.lon, q.lat], zoom: z });
+    if (posMarker) { posMarker.getElement().classList.add('approx'); posMarker.setLngLat([q.lon, q.lat]); if (!posMarker._added) { posMarker.addTo(map); posMarker._added = true; } }
   }
   Platform.quickPosition(function (pos) { if (lastFix || !pos || !pos.coords) return; quickFix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy }; showQuick(); });
   function setFollow(on) { mapFollow = on; settings.follow = on; saveSettings(); $('#btnFollow').setAttribute('aria-pressed', String(on)); if (on && lastFix) updatePosition(lastFix, true); }
@@ -231,13 +236,17 @@
   $('#btnHeading').setAttribute('aria-pressed', String(!!settings.headingUp)); $('#btnFollow').setAttribute('aria-pressed', String(mapFollow));
   var firstFixCentered = false;
   function updatePosition(fix, force) {
-    if (!map || !mapReady) return;
-    if (posMarker) { posMarker.setLngLat([fix.lon, fix.lat]); if (!posMarker._added) { posMarker.addTo(map); posMarker._added = true; } if (sens.heading != null) posMarker.setRotation(sens.heading - (settings.headingUp ? map.getBearing() : 0) + (settings.headingUp ? map.getBearing() : 0)); }
-    if (!firstFixCentered) { firstFixCentered = true; map.jumpTo({ center: [fix.lon, fix.lat], zoom: 15 }); return; }
+    if (!map || !posMarker) return;
+    if (posMarker) { posMarker.getElement().classList.remove('approx'); posMarker.setLngLat([fix.lon, fix.lat]); if (!posMarker._added) { posMarker.addTo(map); posMarker._added = true; } if (sens.heading != null) posMarker.setRotation(sens.heading - (settings.headingUp ? map.getBearing() : 0) + (settings.headingUp ? map.getBearing() : 0)); }
+    if (!firstFixCentered) { firstFixCentered = true; var c0 = map.getCenter(); if (Math.abs(c0.lat - fix.lat) > 1e-5 || Math.abs(c0.lng - fix.lon) > 1e-5 || Math.abs(map.getZoom() - 15) > 0.01) map.jumpTo({ center: [fix.lon, fix.lat], zoom: 15 }); return; }
+    if (!mapReady) return;      // mientras carga el mapa: solo se coloca el marcador; la cámara se pone al día al cargar
     if (mapFollow && (currentView === 'map')) {
       var opts = { center: [fix.lon, fix.lat], duration: force ? 300 : 900, easing: function (t) { return t; } };
       if (settings.headingUp && sens.heading != null) opts.bearing = sens.heading;
       if (rec && map.getZoom() < 14) opts.zoom = 15;
+      // Parado (el GPS repite la misma posición cada segundo): no se mueve la cámara ni se redibuja el mapa.
+      var cc = map.getCenter();
+      if (!force && opts.bearing == null && opts.zoom == null && !map.isMoving() && Math.abs(cc.lat - fix.lat) < 5e-6 && Math.abs(cc.lng - fix.lon) < 5e-6) return;
       map.easeTo(opts);
     }
   }
@@ -405,7 +414,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   $('#followStop').addEventListener('click', function () { followPlan(null, false); });
   $('#followGmaps').addEventListener('click', function () { if (activePlan) openInMaps(activePlan.wps); });
   function renderPlans(list) {
-    var top = document.createElement('div'); top.className = 'actions'; top.style.gridTemplateColumns = '1fr';
+    var top = document.createElement('div'); top.className = 'actions rg-plantop';
     top.innerHTML = '<button class="btn primary wide" type="button" id="btnNewPlan"><svg><use href="#i-route"/></svg>Planificar una ruta nueva</button><button class="btn wide" type="button" id="btnExplore"><svg><use href="#i-people"/></svg>Explorar rutas públicas de otros moteros</button>';
     top.querySelector('#btnNewPlan').addEventListener('click', function () { showView('map'); enterPlanMode(); });
     top.querySelector('#btnExplore').addEventListener('click', function () { if (window.RGNav) RGNav.explore(); });
@@ -476,21 +485,22 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     var pts = r.points || [];
     return { id: r.id, start: r.start, end: r.end, name: r.name || '', maxL: Math.round(r.maxL * 10) / 10, maxR: Math.round(r.maxR * 10) / 10, vMax: Math.round(r.vMax), dist: Math.round(r.dist * 100) / 100, movingS: Math.round(r.movingS),
       corners: r.corners.map(function (c) { var o = {}; for (var k in c) o[k] = c[k]; return o; }), vehicleId: r.vehicleId || null, favorite: !!r.favorite, stars: r.stars || 0, note: r.note || '',
-      hasTrack: pts.length > 1, hasLean: est.state.ready, nPoints: pts.length, cells: pts.length > 1 ? Achievements.cellsOf(pts) : [], thumb: pts.length > 1 ? Geo.simplify(pts, 25).slice(0, 400).map(function (p) { return [p[1], p[2]]; }) : null, recovered: !!r.recovered, demo: !!r.demo, imported: !!r.imported, weather: r.weather || null };
+      trip: !!r.trip, hasTrack: pts.length > 1, hasLean: est.state.ready, nPoints: pts.length, cells: pts.length > 1 ? Achievements.cellsOf(pts) : [], thumb: pts.length > 1 ? Geo.simplify(pts, 25).slice(0, 400).map(function (p) { return [p[1], p[2]]; }) : null, recovered: !!r.recovered, demo: !!r.demo, imported: !!r.imported, weather: r.weather || null };
   }
-  function startRide(auto) {
+  // trip = «trayecto»: un desplazamiento corto (ir a un recado). Mide lo mismo, pero no guarda por dónde has pasado.
+  function startRide(auto, trip) {
     if (rec) return;
     startMotion().then(function (r) {
       if (r !== 'ok' && !sens.demo) toast('Sin acceso a los sensores: se grabará la ruta sin inclinación.', 'warn');
       if (!sens.demo) startGps('bg');
       Platform.keepAwake(true);
-      resetLast(); rec = newRec(); if (sens.demo) rec.demo = true; if (wx.data && Date.now() - wx.at < 30 * 60000) rec.weather = wx.data; det.setOptions({ minPeak: settings.minPeak }); liveFeatures = []; drawLiveTrack(true); pausedSince = null; lastSave = performance.now();
+      resetLast(); rec = newRec(); if (trip) rec.trip = true; if (sens.demo) rec.demo = true; if (wx.data && Date.now() - wx.at < 30 * 60000) rec.weather = wx.data; det.setOptions({ minPeak: settings.minPeak }); liveFeatures = []; drawLiveTrack(true); pausedSince = null; lastSave = performance.now();
       LS.set('inclina.recording', rec.id);
       recTick = setInterval(render, 1000);
       setFollow(true);
       hideNotice(); render();
       if (window.RGNav) RGNav.sync();
-      if (auto) toast('Grabando ruta (inicio automático).', 'ok');
+      if (auto) toast('Grabando ruta (inicio automático).', 'ok'); else if (trip) toast('Trayecto en marcha. Pulsa Parar al llegar.', 'ok');
     });
   }
   function stopRide() {
@@ -506,14 +516,32 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     if (done.points.length > 1) { var st = Geo.stats(done.points); done.altMax = st.altMax; done.climb = Math.round(st.climb); if (!done.dist) done.dist = st.distKm; if (!done.movingS) done.movingS = st.movingS; if (!done.vMax) done.vMax = st.vMaxKmh; }
     var meta = recMeta(done); meta.inProgress = false; meta.altMax = done.altMax; meta.climb = done.climb;
     if (done.points.length < 2 && !done.corners.length) { toast('Ruta demasiado corta: no se ha guardado.', 'warn'); liveFeatures = []; drawLiveTrack(true); DB.deleteRide(done.id).catch(function () {}); render(); return; }
+    if (done.trip) {
+      // Trayecto: se queda con las cifras (tiempo, km, velocidades, inclinación) y suma los km a la moto. Ni trazado ni curvas.
+      meta.trip = true; meta.hasTrack = false; meta.thumb = null; meta.corners = []; meta.nPoints = 0; if (!meta.name) meta.name = 'Trayecto';
+      DB.putRide(meta).then(function () { return DB.delTrack(done.id); }).then(function () { return reloadRides(); }).then(function () { liveFeatures = []; drawLiveTrack(true); render(); tripSummary(meta); syncSoon(); return checkAchievements(); });
+      return;
+    }
     DB.putRide(meta).then(function () { return DB.putTrack(done.id, done.points); }).then(function () { return reloadRides(); }).then(function () { liveFeatures = []; drawLiveTrack(true); openDetail(done.id); if (window.RGStats) RGStats.rideSaved(); syncSoon(); return checkAchievements(); });
+  }
+  function tripSummary(m) {
+    if (!window.RGCloud) { toast('Trayecto guardado: ' + fmtKm(m.dist) + '.', 'ok'); return; }
+    var secs = m.movingS || Math.round(((m.end || Date.now()) - m.start) / 1000), avg = secs > 0 ? Math.round(m.dist / (secs / 3600)) : 0;
+    var v = vehicles.filter(function (x) { return x.id === m.vehicleId; })[0];
+    var f = function (l, val, cls) { return '<div class="fig' + (cls ? ' ' + cls : '') + '"><span class="label">' + l + '</span><span class="val cifra">' + val + '</span></div>'; };
+    RGCloud.sheet('<span class="rg-plaza"><i></i>Trayecto terminado</span><h1>' + fmtKm(m.dist) + ' · ' + fmtDur(secs * 1000) + '</h1>' +
+      '<div class="rg-trip">' + f('Velocidad máx', (m.vMax || 0) + '<span class="unit">km/h</span>') + f('Velocidad media', avg + '<span class="unit">km/h</span>') + f('Máx izquierda', Math.round(m.maxL) + '°', 'l') + f('Máx derecha', Math.round(m.maxR) + '°', 'r') + '</div>' +
+      '<p class="rg-small">' + (v ? 'Los km se han sumado a «' + esc(v.name) + '» para su mantenimiento. ' : '') + 'No se guarda por dónde has pasado. Lo tienes en Rutas, en «Trayectos».</p>' +
+      '<button class="btn big primary" id="tripOk" type="button"><svg><use href="#i-check"/></svg>Hecho</button><button class="btn rg-skip danger" id="tripDel" type="button">Borrar este trayecto</button>', 'win');
+    $('#tripOk').addEventListener('click', RGCloud.closeSheet);
+    $('#tripDel').addEventListener('click', function () { RGCloud.closeSheet(); if (window.RGSync) RGSync.rideDeleted(m.id); DB.deleteRide(m.id).then(reloadRides).then(function () { toast('Trayecto borrado.', 'ok'); }); });
   }
   function recoverRide() {
     var id = LS.get('inclina.recording', null); if (!id) return Promise.resolve();
     LS.del('inclina.recording');
     return DB.getRide(id).then(function (r) { if (!r) return; r.inProgress = false; r.recovered = true; r.end = r.saved || r.start + 1; return DB.putRide(r); }).catch(function () {});
   }
-  function askAndStart() { if (window.RGPerm) RGPerm.ensure().then(function (ok) { if (ok) startRide(false); }); else startRide(false); }
+  function askAndStart(trip) { trip = trip === true; if (window.RGPerm) RGPerm.ensure().then(function (ok) { if (ok) startRide(false, trip); }); else startRide(false, trip); }
   $('#btnRide').addEventListener('click', askAndStart);
   $('#btnStop').addEventListener('click', stopRide);
   window.addEventListener('pagehide', function () { if (rec) persistRec(); });
@@ -554,7 +582,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       else if (ar >= 3) { setText('#lfSide', phi < 0 ? 'Izquierda' : 'Derecha'); setClass('#lfSide', 'side ' + (phi < 0 ? 'l' : 'r')); } else { setText('#lfSide', 'Vertical'); setClass('#lfSide', 'side'); }
       setText('#lfMaxL', Math.round(mL) + '°'); setText('#lfMaxR', Math.round(mR) + '°');
       setHTML('#lfSpeed', speedTxt + '<span class="unit">km/h</span>');
-      setText('#lfMinor', rec ? rec.corners.length + ' curvas · ' + fmtKm(rec.dist) + (est.state.confirmed || sens.demo ? '' : ' · vertical provisional') : (ready ? (est.state.confirmed ? 'Sin grabar · pulsa Grabar ruta en el mapa' : 'Vertical provisional: se mide sola al empezar a rodar') : 'Esperando a los sensores del móvil'));
+      setText('#lfMinor', rec ? rec.corners.length + ' curvas · ' + fmtKm(rec.dist) + (est.state.confirmed || sens.demo ? '' : ' · vertical provisional') : (ready ? (est.state.confirmed ? 'Sin grabar · pulsa Iniciar ruta en el mapa' : 'Vertical provisional: se mide sola al empezar a rodar') : 'Esperando a los sensores del móvil'));
       setText('#lfTimer', rec ? fmtTime(Date.now() - rec.start) : '00:00:00'); setClass('#lfTimer', 'timer cifra' + (rec ? ' on' : ''));
       setClass('#lfSens', 'chip ' + (motionFresh ? (sens.gyro ? 'ok' : 'warn') : (sens.listening ? 'bad' : ''))); setText('#lfSens', motionFresh ? (sens.gyro ? 'Sensores' : 'Sin giróscopo') : 'Sensores');
       setClass('#lfGps', 'chip ' + (gpsFresh ? 'ok' : (sens.gpsError ? 'bad' : (gpsMode ? 'warn' : '')))); setText('#lfGps', gpsFresh ? 'GPS' : (sens.gpsError ? 'GPS ' + sens.gpsError : (gpsMode ? 'GPS…' : 'GPS')));
@@ -593,14 +621,14 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   $$('.tab').forEach(function (t) { t.addEventListener('click', function () { showView(t.dataset.view); }); });
   function openLeanFull() { $('#leanFull').hidden = false; startMotion(); if (!gpsMode && !rec) startGps('fg'); }
   function closeLeanFull() { $('#leanFull').hidden = true; }
-  $('#btnLeanFull').addEventListener('click', openLeanFull); $('#btnHudLean').addEventListener('click', openLeanFull); $('#hudCard .hud').addEventListener('click', openLeanFull); $('#btnLeanClose').addEventListener('click', closeLeanFull);
+  $('#btnTrip').addEventListener('click', function () { askAndStart(true); }); $('#btnHudLean').addEventListener('click', openLeanFull); $('#hudCard .hud').addEventListener('click', openLeanFull); $('#btnLeanClose').addEventListener('click', closeLeanFull);
 
   /* ---------- rutas: totales y lista ---------- */
   var ridesFilter = 'all', ridesQuery = '';
   function reloadRides() { return DB.allRides().then(function (a) { rides = a.filter(function (r) { return !r.inProgress; }); renderTotals(); mineDirty = true; if (settings.layerRides) refreshMine(); return rides; }); }
   function renderTotals() {
     var km = rides.reduce(function (s, r) { return s + (r.dist || 0); }, 0);
-    setHTML('#totKm', Math.round(km) + '<span class="unit">km</span>'); setText('#totRides', String(rides.length));
+    setHTML('#totKm', Math.round(km) + '<span class="unit">km</span>'); setText('#totRides', String(rides.filter(function (r) { return !r.trip; }).length));
   }
   function renderRides() {
     var list = $('#ridesList'); list.innerHTML = '';
@@ -616,12 +644,12 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     var typeOf = function (r) { var v = vehicles.filter(function (x) { return x.id === r.vehicleId; })[0] || (!r.vehicleId ? principal : null); return v ? v.type || 'moto' : 'moto'; };
     var shown = rides.filter(function (r) {
       if (ridesFilter === 'fav' && !r.favorite) return false;
-      if (ridesFilter === 'lean' && !(r.maxL > 5 || r.maxR > 5)) return false;
+      if ((ridesFilter === 'trips') !== !!r.trip) return false;
       if ((ridesFilter === 'moto' || ridesFilter === 'coche') && typeOf(r) !== ridesFilter) return false;
       if (q && (rideTitle(r) + ' ' + fmtDateLong(r.start) + ' ' + (r.note || '')).toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
-    if (!shown.length) { list.innerHTML = '<div class="empty">' + (rides.length ? 'Ninguna ruta coincide con el filtro.' : 'Aún no hay rutas grabadas. Pulsa «Grabar ruta» en el mapa y a rodar.') + '</div>'; return; }
+    if (!shown.length) { list.innerHTML = '<div class="empty">' + (rides.length ? (ridesFilter === 'trips' ? 'Aún no hay trayectos. Pulsa «Trayecto» en el mapa cuando vayas a un recado.' : 'Ninguna ruta coincide con el filtro.') : 'Aún no hay rutas grabadas. Pulsa «Iniciar ruta» en el mapa y a rodar.') + '</div>'; return; }
     var lastMonth = null;
     shown.forEach(function (r) {
       var d = new Date(r.start), mk = d.getFullYear() + '-' + d.getMonth();
@@ -629,7 +657,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
         lastMonth = mk;
         var inMonth = shown.filter(function (x) { var dd = new Date(x.start); return dd.getFullYear() === d.getFullYear() && dd.getMonth() === d.getMonth(); });
         var h = document.createElement('div'); h.className = 'month';
-        h.innerHTML = '<span class="label">' + monthName(d.getFullYear(), d.getMonth()) + ' <span class="muted">· ' + inMonth.length + (inMonth.length === 1 ? ' ruta' : ' rutas') + '</span></span><span class="label" style="color:var(--color-accent)">' + Math.round(inMonth.reduce(function (s, x) { return s + (x.dist || 0); }, 0)) + ' km</span>';
+        h.innerHTML = '<span class="label">' + monthName(d.getFullYear(), d.getMonth()) + ' <span class="muted">· ' + inMonth.length + (ridesFilter === 'trips' ? (inMonth.length === 1 ? ' trayecto' : ' trayectos') : (inMonth.length === 1 ? ' ruta' : ' rutas')) + '</span></span><span class="label" style="color:var(--color-accent)">' + Math.round(inMonth.reduce(function (s, x) { return s + (x.dist || 0); }, 0)) + ' km</span>';
         list.appendChild(h);
       }
       var b = document.createElement('button'); b.type = 'button'; b.className = 'row';
@@ -637,7 +665,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       b.innerHTML = '<span class="thumb">' + thumb + '</span>' +
         '<span class="date">' + esc(rideTitle(r)) + ' <span>· ' + fmtClock(r.start) + (r.recovered ? ' · recuperada' : '') + (r.imported ? ' · GPX' : '') + (r.demo ? ' · simulada' : '') + '</span>' + (r.favorite ? '<svg class="fav" width="16" height="16" viewBox="0 0 24 24"><use href="#i-star"/></svg>' : '') + '</span>' +
         '<span class="big"><span><span class="n l">' + Math.round(r.maxL) + '°</span><span class="label l">Izq</span></span><span><span class="n r">' + Math.round(r.maxR) + '°</span><span class="label r">Dcha</span></span></span>' +
-        '<span class="sub">' + fmtKm(r.dist) + ' · ' + fmtDur((r.movingS || 0) * 1000) + ' · ' + r.corners.length + ' curvas · ' + (r.vMax || 0) + ' km/h máx</span>' +
+        '<span class="sub">' + fmtKm(r.dist) + ' · ' + fmtDur((r.movingS || 0) * 1000) + (r.trip ? '' : ' · ' + r.corners.length + ' curvas') + ' · ' + (r.vMax || 0) + ' km/h máx</span>' +
         '<span class="chev"><svg><use href="#i-chev"/></svg></span>';
       b.addEventListener('click', function () { openDetail(r.id); });
       list.appendChild(b);
@@ -803,12 +831,13 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   $('#btnDeleteRide').addEventListener('click', function () { armOrRun($('#btnDeleteRide'), 'Borrar esta ruta', 'Toca otra vez para borrar', function () { if (window.RGSync) RGSync.rideDeleted(detailId); DB.deleteRide(detailId).then(reloadRides).then(function () { showView('rides'); }); }); });
   // fotos
   function renderPhotos(rideId) {
+    if (window.RGSync) RGSync.pullPhotos(rideId).then(function (n) { if (n && detailId === rideId) renderPhotos(rideId); });
     DB.photosOf(rideId).then(function (ps) {
       var g = $('#photos'); g.innerHTML = '';
       ps.forEach(function (p) {
         var d = document.createElement('div'); d.className = 'ph';
         var img = document.createElement('img'); img.src = p.data; img.alt = ''; img.addEventListener('click', function () { $('#lightboxImg').src = p.data; $('#lightbox').hidden = false; });
-        var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.innerHTML = '<svg><use href="#i-close"/></svg>'; del.addEventListener('click', function () { DB.deletePhoto(p.id).then(function () { renderPhotos(rideId); }); });
+        var del = document.createElement('button'); del.type = 'button'; del.className = 'del'; del.innerHTML = '<svg><use href="#i-close"/></svg>'; del.addEventListener('click', function () { if (window.RGSync) RGSync.photoDeleted(p); DB.deletePhoto(p.id).then(function () { renderPhotos(rideId); }); });
         d.appendChild(img); d.appendChild(del); g.appendChild(d);
       });
       var add = document.createElement('button'); add.type = 'button'; add.className = 'add'; add.innerHTML = '<svg><use href="#i-camera"/></svg>Añadir foto'; add.addEventListener('click', function () { $('#photoFile').value = ''; $('#photoFile').click(); }); g.appendChild(add);
@@ -1088,7 +1117,10 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
 
   /* ---------- perfil, XP y logros ---------- */
   var profile = { name: '', avatar: null }, unlocked = {}, flags = {}, achFilter = 'all';
-  function loadProfile() { return Promise.all([DB.get('profile', null), DB.get('achievements', {}), DB.get('flags', {})]).then(function (r) { if (r[0]) profile = r[0]; unlocked = r[1] || {}; flags = r[2] || {}; renderAvatar(); }); }
+  function loadProfile() { return Promise.all([DB.get('profile', null), DB.get('achievements', {}), DB.get('flags', {})]).then(function (r) { if (r[0]) profile = r[0]; else profile = { name: '', avatar: null }; unlocked = r[1] || {}; flags = r[2] || {}; var cn = window.RGCloud && RGCloud.user() ? RGCloud.profileName() : ''; if (cn) profile.name = cn; renderAvatar(); }); }
+  function reloadProfile() { return loadProfile().then(function () { var i = $('#profileName'); if (i && document.activeElement !== i) i.value = profile.name || ''; if (!$('#view-profile').hidden) renderProfile(); drawParking(); return checkAchievements(); }); }
+  // Con sesión abierta, el nombre es el de la cuenta (el que se puso al crearla), no uno guardado en el móvil.
+  function setProfileName(n) { n = (n || '').trim(); if (!n || profile.name === n) return; profile.name = n; var i = $('#profileName'); if (i && document.activeElement !== i) i.value = n; renderAvatar(); DB.set('profile', profile); }
   function setFlag(k) { if (flags[k]) return Promise.resolve(); flags[k] = Date.now(); return DB.set('flags', flags).then(checkAchievements); }
   function checkAchievements() {
     var ctx = Achievements.computeContext(rides, vehicles, flags), fresh = Achievements.evaluate(ctx, unlocked);
@@ -1145,9 +1177,9 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   $('#btnProfile').addEventListener('click', function () { showView('profile'); });
   $('#btnProfileBack').addEventListener('click', function () { showView('map'); });
   var nameTimer = null;
-  $('#profileName').addEventListener('input', function (e) { profile.name = e.target.value; renderAvatar(); if (nameTimer) clearTimeout(nameTimer); nameTimer = setTimeout(function () { DB.set('profile', profile); }, 500); });
+  $('#profileName').addEventListener('input', function (e) { profile.name = e.target.value; renderAvatar(); if (nameTimer) clearTimeout(nameTimer); nameTimer = setTimeout(function () { DB.set('profile', profile); if (window.RGCloud && RGCloud.saveName) RGCloud.saveName(profile.name); }, 900); });
   $('#btnAvatar').addEventListener('click', function () { $('#avatarFile').value = ''; $('#avatarFile').click(); });
-  $('#avatarFile').addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; shrinkImage(f, 256).then(function (d) { if (!d) return; profile.avatar = d; renderAvatar(); DB.set('profile', profile); }); });
+  $('#avatarFile').addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; shrinkImage(f, 256).then(function (d) { if (!d) return; profile.avatar = d; renderAvatar(); DB.set('profile', profile); if (window.RGSync) RGSync.touch('avatar'); }); });
 
   /* ---------- ajustes ---------- */
   function renderSettings() {
@@ -1229,8 +1261,8 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   window.RGApp = {
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, activePlan: function () { return planMode ? null : activePlan; },
-    isRec: function () { return !!rec; }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
-    startRide: function () { askAndStart(); }, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
+    isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
+    startRide: function () { askAndStart(); }, reloadProfile: reloadProfile, setProfileName: setProfileName, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
     plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); },
     routeBetween: function (wps) { return routeBetween(wps); },   // [[lat, lon], …] → { coords, dist (km), dur (s), steps, routed }
     previewPlan: function (p) { p.preview = true; showView('map'); followPlan(p, true); },

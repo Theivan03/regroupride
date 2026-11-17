@@ -35,15 +35,23 @@ var Platform = (function () {
   /* --- posición rápida: la última que conozca el teléfono (red, wifi o GPS de hace poco), sin esperar al GPS ---
      No pide permisos: si aún no los hay, no hace nada (ya los pide watchPosition). */
   function quickPosition(onPos) {
-    var o = { enableHighAccuracy: false, maximumAge: 10 * 60000, timeout: 8000 };
+    // Dos pasos: primero la última que tenga guardada el teléfono (sale al instante) y luego una nueva por red o wifi,
+    // que llega en uno o dos segundos. El GPS bueno va aparte y sustituye a las dos cuando llega.
+    var last = { enableHighAccuracy: false, maximumAge: 24 * 3600000, timeout: 3000 }, fresh = { enableHighAccuracy: false, maximumAge: 15000, timeout: 8000 };
+    var ok = function (pos) { if (pos) onPos(pos); };
     try {
       if (has('Geolocation')) {
         P.Geolocation.checkPermissions().then(function (st) {
           if (!st || (st.location !== 'granted' && st.coarseLocation !== 'granted')) return;
-          return P.Geolocation.getCurrentPosition(o).then(function (pos) { if (pos) onPos(pos); });
+          P.Geolocation.getCurrentPosition(last).then(ok, function () {});
+          P.Geolocation.getCurrentPosition(fresh).then(ok, function () {});
         }).catch(function () {});
       } else if ('geolocation' in navigator && navigator.permissions && navigator.permissions.query) {
-        navigator.permissions.query({ name: 'geolocation' }).then(function (st) { if (st.state === 'granted') navigator.geolocation.getCurrentPosition(onPos, function () {}, o); }, function () {});
+        navigator.permissions.query({ name: 'geolocation' }).then(function (st) {
+          if (st.state !== 'granted') return;
+          navigator.geolocation.getCurrentPosition(ok, function () {}, last);
+          navigator.geolocation.getCurrentPosition(ok, function () {}, fresh);
+        }, function () {});
       }
     } catch (e) {}
   }
