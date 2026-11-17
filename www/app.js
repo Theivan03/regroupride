@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.14.1';
+  var APP_VERSION = '0.15.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -189,7 +189,7 @@
   /* ---------- mapa ---------- */
   var map = null, dmap = null, posMarker = null, mapReady = false, liveFeatures = [], mapFollow = settings.follow !== false;
   // El mapa lleva estilo propio (rg-mapstyle.js, Dirección A): no hay que descargar nada para montarlo.
-  function fallbackStyle() { return { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': isDark() ? '#1D2226' : '#F4F1EC' } }] }; }
+  function fallbackStyle() { return { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': isDark() ? '#1E2226' : '#F2EFE9' } }] }; }
   function loadStyle() { var st; try { st = window.RGMapStyle ? window.RGMapStyle(isDark()) : fallbackStyle(); } catch (e) { st = fallbackStyle(); } return Promise.resolve(st); }
   function setMapStyle(m, isDetail) { loadStyle().then(function (st) { m.setStyle(st); m.once('style.load', function () { if (isDetail) { if (detailTrack) drawDetailTrack(); } else drawLiveTrack(true); }); }); }
   function addTrackLayers(m, prefix) {
@@ -378,7 +378,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     var o = wps[0], d = wps[wps.length - 1], mid = wps.slice(1, -1).slice(0, 9);
     return 'https://www.google.com/maps/dir/?api=1&origin=' + o[0].toFixed(6) + ',' + o[1].toFixed(6) + '&destination=' + d[0].toFixed(6) + ',' + d[1].toFixed(6) + (mid.length ? '&waypoints=' + mid.map(function (w) { return w[0].toFixed(6) + ',' + w[1].toFixed(6); }).join('|') : '') + '&travelmode=driving';
   }
-  function planThumb(p) { return Geo.thumbSvg(p.coords.map(function (c) { return [0, c[1], c[0]]; }), 120, '#2F7CF6'); }
+  function planThumb(p) { return Geo.thumbSvg(p.coords.map(function (c) { return [0, c[1], c[0]]; }), 120, 'currentColor'); }
   function followPlan(p, fit) {
     activePlan = p; settings.activePlanId = p ? p.id : null; saveSettings(); drawPlan(); renderFollow();
     if (p && fit && map && mapReady) { setFollow(false); var b = Geo.bounds(p.coords.map(function (c) { return [0, c[1], c[0]]; })); if (b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: 120, bottom: 220, left: 40, right: 70 }, duration: 600 }); }
@@ -414,7 +414,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     plans.forEach(function (p) {
       var d = document.createElement('div'); d.className = 'plan';
       d.innerHTML = '<div class="thumb">' + planThumb(p) + '</div><div><div class="name">' + esc(p.name) + '</div><div class="muted">' + fmtKm(p.dist) + ' · ' + fmtDur(p.dur * 1000) + (p.routed ? ' por carretera' : ' en línea recta') + ' · ' + p.wps.length + ' puntos · ' + fmtDate(p.created) + '</div></div>' +
-        '<div class="plan-actions"><button class="btn small primary" type="button" data-act="follow">' + (activePlan && activePlan.id === p.id ? 'Seleccionada' : 'Seguir esta ruta') + '</button><button class="btn small' + (p.pub ? ' on' : '') + '" type="button" data-act="pub">' + (p.pub ? 'Pública ✓' : 'Privada · publicar') + '</button><button class="btn small" type="button" data-act="gpx"><svg><use href="#i-download"/></svg>Descargar GPX</button><button class="btn small" type="button" data-act="gmaps"><svg><use href="#i-gmaps"/></svg>Google Maps</button><button class="btn small danger" type="button" data-act="del">Borrar</button></div>';
+        '<div class="plan-actions"><button class="btn small primary" type="button" data-act="follow"><svg><use href="#i-play"/></svg>' + (activePlan && activePlan.id === p.id ? 'Seleccionada' : 'Seguir esta ruta') + '</button><button class="btn small' + (p.pub ? ' on' : '') + '" type="button" data-act="pub"><svg><use href="#i-' + (p.pub ? 'check' : 'lock') + '"/></svg>' + (p.pub ? 'Pública' : 'Privada · publicar') + '</button><button class="btn small" type="button" data-act="gpx"><svg><use href="#i-download"/></svg>Descargar GPX</button><button class="btn small" type="button" data-act="gmaps"><svg><use href="#i-gmaps"/></svg>Google Maps</button><button class="btn small danger" type="button" data-act="del"><svg><use href="#i-trash"/></svg>Borrar</button></div>';
       d.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () {
         if (b.dataset.act === 'follow') { followPlan(p, true); showView('map'); }
         if (b.dataset.act === 'gmaps') openInMaps(p.wps);
@@ -793,13 +793,13 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     if (!detailRide) return;
     var wrap = document.createElement('div'); wrap.className = 'form'; wrap.style.marginTop = '8px';
     wrap.innerHTML = '<input type="text" id="renameInput" maxlength="60" placeholder="Nombre de la ruta" value="' + esc(detailRide.name || '') + '"><div class="actions"><button class="btn" type="button" id="renameCancel">Cancelar</button><button class="btn primary" type="button" id="renameOk">Guardar</button></div>';
-    $('#btnRename').parentNode.insertBefore(wrap, $('#btnRename').parentNode.firstChild);
+    var host = $('#btnRename').parentNode; host.parentNode.insertBefore(wrap, host);
     $('#renameInput').focus();
     $('#renameCancel').addEventListener('click', function () { wrap.remove(); });
     $('#renameOk').addEventListener('click', function () { detailRide.name = $('#renameInput').value.trim(); DB.putRide(detailRide).then(checkAchievements).then(function () { wrap.remove(); $('#detailTitle').innerHTML = esc(rideTitle(detailRide)) + ' <span class="muted">· ' + fmtClock(detailRide.start) + '</span>'; }); });
   });
-  function disarm(b, label) { b.classList.remove('armed'); b.dataset.armed = ''; b.textContent = label; if (b._t) clearTimeout(b._t); }
-  function armOrRun(b, label, armedLabel, fn) { if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.classList.add('armed'); b.textContent = armedLabel; b._t = setTimeout(function () { disarm(b, label); }, 4000); return; } disarm(b, label); fn(); }
+  function disarm(b, label) { b.classList.remove('armed'); b.dataset.armed = ''; if (b._html != null) { b.innerHTML = b._html; b._html = null; } else if (!b.querySelector('svg')) b.textContent = label; if (b._t) clearTimeout(b._t); }
+  function armOrRun(b, label, armedLabel, fn) { if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.classList.add('armed'); b._html = b.innerHTML; b.textContent = armedLabel; b._t = setTimeout(function () { disarm(b, label); }, 4000); return; } disarm(b, label); fn(); }
   $('#btnDeleteRide').addEventListener('click', function () { armOrRun($('#btnDeleteRide'), 'Borrar esta ruta', 'Toca otra vez para borrar', function () { if (window.RGSync) RGSync.rideDeleted(detailId); DB.deleteRide(detailId).then(reloadRides).then(function () { showView('rides'); }); }); });
   // fotos
   function renderPhotos(rideId) {
@@ -942,10 +942,10 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       var mine = rides.filter(function (r) { return r.vehicleId === v.id || (!r.vehicleId && principal && principal.id === v.id); });
       var vkm = mine.reduce(function (s, r) { return s + (r.dist || 0); }, 0), vs = mine.reduce(function (s, r) { return s + (r.movingS || 0); }, 0), odo = Math.round((v.odoStart || 0) + vkm), digits = String(odo).padStart(6, '0');
       var d = document.createElement('div'); d.className = 'vehicle' + (v.principal ? ' main' : '');
-      d.innerHTML = '<div class="vhead"><div><span class="label" style="color:' + (v.principal ? 'var(--color-accent)' : 'var(--color-text-2)') + '">' + (v.principal ? 'Principal' : (v.type === 'coche' ? 'Coche' : 'Moto')) + '</span><div class="name">' + esc(v.name) + '</div><div class="muted">' + esc([v.make, v.model].filter(Boolean).join(' ')) + '</div></div><svg style="width:32px;height:32px;color:var(--color-text-2)"><use href="#i-bike"/></svg></div>' +
+      d.innerHTML = '<div class="vhead"><div>' + (v.principal ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>principal</span>' : '<span class="label">' + (v.type === 'coche' ? 'Coche' : 'Moto') + '</span>') + '<div class="name">' + esc(v.name) + '</div><div class="muted">' + esc([v.make, v.model].filter(Boolean).join(' ')) + '</div></div></div>' +
         '<div><span class="label">Odómetro · km</span><br><span class="odo">' + digits.slice(0, 5) + '<b>' + digits.slice(5) + '</b></span></div>' +
         '<div class="vstats">' + fig('Rutas', String(mine.length)) + fig('Horas', (vs / 3600).toFixed(0)) + fig('Km en la app', Math.round(vkm) + '') + '</div>' +
-        '<div class="actions">' + (v.principal ? '' : '<button class="btn small" type="button" data-act="main">Hacer principal</button>') + '<button class="btn small" type="button" data-act="edit">Editar</button><button class="btn small danger wide" type="button" data-act="del">Quitar del garaje</button></div>' +
+        '<div class="actions">' + (v.principal ? '' : '<button class="btn small" type="button" data-act="main">Hacer principal</button>') + '<button class="btn small" type="button" data-act="edit"><svg><use href="#i-edit"/></svg>Editar</button><button class="btn small danger" type="button" data-act="del">Quitar del garaje</button></div>' +
         maintHtml(v, odo);
       d.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () {
         if (b.dataset.act === 'main') { vehicles.forEach(function (x) { x.principal = x.id === v.id; }); Promise.all(vehicles.map(DB.putVehicle)).then(renderGarage); }
@@ -989,11 +989,11 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       if (s.moLeft != null) when.push(s.moLeft <= 0 ? 'pasado por ' + Math.round(-s.moLeft) + ' meses' : 'quedan ' + (s.moLeft < 1 ? 'días' : Math.round(s.moLeft) + ' meses'));
       var every = [m.everyKm ? 'cada ' + fmtInt(m.everyKm) + ' km' : null, m.everyMonths ? (m.everyKm ? 'o ' : 'cada ') + m.everyMonths + ' meses' : null].filter(Boolean).join(' ');
       rows += '<div class="mitem ' + s.st + '"><button class="edit" type="button" data-act="medit" data-m="' + m.id + '"><div class="mname">' + esc(m.name) + '</div><div class="msub">' + every + ' · ' + when.join(' · ') + (m.lastAt ? ' · última: ' + fmtDate(m.lastAt).toLowerCase() + (m.lastKm ? ' a ' + fmtInt(m.lastKm) + ' km' : '') : '') + '</div></button>' +
-        '<span class="mstatus ' + s.st + '">' + ({ ok: 'Al día', soon: 'Pronto', due: 'Pasado' })[s.st] + '</span><button class="btn small" type="button" data-act="mdone" data-m="' + m.id + '">Hecho</button><div class="bar3"><i style="width:' + Math.round(s.frac * 100) + '%"></i></div></div>';
+        '<span class="mstatus ' + s.st + '">' + ({ ok: '<svg><use href="#i-check"/></svg>al día', soon: '<svg><use href="#i-clock"/></svg>toca pronto', due: '<svg><use href="#i-warn"/></svg>pasada' })[s.st] + '</span><button class="btn small" type="button" data-act="mdone" data-m="' + m.id + '"><svg><use href="#i-check"/></svg>Hecho</button><div class="bar3"><i style="width:' + Math.round(s.frac * 100) + '%"></i></div></div>';
     });
-    return '<div class="maint"><div class="mhead"><span class="label">Mantenimiento</span>' + (items.length ? '<span class="mstatus ' + worst + '">' + ({ ok: 'Todo al día', soon: 'Algo pronto', due: 'Pendiente' })[worst] + '</span>' : '') + '</div>' +
+    return '<div class="maint"><div class="mhead"><span class="label">Mantenimiento</span>' + (items.length ? '<span class="mstatus ' + worst + '">' + ({ ok: '<svg><use href="#i-check"/></svg>todo al día', soon: '<svg><use href="#i-clock"/></svg>algo toca pronto', due: '<svg><use href="#i-warn"/></svg>hay algo pasado' })[worst] + '</span>' : '') + '</div>' +
       (items.length ? rows : '<div class="muted">Lleva el aceite, los filtros y el resto por km: te avisa cuando toca.</div>') +
-      '<div class="actions" style="margin-top:var(--sp-2)"><button class="btn small" type="button" data-act="addm"><svg><use href="#i-plus"/></svg>Tarea</button><button class="btn small" type="button" data-act="preset"><svg><use href="#i-wrench"/></svg>' + (isZontes(v) ? 'Plan 703RR' : 'Plan genérico') + '</button></div></div>';
+      '<div class="actions" style="margin-top:var(--sp-2)"><button class="btn small" type="button" data-act="addm"><svg><use href="#i-plus"/></svg>Tarea</button><button class="btn small" type="button" data-act="preset"><svg><use href="#i-sliders"/></svg>' + (isZontes(v) ? 'Plan 703RR' : 'Plan genérico') + '</button></div></div>';
   }
   function fmtInt(n) { return Math.round(n).toLocaleString('es-ES'); }
   // El plan no se pone solo: primero se enseña lo que se va a añadir, se puede quitar o cambiar cada tarea, y hay que confirmar.
@@ -1046,7 +1046,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     $('#mDelete').hidden = !m; disarm($('#mDelete'), 'Quitar esta tarea');
     $('#vehicleForm').hidden = true; $('#maintForm').hidden = false; $('#maintForm').scrollIntoView({ block: 'start', behavior: 'smooth' }); $('#mName').focus();
   }
-  $('#mCancel').addEventListener('click', function () { $('#maintForm').hidden = true; });
+  $('#mCancel').addEventListener('click', function () { $('#maintForm').hidden = true; }); $('#mClose').addEventListener('click', function () { $('#maintForm').hidden = true; });
   $('#mSave').addEventListener('click', function () {
     if (!maintCtx) return;
     var name = $('#mName').value.trim(), km = parseInt($('#mKm').value, 10) || 0, mo = parseInt($('#mMonths').value, 10) || 0;
@@ -1078,7 +1078,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   }
   $('#btnAddVehicle').addEventListener('click', function () { openVehicleForm(null); });
   $$('#vType button').forEach(function (b) { b.addEventListener('click', function () { vType = b.dataset.t; $$('#vType button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
-  $('#vCancel').addEventListener('click', function () { $('#vehicleForm').hidden = true; });
+  $('#vCancel').addEventListener('click', function () { $('#vehicleForm').hidden = true; }); $('#vClose').addEventListener('click', function () { $('#vehicleForm').hidden = true; });
   $('#vSave').addEventListener('click', function () {
     var name = $('#vName').value.trim(); if (!name) { $('#vName').focus(); return; }
     var v = editingVehicle || { id: Date.now(), principal: vehicles.length === 0 };

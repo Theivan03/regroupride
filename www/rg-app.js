@@ -22,9 +22,11 @@
     if (kind === 'arrive') return '<svg viewBox="0 0 32 32"><path d="M9 28V5m0 1h14l-3.5 5 3.5 5H9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     if (kind === 'roundabout') return '<svg viewBox="0 0 32 32"><circle cx="16" cy="15" r="6.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 29v-7.5M21 9l5-5m0 0h-5.5M26 4v5.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     if (kind === 'stop') return '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M12.500 11v10M19.500 11v10" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg>';
-    if (kind === 'off') return '<svg viewBox="0 0 32 32"><path d="M16 5 3.5 26.5h25z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M16 13v6.5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="23" r="1.7" fill="currentColor"/></svg>';
-    // giros a derecha e izquierda: flecha que dobla, como en una señal
-    if (kind === 'right' || kind === 'left') return '<svg viewBox="0 0 32 32"><g' + (kind === 'left' ? ' transform="matrix(-1 0 0 1 32 0)"' : '') + '><path d="M9.5 27V16.5a5 5 0 0 1 5-5H25m0 0-6.5-6.500M25 11.500 18.500 18" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
+    // iconos de la guía (rejilla de 24, trazo de 2,6 en el cartel)
+    if (kind === 'off') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.2"/></svg>';
+    if (kind === 'right') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21V12a4 4 0 0 1 4-4h8"/><path d="M15 3.5L19.5 8 15 12.5"/></svg>';
+    if (kind === 'left') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21V12a4 4 0 0 0-4-4H5"/><path d="M9 3.5L4.5 8 9 12.5"/></svg>';
+    if (kind === 'straight') return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V5M6 11l6-6 6 6"/></svg>';
     if (kind === 'uturn') return '<svg viewBox="0 0 32 32"><path d="M9 27V13.5a6.5 6.5 0 0 1 13 0V23m0 0-5.5-5.5M22 23l5.5-5.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     var a = ARROW[kind] == null ? 0 : ARROW[kind];
     return '<svg viewBox="0 0 32 32"><g transform="rotate(' + a + ' 16 16)"><path d="M16 27V6m0 0-7.5 7.5M16 6l7.5 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
@@ -36,7 +38,7 @@
     var p = plan(), on = !!(p && A.isRec() && p.coords && p.coords.length > 1);
     var info = $('#followInfo'), ride = $('#btnRide');
     if (info) info.textContent = p ? (fmtKm((p.dist || 0) * 1000) + (p.dur ? ' · ' + fmtMin(p.dur) : '')) : '';
-    if (ride) ride.textContent = p ? 'Iniciar ruta' : 'Grabar ruta';
+    if (ride) { ride.textContent = p ? 'Iniciar ruta' : 'Grabar ruta'; ride.classList.toggle('rg-go', !!p); }
     if (on && (!nav.active || nav.planId !== p.id)) {
       nav.active = true; nav.planId = p.id; nav.tr = L.Tracker(p.coords, L.navSteps(p)); nav.rejoin = null; nav.rejoinAt = 0; nav.last = null; nav.notified = false; nav.toStart = false; nav.asked = false;
       askNotif();
@@ -80,9 +82,10 @@
     var d0 = L.dist(fix.lat, fix.lon, p.coords[0][1], p.coords[0][0]);
     if (d0 < 300) return;
     var name = ((p.wps && p.wps[0] && p.wps[0][2]) || '').split(',')[0];
-    sheet('<div class="head"><h1>¿Por dónde empiezas?</h1></div><p>Estás a <b>' + L.fmtDist(d0) + '</b> del punto de salida' + (name ? ' (' + esc(name) + ')' : '') + '.</p>' +
-      '<button class="btn big primary" id="tsStart" type="button">Ir al punto de salida</button><button class="btn big" id="tsNear" type="button">Entrar por el punto más cercano</button>' +
+    sheet('<div class="head"><h1>Iniciar ruta</h1><button class="btn small icon" id="tsX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p>Estás a <b>' + L.fmtDist(d0) + '</b> del punto de salida' + (name ? ' (' + esc(name) + ')' : '') + '.</p>' +
+      '<button class="btn big" id="tsNear" type="button"><svg><use href="#i-route"/></svg>Entrar por el punto más cercano</button><button class="btn big primary" id="tsStart" type="button"><svg><use href="#i-gmaps"/></svg>Ir al punto de salida</button>' +
       '<p class="muted rg-small" style="text-align:left">«Ir al punto de salida» te lleva hasta donde empieza la ruta y, al llegar, sigue con ella.</p>');
+    $('#tsX').addEventListener('click', closeSheet);
     $('#tsNear').addEventListener('click', closeSheet);
     $('#tsStart').addEventListener('click', function () {
       closeSheet(); var q = plan(); if (!nav.active || !q || q.id !== p.id) return;
@@ -193,7 +196,7 @@
     if (legs.length === 1) { Platform.openExternal(legs[0].url); return; }
     var s = sheet('<div class="head"><h1>Abrir en Google Maps</h1><button class="btn small icon" id="rgClose" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
       '<p class="muted">Google Maps solo admite unas 9 paradas por enlace, así que esta ruta de ' + wps.length + ' puntos va en ' + legs.length + ' tramos. Al acabar uno, vuelve aquí y abre el siguiente. Para llevarla entera, usa «Iniciar ruta» en la app.</p>' +
-      legs.map(function (l, i) { return '<button class="btn big" type="button" data-leg="' + i + '">Tramo ' + (i + 1) + ': puntos ' + l.from + ' a ' + l.to + '</button>'; }).join(''));
+      legs.map(function (l, i) { return '<button class="btn big" type="button" data-leg="' + i + '"><svg><use href="#i-gmaps"/></svg>Tramo ' + (i + 1) + ': puntos ' + l.from + ' a ' + l.to + '</button>'; }).join(''));
     $('#rgClose').addEventListener('click', closeSheet);
     s.querySelectorAll('[data-leg]').forEach(function (b) { b.addEventListener('click', function () { Platform.openExternal(legs[+b.dataset.leg].url); }); });
   }
@@ -454,10 +457,18 @@
     if (m.indexOf('fetch') >= 0 || m.indexOf('network') >= 0) return 'Sin conexión con el servidor. Revisa tu cobertura.';
     return (e && e.message) || String(e);
   }
-  function sheet(html) { var s = $('#rgSheet'); s.innerHTML = '<div class="rg-sheet-in">' + html + '</div>'; s.hidden = false; s.scrollTop = 0; return s; }
+  // Hoja inferior (formularios y decisiones). kind 'page' = pantalla entera (bienvenida y permisos);
+  // kind 'win' = ventana centrada (avisos que piden una respuesta).
+  // En Mapa y Comunidad lleva la clase rg-eq, que da más violeta (guía de estética).
+  function sheet(html, kind) {
+    if (!kind && (/^<div class="rg-logo"/.test(html) || /<h1>(Un permiso más|Falta algo para rodar|Permiso de ubicación)<\/h1>/.test(html))) kind = 'page';
+    var s = $('#rgSheet'), v = document.querySelector('.app > .view:not([hidden])'), eq = !!(v && (v.id === 'view-map' || v.id === 'view-club')) && kind !== 'page';
+    s.className = 'rg-sheet' + (kind === 'page' ? ' rg-page' : '') + (kind === 'win' ? ' rg-win' : '') + (eq ? ' rg-eq' : '');
+    s.innerHTML = '<div class="rg-sheet-in">' + html + '</div>'; s.hidden = false; s.scrollTop = 0; var inn = s.firstChild; if (inn) inn.scrollTop = 0; return s;
+  }
   function closeSheet() { var s = $('#rgSheet'); s.hidden = true; s.innerHTML = ''; }
   function busy(btn, f) { var old = btn.innerHTML; btn.disabled = true; btn.textContent = 'Un momento…'; return Promise.resolve().then(f).catch(function (e) { A.toast(msg(e), 'bad'); }).then(function () { btn.disabled = false; btn.innerHTML = old; }); }
-  var LOGO = '<div class="rg-logo"><span class="rg-mark"><svg viewBox="0 0 32 32"><path d="M7 25C7 15 25 19 25 8.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="7" cy="25" r="3.5" fill="currentColor"/><circle cx="25" cy="8.5" r="3.5" fill="currentColor"/><circle cx="16" cy="16.9" r="3.3" fill="var(--color-accent)"/><circle cx="16" cy="16.9" r="2.2" fill="#fff"/></svg></span><b>ReGroup<i>Ride</i></b></div>';
+  var LOGO = '<div class="rg-logo"><img class="rg-sym" src="simbolo.svg" alt=""><b>ReGroup<i>Ride</i></b></div>';
 
   function openAuth(first) {
     var mode = first ? 'signup' : 'login';
@@ -569,7 +580,7 @@
       var name = (profile && profile.name) || (user.user_metadata && user.user_metadata.name) || 'Tu cuenta';
       box.innerHTML = '<div class="rg-acc"><span class="rg-ava">' + esc(name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(name) + '</b><span class="muted">' + esc(user.email || '') + '</span></div></div>' +
         '<button class="rg-level" id="rgPhone" type="button"><span>' + (ridePhone ? esc(ridePhone) : 'Teléfono para las rutas') + '</span><small>' + (ridePhone ? 'Teléfono para las rutas (opcional) · tocar para cambiarlo' : 'Opcional · para que puedan llamarte si administras una ruta') + '</small></button>' +
-        '<div class="rg-row"><button class="btn small" id="rgFeedback" type="button">Sugerencias y fallos</button><button class="btn small" id="rgOut" type="button">Cerrar sesión</button></div>';
+        '<div class="rg-row"><button class="btn small" id="rgFeedback" type="button"><svg><use href="#i-info"/></svg>Sugerencias y fallos</button><button class="btn small" id="rgOut" type="button"><svg><use href="#i-exit"/></svg>Cerrar sesión</button></div>';
       $('#rgPhone').addEventListener('click', openPhone);
       $('#rgOut').addEventListener('click', function () { sb.auth.signOut().then(function () { user = null; profile = null; renderAccount(); A.toast('Sesión cerrada.', 'ok'); }); });
     } else {

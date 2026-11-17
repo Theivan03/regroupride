@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Colores de los botones de aviso de la notificación (guía de marca). -->
+<resources>
+    <color name="rg_sos_bg">#A31919</color>
+    <color name="rg_sos_fg">#FFFFFF</color>
+    <color name="rg_averia_bg">#FFB300</color>
+    <color name="rg_averia_fg">#1A1300</color>
+    <color name="rg_gas_bg">#E9EDF2</color>
+    <color name="rg_gas_fg">#0E141B</color>
+</resources>

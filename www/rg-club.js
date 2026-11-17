@@ -23,7 +23,7 @@
   }
   function share(text) { if (P.Share) P.Share.share({ text: text }).catch(function () {}); else if (navigator.share) navigator.share({ text: text }).catch(function () {}); else copy(text, 'Invitación copiada'); }
   function openUrl(u) { if (!/^https?:\/\//i.test(u)) u = 'https://' + u; if (window.Platform) Platform.openExternal(u); else window.open(u, '_blank', 'noopener'); }
-  function armed(btn, label, run) { if (btn.dataset.armed) { run(); return; } btn.dataset.armed = '1'; var old = btn.textContent; btn.textContent = label; setTimeout(function () { delete btn.dataset.armed; btn.textContent = old; }, 3500); }
+  function armed(btn, label, run) { if (btn.dataset.armed) { run(); return; } btn.dataset.armed = '1'; var old = btn.innerHTML; btn.textContent = label; setTimeout(function () { delete btn.dataset.armed; btn.innerHTML = old; }, 3500); }
   // Los nombres se recuerdan entre sesiones: solo se piden los que no se conocen (y, sin esperar, los que tienen más de un día).
   var NAMES_AT = {};
   try { var nm0 = JSON.parse(localStorage.getItem('rg.club.names') || '{}'); S.names = nm0.n || {}; NAMES_AT = nm0.t || {}; } catch (e) {}
@@ -87,7 +87,7 @@
     if (S.missing) { box.innerHTML = '<div class="notice">Las comunidades aún no están activadas en el servidor. Falta ejecutar el archivo 02_comunidades.sql en Supabase.</div>'; return; }
     var c = cur();
     if (!c) { renderJoin(); return; }
-    box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><button class="btn small" id="clInvite" type="button">Invitar</button></div>' +
+    box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button></div>' +
       '<div class="pills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button></div>' +
       '<div class="seg rg-wide" id="clTabs">' + [['events', 'Eventos'], ['board', 'Tablón'], ['pages', 'Info'], ['members', 'Miembros']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
     $('#clInvite').addEventListener('click', invite);
@@ -107,8 +107,8 @@
   }
   function invite() {
     var c = cur(), text = 'Únete a «' + c.name + '» en ReGroupRide. En la app, entra en Comunidad y escribe el código ' + c.code + '.';
-    Cl.sheet('<div class="head"><h1>Invitar</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">Pasa este código a quien quieras que entre en «' + esc(c.name) + '». Lo escribe en la pestaña Comunidad.</p><div class="club-code">' + esc(c.code) + '</div><button class="btn big primary" id="clShare" type="button">Compartir invitación</button><button class="btn" id="clCopy" type="button">Copiar código</button>' +
-      '<button class="btn" id="clNew" type="button">Unirme a otra comunidad o crear una</button>');
+    Cl.sheet('<div class="head"><h1>Invitar</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">Pasa este código a quien quieras que entre en «' + esc(c.name) + '». Lo escribe en la pestaña Comunidad.</p><div class="club-code">' + esc(c.code) + '</div><button class="btn" id="clCopy" type="button"><svg><use href="#i-copy"/></svg>Copiar código</button><button class="btn big primary" id="clShare" type="button"><svg><use href="#i-share"/></svg>Compartir invitación</button>' +
+      '<button class="btn rg-skip" id="clNew" type="button">Unirme a otra comunidad o crear una</button>');
     $('#clX').addEventListener('click', Cl.closeSheet); $('#clShare').addEventListener('click', function () { share(text); }); $('#clCopy').addEventListener('click', function () { copy(c.code, 'Código copiado'); });
     $('#clNew').addEventListener('click', function () { Cl.closeSheet(); renderJoin(); });
   }
@@ -173,27 +173,34 @@
   }
   function drawEvents(c, evs, att) {
     var pane = $('#clPane'); if (!pane || S.tab !== 'events') return;
-    pane.innerHTML = (isAdmin() ? '<button class="btn primary club-add" id="evNew" type="button">+ Nuevo evento o ruta</button>' : '') + (evs.length ? evs.map(function (e) {
+    pane.innerHTML = (isAdmin() ? '<button class="btn big primary club-add" id="evNew" type="button"><svg><use href="#i-plus"/></svg>Nuevo evento o ruta</button>' : '') + (evs.length ? evs.map(function (e) {
       var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
       var taken = takenOf(att, e), queue = queueOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap;
       var st = mine ? mine.status : 'no', iGo = st === 'going', people = going.length + going.filter(function (x) { return x.companion; }).length;
       var routeAdm = (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0, canRun = isAdmin() || routeAdm, m = meetOf(e), pos = queue.map(function (x) { return x.user_id; }).indexOf(S.user.id) + 1, dl = deadlineOf(e, mine);
       var count = cap ? taken.length + ' de ' + cap + (cap === 1 ? ' plaza' : ' plazas') + (queue.length ? ' · ' + queue.length + ' en lista de espera' : '')
         : (going.length ? going.length + (going.length === 1 ? ' moto' : ' motos') + (people > going.length ? ' · ' + people + ' personas' : '') : 'Nadie apuntado todavía');
-      var mineHtml;
+      // Tarjeta de evento de la guía: la franja de arriba dice el estado (color, icono y texto) y debajo va lo demás.
+      var ic = function (n) { return '<svg><use href="#i-' + n + '"/></svg>'; };
+      var strip = st === 'going' ? ['si', 'check', 'Estás apuntado'] : st === 'waiting' ? ['espera', 'clock', 'En lista de espera' + (pos ? ' · puesto ' + pos + ' de ' + queue.length : '')]
+        : st === 'offered' ? ['plaza', 'clock', 'Plaza libre por confirmar'] : ['no', 'info', 'No estás apuntado'];
+      var startBtn = canRun && e.route, mineHtml;
       if (st === 'offered') mineHtml = '<div class="ev-offer"><b>Ha quedado una plaza libre para ti</b><span>Confirma si vienes' + (dl ? ' antes del ' + fmtWhen(dl).toLowerCase() : '') + '. Si no puedes, pasa al siguiente de la lista.</span><div class="ev-go"><button class="btn small primary" data-act="confirm" type="button">Sí, voy</button><button class="btn small" data-act="no" type="button">No puedo</button></div></div>';
-      else if (st === 'waiting') mineHtml = '<div class="ev-go"><span class="ev-wait">En lista de espera' + (pos ? ' · puesto ' + pos + ' de ' + queue.length : '') + '</span><button class="btn small" data-act="no" type="button">Salir de la lista</button>';
-      else mineHtml = '<div class="ev-go"><button class="btn small' + (iGo ? ' primary' : '') + '" data-act="go" type="button">' + (iGo ? 'Voy ✓' : (full ? 'Apuntarme a la lista de espera' : 'Voy')) + '</button>' + (iGo ? '<button class="btn small" data-act="comp" type="button" aria-pressed="' + !!mine.companion + '">Con acompañante</button>' : '') + (iGo ? '<button class="btn small" data-act="no" type="button">No voy</button>' : '');
+      else if (st === 'waiting') mineHtml = '<div class="ev-go"><button class="btn small" data-act="no" type="button">' + ic('exit') + 'Salir de la lista</button>';
+      else if (iGo) mineHtml = '<div class="ev-go"><button class="btn small" data-act="comp" type="button" aria-pressed="' + !!mine.companion + '">Con acompañante</button><button class="btn small" data-act="no" type="button">No voy</button>';
+      else mineHtml = '<div class="ev-go"><button class="btn' + (startBtn ? ' small' : ' big primary') + '" data-act="go" type="button">' + ic('check') + (full ? 'Apuntarme a la lista de espera' : 'Voy') + '</button>';
       if (st !== 'offered') mineHtml += (e.luma_url ? '<button class="btn small" data-act="luma" type="button">Apuntarse en Luma</button>' : '') + '</div>';
-      return '<div class="club-card ev" data-ev="' + e.id + '"><span class="ev-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b>' +
-        (m.url ? '<div class="ev-meet"><button class="link" data-act="meet" type="button"><svg><use href="#i-gmaps"/></svg><span>Salida: ' + esc(m.name || 'ver en Maps') + '</span></button>' + (m.lat != null ? '<button class="btn small" data-act="gomeet" type="button">Ir al punto de salida</button>' : '') + '</div>'
+      var countHtml = '<button class="link ev-count" data-act="who" type="button">' + count + '</button>';
+      return '<div class="club-card ev" data-ev="' + e.id + '"><div class="ev-estado ev-estado--' + strip[0] + '">' + ic(strip[1]) + '<span>' + strip[2] + '</span></div><div class="ev-cuerpo">' +
+        '<span class="ev-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b>' +
+        (m.url ? '<div class="ev-meet"><button class="link" data-act="meet" type="button">' + ic('gmaps') + '<span>Salida: ' + esc(m.name || 'ver en Maps') + '</span></button>' + (m.lat != null ? '<button class="btn small" data-act="gomeet" type="button">' + ic('compass') + 'Ir al punto de salida</button>' : '') + '</div>'
           : (e.meet_name ? '<span class="muted">Salida: ' + esc(e.meet_name) + '</span>' : '')) + (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
-        (e.route ? '<div class="ev-route"><span><svg><use href="#i-route"/></svg>' + esc(e.route.name || 'Ruta') + ' · ' + String(e.route.dist || 0).replace('.', ',') + ' km</span><button class="btn small" data-act="route" type="button">Cargar ruta</button></div>' : '') +
-        (canRun && e.route ? '<button class="btn primary ev-start" data-act="start" type="button">Iniciar la ruta para los apuntados</button>' : '') +
-        (routeAdm && !isAdmin() ? '<span class="muted rg-small">Eres administrador de esta ruta.</span>' : '') + mineHtml +
-        '<button class="link" data-act="who" type="button">' + count + '</button>' +
+        (e.route ? '<div class="ev-route"><span>' + ic('route') + esc(e.route.name || 'Ruta') + ' · ' + String(e.route.dist || 0).replace('.', ',') + ' km</span><button class="btn small" data-act="route" type="button">Cargar ruta</button></div>' : '') +
+        (routeAdm && !isAdmin() ? '<span class="muted rg-small">Eres administrador de esta ruta.</span>' : '') +
+        (st === 'offered' ? mineHtml + countHtml : countHtml + mineHtml) +
+        (startBtn ? '<button class="btn big primary ev-start" data-act="start" type="button">' + ic('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
         ((iGo || st === 'offered') && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
-        (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">Administradores de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</button><button class="link" data-act="edit" type="button">Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div>';
+        (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
     if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
     $$('.ev', pane).forEach(function (card) {
@@ -353,8 +360,8 @@
         var posts = ok(r); return names(posts.map(function (p) { return p.author_id; })).then(function () { return posts; }); });
     }, function (posts) { (function () {
         var pane = $('#clPane'); if (!pane || S.tab !== 'board' || !cur() || cur().id !== c.id) return;
-        pane.innerHTML = (isAdmin() ? '<div class="club-card"><textarea class="note" id="poBody" maxlength="4000" placeholder="Escribe un aviso para la comunidad"></textarea><button class="btn primary" id="poSend" type="button" style="width:100%;margin-top:10px">Publicar aviso</button></div>' : '') +
-          (posts.length ? posts.map(function (p) { return '<div class="club-card" data-po="' + p.id + '"><span class="muted">' + esc(who(p.author_id)) + ' · ' + fmtWhen(p.created_at) + '</span><p>' + esc(p.body) + '</p>' + (isAdmin() ? '<button class="link danger" type="button">Borrar</button>' : '') + '</div>'; }).join('') : '<div class="empty">Aún no hay avisos.</div>');
+        pane.innerHTML = (isAdmin() ? '<div class="club-card"><span class="label">Aviso para la comunidad</span><textarea class="note" id="poBody" maxlength="4000" placeholder="Escribe un aviso para la comunidad"></textarea><button class="btn big primary" id="poSend" type="button">Publicar aviso</button></div>' : '') +
+          (posts.length ? posts.map(function (p) { return '<div class="club-card" data-po="' + p.id + '"><span class="muted">' + esc(who(p.author_id)) + ' · ' + fmtWhen(p.created_at) + '</span><p>' + esc(p.body) + '</p>' + (isAdmin() ? '<button class="link danger" type="button"><svg><use href="#i-trash"/></svg>Borrar</button>' : '') + '</div>'; }).join('') : '<div class="empty">Aún no hay avisos.</div>');
         if ($('#poSend')) $('#poSend').addEventListener('click', function (ev) { var t = $('#poBody').value.trim(); if (!t) return; Cl.busy(ev.currentTarget, function () { return sb.from('community_posts').insert({ community_id: c.id, body: t }).then(function (r) { ok(r); return paneBoard(c); }); }); });
         $$('[data-po] .link', pane).forEach(function (b) { b.addEventListener('click', function () { armed(b, '¿Seguro? Toca otra vez', function () { sb.from('community_posts').delete().eq('id', b.parentNode.dataset.po).then(function (r) { ok(r); return paneBoard(c); }).catch(fail); }); }); });
       })(); }, useCache);
@@ -364,16 +371,16 @@
   function panePages(c, useCache) {
     return swr('pages:' + c.id, function () { return sb.from('community_pages').select('*').eq('community_id', c.id).order('position').order('title').then(ok); }, function (pages) {
       var pane = $('#clPane'); if (!pane || S.tab !== 'pages' || !cur() || cur().id !== c.id) return;
-      pane.innerHTML = (isAdmin() ? '<button class="btn primary club-add" id="pgNew" type="button">+ Nueva página</button>' : '') +
-        (pages.length ? pages.map(function (p) { return '<button class="club-card club-page" type="button" data-pg="' + p.id + '"><b>' + esc(p.title) + '</b><span class="muted">' + esc((p.body || '').slice(0, 90)) + ((p.links || []).length ? ' · ' + p.links.length + (p.links.length === 1 ? ' enlace' : ' enlaces') : '') + '</span></button>'; }).join('') : '<div class="empty">Aquí irán las normas, los descuentos y los enlaces de la comunidad.</div>');
+      pane.innerHTML = (isAdmin() ? '<button class="btn big primary club-add" id="pgNew" type="button"><svg><use href="#i-plus"/></svg>Nueva página</button>' : '') +
+        (pages.length ? pages.map(function (p) { return '<button class="club-card club-page" type="button" data-pg="' + p.id + '"><i class="club-ic"><svg><use href="#i-info"/></svg></i><span class="club-pg"><b>' + esc(p.title) + '</b><span class="muted">' + esc((p.body || '').slice(0, 90)) + ((p.links || []).length ? ' · ' + p.links.length + (p.links.length === 1 ? ' enlace' : ' enlaces') : '') + '</span></span><svg><use href="#i-chev"/></svg></button>'; }).join('') : '<div class="empty">Aquí irán las normas, los descuentos y los enlaces de la comunidad.</div>');
       if ($('#pgNew')) $('#pgNew').addEventListener('click', function () { pageForm(c, null); });
       $$('[data-pg]', pane).forEach(function (b) { b.addEventListener('click', function () { pageView(c, pages.filter(function (p) { return p.id === b.dataset.pg; })[0]); }); });
     }, useCache);
   }
   function pageView(c, p) {
     Cl.sheet('<div class="head"><h1>' + esc(p.title) + '</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div>' + (p.body ? '<p class="club-body">' + esc(p.body) + '</p>' : '') +
-      (p.links || []).map(function (l, i) { return '<div class="club-link"><button class="btn" data-url="' + i + '" type="button"' + (l.url ? '' : ' disabled') + '>' + esc(l.label || l.url) + '</button>' + (l.code ? '<button class="club-codechip" data-code="' + i + '" type="button"><b>' + esc(l.code) + '</b><span>Copiar código</span></button>' : '') + '</div>'; }).join('') +
-      (isAdmin() ? '<div class="ev-admin"><button class="link" id="pgEdit" type="button">Editar</button><button class="link danger" id="pgDel" type="button">Borrar</button></div>' : ''));
+      (p.links || []).map(function (l, i) { return '<div class="club-link"><button class="btn" data-url="' + i + '" type="button"' + (l.url ? '' : ' disabled') + '><svg><use href="#i-link"/></svg>' + esc(l.label || l.url) + '</button>' + (l.code ? '<button class="club-codechip" data-code="' + i + '" type="button"><b>' + esc(l.code) + '</b><span>Copiar código</span></button>' : '') + '</div>'; }).join('') +
+      (isAdmin() ? '<div class="ev-admin pg-admin"><button class="link" id="pgEdit" type="button"><svg><use href="#i-edit"/></svg>Editar</button><button class="link danger" id="pgDel" type="button"><svg><use href="#i-trash"/></svg>Borrar</button></div>' : ''));
     $('#clX').addEventListener('click', Cl.closeSheet);
     $$('[data-url]').forEach(function (b) { b.addEventListener('click', function () { openUrl(p.links[+b.dataset.url].url); }); });
     $$('[data-code]').forEach(function (b) { b.addEventListener('click', function () { copy(p.links[+b.dataset.code].code, 'Código copiado'); }); });
@@ -404,13 +411,13 @@
         var ms = ok(r); return names(ms.map(function (m) { return m.user_id; })).then(function () { return ms; }); });
     }, function (ms) { (function () {
         var pane = $('#clPane'); if (!pane || S.tab !== 'members' || !cur() || cur().id !== c.id) return;
-        pane.innerHTML = '<span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span>' + ms.map(function (m) {
+        pane.innerHTML = '<span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span><div class="club-card club-people">' + ms.map(function (m) {
           var me = m.user_id === S.user.id;
-          return '<div class="club-person" data-u="' + m.user_id + '"><span class="rg-ava">' + esc(who(m.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok">Admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
-            (isAdmin() && !me ? '<button class="link" data-act="role" type="button">' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</button><button class="link danger" data-act="kick" type="button">Expulsar</button>' : '') + '</div>';
-        }).join('') + '<button class="btn danger" id="clLeave" type="button" style="margin-top:14px">Salir de esta comunidad</button>';
+          return '<div class="club-person" data-u="' + m.user_id + '"><span class="rg-ava">' + esc(who(m.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
+            (isAdmin() && !me ? '<span class="rg-macts"><button class="link" data-act="role" type="button">' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</button><button class="link danger" data-act="kick" type="button">Expulsar</button></span>' : '') + '</div>';
+        }).join('') + '</div><button class="btn" id="clLeave" type="button"><svg><use href="#i-exit"/></svg>Salir de esta comunidad</button>';
         $$('[data-act]', pane).forEach(function (b) { b.addEventListener('click', function () {
-          var uid = b.parentNode.dataset.u, m = ms.filter(function (x) { return x.user_id === uid; })[0];
+          var uid = b.closest('.club-person').dataset.u, m = ms.filter(function (x) { return x.user_id === uid; })[0];
           if (b.dataset.act === 'role') sb.from('community_members').update({ role: m.role === 'admin' ? 'member' : 'admin' }).eq('community_id', c.id).eq('user_id', uid).then(function (r) { ok(r); return paneMembers(c); }).catch(fail);
           else armed(b, '¿Seguro?', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', uid).then(function (r) { ok(r); return paneMembers(c); }).catch(fail); });
         }); });
@@ -505,10 +512,11 @@
     if (ch) jset('rg.offers', seen);
   }
   function offerSheet(e) {
-    Cl.sheet('<div class="head"><h1>Hay una plaza para ti</h1></div><p><b>' + esc(e.title) + '</b><br>' + fmtWhen(e.starts_at) + (e.meet_name ? ' · Salida: ' + esc(e.meet_name) : '') + '</p>' +
+    Cl.sheet('<span class="rg-plaza"><i></i>Plaza libre</span><h1>Hay una plaza para ti</h1><p class="rg-win-t">' + esc(e.title) + '</p>' +
+      '<p class="rg-small">' + fmtWhen(e.starts_at) + (e.meet_name ? ' · Salida: ' + esc(e.meet_name) : '') + '</p>' +
       '<p>Alguien se ha desapuntado y eres el siguiente de la lista de espera. ¿Vas a venir?</p>' +
-      '<button class="btn big primary" id="ofYes" type="button">Sí, voy</button><button class="btn big" id="ofNo" type="button">No puedo, que pase al siguiente</button>' +
-      '<p class="muted rg-small" style="text-align:left">Si no contestas antes del ' + fmtWhen(e.deadline).toLowerCase() + ', la plaza pasa al siguiente y tú vuelves a la lista.</p>');
+      '<button class="btn big primary" id="ofYes" type="button"><svg><use href="#i-check"/></svg>Sí, voy</button><button class="btn big" id="ofNo" type="button">No puedo, que pase al siguiente</button>' +
+      '<p class="rg-small">Si no contestas antes del ' + fmtWhen(e.deadline).toLowerCase() + ', la plaza pasa al siguiente y tú vuelves a la lista.</p>', 'win');
     $('#ofYes').addEventListener('click', function (ev) { Cl.busy(ev.currentTarget, function () { return answer(e.id, e.title, true).then(Cl.closeSheet); }); });
     $('#ofNo').addEventListener('click', function (ev) { Cl.busy(ev.currentTarget, function () { return answer(e.id, e.title, false).then(Cl.closeSheet); }); });
   }

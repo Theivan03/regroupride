@@ -170,9 +170,13 @@
     var phone = mode === 'notice' && to && to.phone ? tel(to.phone) : '', el = $('#rgAlarm');
     if (el) {
       el.className = 'rg-alarm ' + r.alert + (mode === 'notice' ? ' quiet' : ''); el.hidden = false;
-      el.innerHTML = '<div class="rg-alarm-in"><span class="rg-alarm-kind">' + esc(k.t) + '</span><b>' + esc(r.name) + '</b><p>' + esc(lead.trim()) + '</p>' +
-        (phone ? '<a class="btn big rg-call" href="tel:' + phone + '">Llamar a ' + esc(to.name) + ' · ' + esc(to.phone) + '</a>' : (mode === 'notice' && to ? '<p class="rg-alarm-small">' + esc(to.name) + ' no ha puesto su teléfono en la app.</p>' : '')) +
-        (r.lat != null ? '<button class="btn big" id="alMap" type="button">Ver dónde está</button>' : '') + '<button class="btn big" id="alOk" type="button">' + (mode === 'alarm' ? 'Entendido, me encargo' : 'Entendido') + '</button></div>';
+      var icn = '<i class="rg-alarm-ic"><svg><use href="#i-' + (r.alert === 'averia' ? 'wrench' : r.alert === 'gasolina' ? 'fuel' : 'warn') + '"/></svg></i>';
+      var mapBtn = r.lat != null ? '<button class="btn big" id="alMap" type="button">' + (mode === 'alarm' ? '' : '<svg><use href="#i-eye"/></svg>') + 'Ver dónde está</button>' : '';
+      if (mode === 'alarm') el.innerHTML = '<div class="rg-alarm-in">' + icn + '<span class="rg-alarm-kind">' + esc(k.t) + '</span><b>' + esc(r.name) + '</b><p>' + esc(lead.trim()) + '</p>' +
+        '<div class="rg-alarm-acts">' + mapBtn + '<button class="btn big" id="alOk" type="button"><svg><use href="#i-check"/></svg>Entendido, me encargo</button></div></div>';
+      else el.innerHTML = '<div class="rg-alarm-in">' + icn + '<b>' + esc(k.t) + ' · ' + esc(r.name) + '</b><p>' + esc(lead.trim()) + '</p>' +
+        (phone ? '<a class="btn big rg-call" href="tel:' + phone + '"><svg><use href="#i-phone"/></svg>Llamar a ' + esc(to.name) + ' · ' + esc(to.phone) + '</a>' : (to ? '<p class="rg-alarm-small">' + esc(to.name) + ' no ha puesto su teléfono en la app.</p>' : '')) +
+        mapBtn + '<button class="btn big" id="alOk" type="button">Entendido</button></div>';
       var how = mode === 'alarm' ? 'seen' : 'ok';
       $('#alOk').addEventListener('click', function () { dismiss(how); });
       if ($('#alMap')) $('#alMap').addEventListener('click', function () { var a = G.alarm; dismiss(how); if (!a) return; if (G.sheetOpen) close(); A.showView('map'); var m = A.map(); if (m) m.flyTo({ center: [a.lon, a.lat], zoom: 14 }); });
@@ -198,11 +202,14 @@
     if (!G.s) return;
     var cur = G.s.myAlert, mine = row(me()), to = mine && mine.alert_to ? row(mine.alert_to) : null, by = mine && mine.seen_by ? row(mine.seen_by) : null, who = by || to;
     var state = G.s.alertPending ? 'Sin cobertura: se enviará en cuanto haya señal.' : (G.s.mySeen ? (by ? esc(by.name) : 'Un administrador') + ' lo ha visto y se encarga.' : 'Le ha saltado a ' + (to ? esc(to.name) + ', el administrador más cercano' : 'los administradores') + '. Aún no lo ha visto.');
-    Cl.sheet(head('Avisar al grupo') + (cur ? '<div class="notice">Aviso enviado: <b>' + esc(KIND[cur].t) + '</b>. ' + state + '</div>' +
-        (who && who.phone ? '<a class="btn big rg-call" href="tel:' + tel(who.phone) + '">Llamar a ' + esc(who.name) + ' · ' + esc(who.phone) + '</a>' : '') + '<button class="btn" id="avCancel" type="button">Cancelar el aviso</button>'
-      : '<p class="muted">Le salta al administrador que esté más cerca de ti, con tu posición; el resto de administradores se enteran. SOS y avería suenan como una alarma.</p>') +
-      '<button class="btn big rg-av sos" data-av="sos" type="button">SOS · Necesito ayuda</button><button class="btn big rg-av averia" data-av="averia" type="button">Avería</button><button class="btn big rg-av gasolina" data-av="gasolina" type="button">Gasolina · Necesito repostar</button>' +
-      '<a class="btn" href="tel:112">Llamar al 112</a>');
+    var btns = function (small) {
+      return '<button class="btn ' + (small ? 'small' : 'big') + ' rg-av sos" data-av="sos" type="button"><svg><use href="#i-warn"/></svg>SOS · Necesito ayuda</button><button class="btn ' + (small ? 'small' : 'big') + ' rg-av averia" data-av="averia" type="button"><svg><use href="#i-wrench"/></svg>Avería</button>' +
+        '<button class="btn ' + (small ? 'small' : 'big') + ' rg-av gasolina" data-av="gasolina" type="button"><svg><use href="#i-fuel"/></svg>' + (small ? 'Gasolina' : 'Gasolina · Necesito repostar') + '</button><a class="btn ' + (small ? 'small' : 'big') + ' rg-av" href="tel:112"><svg><use href="#i-phone"/></svg>Llamar al 112</a>';
+    };
+    Cl.sheet(head(cur ? 'Aviso enviado' : 'Avisar al grupo') + (cur ? '<div class="notice rg-nota-av">Aviso enviado: <b>' + esc(KIND[cur].t) + '</b>. ' + state + '</div>' +
+        (who && who.phone ? '<a class="btn big rg-call" href="tel:' + tel(who.phone) + '"><svg><use href="#i-phone"/></svg>Llamar a ' + esc(who.name) + ' · ' + esc(who.phone) + '</a>' : '') + '<button class="btn rg-skip" id="avCancel" type="button">Cancelar el aviso</button>' +
+        '<span class="label">Enviar otro aviso</span><div class="rg-av-grid">' + btns(true) + '</div>'
+      : '<p class="muted">Le salta al administrador que esté más cerca de ti, con tu posición; el resto de administradores se enteran. SOS y avería suenan como una alarma.</p><div class="rg-av-col">' + btns(false) + '</div>'));
     $('#grX').addEventListener('click', function () { Cl.closeSheet(); });
     if ($('#avCancel')) $('#avCancel').addEventListener('click', function () { Cl.closeSheet(); sendAlert(null); });
     [].forEach.call(document.querySelectorAll('[data-av]'), function (b) { b.addEventListener('click', function () { Cl.closeSheet(); sendAlert(b.dataset.av); }); });
@@ -222,11 +229,11 @@
   function showGroups(announce) {
     var gs = G.groups || [], uid = me(), mine = null;
     gs.forEach(function (g) { if ((g.members || []).some(function (m) { return m.id === uid; })) mine = g; });
-    var who = function (m) { return esc(m.name) + (m.id === uid ? ' (tú)' : ''); };
+    var who = function (m, g) { return esc(m.name) + (m.id === uid ? ' <small>tú</small>' : (m.id === g.guide ? ' <small>guía</small>' : '')); };
     var html = '<span class="rg-pop-kind">Grupos de salida</span>' + (mine ? '<b>Vas en el grupo ' + mine.n + ' de ' + gs.length + '</b><p>' + (mine.n === 1 ? 'Salís los primeros.' : 'Salís después del grupo ' + (mine.n - 1) + '.') +
         (mine.guide ? ' Guía: ' + (mine.guide === uid ? 'tú' : esc(nameOf(mine.guide))) + '.' : '') + '</p>' : '<b>Reparto por grupos</b><p>No estás en ningún grupo: habla con un administrador.</p>') +
-      '<div class="rg-groups">' + gs.map(function (g) { return '<div class="rg-grp' + (g === mine ? ' me' : '') + '"><span>Grupo ' + g.n + '</span>' + (g.members || []).map(function (m) { return '<i' + (m.id === g.guide ? ' class="guide"' : '') + '>' + who(m) + '</i>'; }).join('') + '</div>'; }).join('') + '</div>' +
-      '<button class="btn big" id="gpOk" type="button">Entendido</button>';
+      '<div class="rg-groups">' + gs.map(function (g) { return '<div class="rg-grp' + (g === mine ? ' me' : '') + '"><span>Grupo ' + g.n + (g === mine ? ' · el tuyo' : '') + '</span>' + (g.members || []).map(function (m) { return '<i' + (m.id === g.guide ? ' class="guide"' : '') + '>' + who(m, g) + '</i>'; }).join('') + '</div>'; }).join('') + '</div>' +
+      '<button class="btn big primary" id="gpOk" type="button">Entendido</button>';
     pop('groups', html, function () { $('#gpOk').addEventListener('click', unpop); });
     if (announce && mine) { speak('Vas en el grupo ' + mine.n + ' de ' + gs.length + '.'); try { if (navigator.vibrate) navigator.vibrate([300, 150, 300]); } catch (e) {} }
   }
@@ -236,10 +243,10 @@
     function draw() {
       var gs = L.makeGroups(G.rows, size), blind = 0; gs.forEach(function (g) { g.members.forEach(function (m) { if (!m.known) blind++; }); });
       Cl.sheet(head('Organizar por grupos') + '<p class="muted">La app reparte por ritmo, del grupo más rápido al más tranquilo, con lo que sabe de cada uno: el nivel que eligió, sus medias de otras rutas y lo medido hoy. Si hay administradores, cada grupo lleva uno de guía.</p>' +
-        '<div class="rg-step"><span>Motos por grupo</span><button class="btn small" id="ogLess" type="button">−</button><b>' + size + '</b><button class="btn small" id="ogMore" type="button">+</button></div>' +
+        '<div class="rg-step"><span>Motos por grupo</span><button class="btn small" id="ogLess" type="button" aria-label="Menos"><svg><use href="#i-minus"/></svg></button><b>' + size + '</b><button class="btn small" id="ogMore" type="button" aria-label="Más"><svg><use href="#i-plus"/></svg></button></div>' +
         '<div class="rg-groups">' + gs.map(function (g) { return '<div class="rg-grp"><span>Grupo ' + g.n + ' · ' + g.members.length + '</span>' + g.members.map(function (m) { return '<i' + (m.id === g.guide ? ' class="guide"' : '') + '>' + esc(m.name) + ' <small>' + (m.known ? String(m.score).replace('.', ',') : 'sin datos') + '</small></i>'; }).join('') + '</div>'; }).join('') + '</div>' +
         (blind ? '<p class="muted rg-small" style="text-align:left">' + blind + (blind === 1 ? ' persona no tiene' : ' personas no tienen') + ' nivel ni rutas guardadas: van como nivel medio. La nota va de 1 (tranquilo) a 5 (muy rápido).</p>' : '<p class="muted rg-small" style="text-align:left">La nota va de 1 (tranquilo) a 5 (muy rápido).</p>') +
-        '<button class="btn big primary" id="ogSend" type="button">Enviar a todos</button>' + (G.groups ? '<button class="btn" id="ogClear" type="button">Retirar el reparto</button>' : ''));
+        '<button class="btn big primary" id="ogSend" type="button"><svg><use href="#i-share"/></svg>Enviar a todos</button>' + (G.groups ? '<button class="btn" id="ogClear" type="button">Retirar el reparto</button>' : ''));
       $('#grX').addEventListener('click', function () { Cl.closeSheet(); });
       $('#ogLess').addEventListener('click', function () { size = Math.max(2, size - 1); draw(); });
       $('#ogMore').addEventListener('click', function () { size = Math.min(20, size + 1); draw(); });
@@ -285,7 +292,7 @@
     }, function () { return []; });
   }
   function askCall(c) {
-    pop('call', '<span class="rg-pop-kind">Empieza la ruta</span><b>' + esc(c.name) + '</b><p>' + esc(c.by) + ' ha iniciado la ruta. ¿Vienes?</p><button class="btn big primary" id="clYes" type="button">Sí, voy</button><button class="btn big" id="clNo" type="button">No voy</button>', function () {
+    pop('call', '<span class="rg-pop-kind">Empieza la ruta</span><b>' + esc(c.name) + '</b><p>' + esc(c.by) + ' ha iniciado la ruta. ¿Vienes?</p><button class="btn big primary" id="clYes" type="button"><svg><use href="#i-check"/></svg>Sí, voy</button><button class="btn big" id="clNo" type="button">No voy</button>', function () {
       $('#clYes').addEventListener('click', function (ev) {
         Cl.busy(ev.currentTarget, function () { return sb.rpc('ride_join_event', { p_id: c.id }).then(function (r) { if (r.error) throw r.error; unpop(); return enter(r.data, { start: true }); }); });
       });
@@ -333,18 +340,18 @@
     if (!G.s) { renderJoin(); return; }
     var r = G.rank, list = r ? r.list : [], waiting = G.rows.filter(function (x) { return x.lat == null; });
     Cl.sheet(head('Grupo') + '<p class="muted">' + esc(G.s.name) + '</p>' +
-      '<div class="grp-code"><div class="grp-qr">' + qrSvg('regroupride:' + G.s.code) + '</div><div><span class="label">Código del grupo</span><b>' + esc(G.s.code) + '</b><button class="btn small primary" id="grShare" type="button">Compartir</button></div></div>' +
+      '<div class="grp-code"><div class="grp-qr">' + qrSvg('regroupride:' + G.s.code) + '</div><div><span class="label">Código del grupo</span><b>' + esc(G.s.code) + '</b><button class="btn small primary" id="grShare" type="button"><svg><use href="#i-share"/></svg>Compartir</button></div></div>' +
       '<span class="label">' + (list.length ? 'En ruta, de delante a atrás' : 'Nadie en marcha todavía') + '</span><div class="rg-list">' + list.map(function (x) {
         var al = alertOf(x.user_id);
-        var tag = al ? '<span class="mstatus due">' + esc(KIND[al].t) + '</span>' : x.stale ? '<span class="mstatus due">sin señal ' + Math.round(x.age / 60000) + ' min</span>' : (x.off ? '<span class="mstatus due">fuera de ruta</span>' : (x.behind ? '<span class="mstatus soon">se queda atrás</span>' : ''));
+        var tag = al ? '<span class="mstatus due"><svg><use href="#i-warn"/></svg>' + esc(KIND[al].t) + '</span>' : x.stale ? '<span class="mstatus due"><svg><use href="#i-sens"/></svg>sin señal ' + Math.round(x.age / 60000) + ' min</span>' : (x.off ? '<span class="mstatus soon"><svg><use href="#i-warn"/></svg>fuera de ruta</span>' : (x.behind ? '<span class="mstatus soon"><svg><use href="#i-warn"/></svg>se queda atrás</span>' : ''));
         var gap = x.me ? 'tú' : (x.gap == null ? '' : (Math.abs(x.gap) < 150 ? 'contigo' : km(x.gap) + (x.gap > 0 ? ' por delante' : ' por detrás')));
-        var rw = row(x.user_id), adm = rw && rw.admin ? ' <span class="mstatus ok">Admin</span>' : '';
+        var rw = row(x.user_id), adm = rw && rw.admin ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '';
         return '<div class="club-person"><span class="rg-ava' + (al || x.stale || x.off ? ' bad' : (x.behind ? ' warn' : '')) + '">' + esc(x.name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + adm + ' ' + tag + '</b><span class="muted">' + gap + '</span></div></div>';
       }).join('') + (waiting.length ? '<p class="muted">Sin iniciar la ruta: ' + waiting.map(function (x) { return esc(x.name); }).join(', ') + '.</p>' : '') + '</div>' +
       '<p class="muted rg-small" style="text-align:left">' + (amAdmin() ? 'Cuando pulses «Iniciar ruta», se les iniciará también a los demás que tengan la app abierta. ' : 'La ruta se te iniciará sola cuando la inicie un administrador: deja la app abierta en pantalla. ') + 'Tu posición solo se comparte con este grupo mientras tienes la ruta en marcha, y se borra al pararla.</p>' +
-      (amAdmin() ? '<button class="btn primary" id="grGroups" type="button">Organizar por grupos</button>' : '') + (G.groups ? '<button class="btn" id="grSeeGroups" type="button">Ver los grupos de salida</button>' : '') +
-      '<button class="btn" id="grAlert" type="button">Avisar al grupo: SOS, avería o gasolina</button>' + (amAdmin() ? '<button class="btn" id="grAdmins" type="button">Administradores de la ruta</button>' : '') +
-      (G.s.owner ? '<button class="btn danger" id="grEnd" type="button">Terminar el grupo para todos</button>' : '') + '<button class="btn" id="grLeave" type="button">Salir del grupo</button>');
+      (amAdmin() ? '<button class="btn big primary" id="grGroups" type="button">Organizar por grupos</button>' : '') + (G.groups ? '<button class="btn" id="grSeeGroups" type="button">Ver los grupos de salida</button>' : '') +
+      '<button class="btn rg-btn-aviso" id="grAlert" type="button"><svg><use href="#i-warn"/></svg>Avisar al grupo: SOS, avería o gasolina</button>' + (amAdmin() ? '<button class="btn" id="grAdmins" type="button">Administradores de la ruta</button>' : '') +
+      (G.s.owner ? '<button class="btn danger" id="grEnd" type="button">Terminar el grupo para todos</button>' : '') + '<button class="btn rg-skip" id="grLeave" type="button"><svg><use href="#i-exit"/></svg>Salir del grupo</button>');
     $('#grX').addEventListener('click', close);
     $('#grAlert').addEventListener('click', function () { G.sheetOpen = false; openAlert(); });
     if ($('#grGroups')) $('#grGroups').addEventListener('click', function () { G.sheetOpen = false; openGroups(); });
@@ -354,13 +361,13 @@
     $('#grLeave').addEventListener('click', function (ev) { arm(ev.currentTarget, '¿Seguro? Toca otra vez', function () { var id = G.s.id; leaveLocal(); close(); sb.rpc('ride_leave', { p_id: id }).then(function () { A.toast('Has salido del grupo.', 'ok'); }); }); });
     if ($('#grEnd')) $('#grEnd').addEventListener('click', function (ev) { arm(ev.currentTarget, '¿Seguro? Se borran las posiciones de todos', function () { var id = G.s.id; sb.rpc('ride_end', { p_id: id }).then(function (r) { if (r.error) { fail(r.error); return; } leaveLocal(); close(); A.toast('Grupo terminado.', 'ok'); }); }); });
   }
-  function arm(btn, label, run) { if (btn.dataset.armed) { run(); return; } btn.dataset.armed = '1'; var old = btn.textContent; btn.textContent = label; setTimeout(function () { delete btn.dataset.armed; btn.textContent = old; }, 3500); }
+  function arm(btn, label, run) { if (btn.dataset.armed) { run(); return; } btn.dataset.armed = '1'; var old = btn.innerHTML; btn.textContent = label; setTimeout(function () { delete btn.dataset.armed; btn.innerHTML = old; }, 3500); }
   function renderJoin() {
     var p = A.activePlan();
     Cl.sheet(head('Rodar en grupo') + '<p class="muted">Todos los del grupo se ven en el mapa durante la ruta, y se sabe quién se ha quedado atrás o se ha salido.</p>' +
       '<div class="club-card"><b>Unirme a un grupo</b><p class="muted">Escribe el código que te pasen o escanea su QR. La ruta se carga sola.</p><div class="plan-link"><input type="text" id="grCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="grJoin" type="button">Unirme</button></div>' +
-      (P.CapacitorBarcodeScanner ? '<button class="btn" id="grScan" type="button" style="width:100%;margin-top:8px">Escanear QR</button>' : '') + '</div>' +
-      '<div class="club-card"><b>Crear un grupo</b>' + (p ? '<p class="muted">Para la ruta «' + esc(p.name) + '». Te dará un código y un QR para pasar a los demás.</p><button class="btn primary" id="grCreate" type="button" style="width:100%">Crear grupo para esta ruta</button>' : '<p class="muted">Primero elige la ruta: créala o cárgala y déjala seleccionada en el mapa. Luego vuelve aquí.</p>') + '</div>');
+      (P.CapacitorBarcodeScanner ? '<button class="btn" id="grScan" type="button"><svg><use href="#i-qr"/></svg>Escanear QR</button>' : '') + '</div>' +
+      '<div class="club-card"><b>Crear un grupo</b>' + (p ? '<p class="muted">Para la ruta «' + esc(p.name) + '». Te dará un código y un QR para pasar a los demás.</p><button class="btn big primary" id="grCreate" type="button">Crear grupo para esta ruta</button>' : '<p class="muted">Primero elige la ruta: créala o cárgala y déjala seleccionada en el mapa. Luego vuelve aquí.</p>') + '</div>');
     $('#grX').addEventListener('click', close);
     var join = function (code, btn) {
       code = String(code || '').replace(/^regroupride:/i, '').trim(); if (code.length < 4) { A.toast('Escribe el código.', 'warn'); return; }

@@ -166,7 +166,7 @@ public class RideAlertsPlugin extends Plugin {
     private static Notification bannerNotification(Context c, boolean merged) {
         NotificationCompat.Builder b = new NotificationCompat.Builder(c, CH_BANNER)
             .setSmallIcon(R.drawable.ic_stat_rg)
-            .setColor(0xFF0B8A4B)
+            .setColor(0xFF5A2DB0)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
@@ -329,7 +329,7 @@ public class RideAlertsPlugin extends Plugin {
         PendingIntent full = open(c, 21);
         NotificationCompat.Builder b = new NotificationCompat.Builder(c, loud ? CH_ALARM : CH_NOTICE)
             .setSmallIcon(R.drawable.ic_stat_rg)
-            .setColor(loud ? 0xFFE5484D : 0xFF2F7CF6)
+            .setColor(loud ? 0xFFA31919 : 0xFF5A2DB0)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(text))

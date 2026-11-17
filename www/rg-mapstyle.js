@@ -5,10 +5,10 @@
 (function (root) {
   'use strict';
   var PAL = {
-    day:   { land: '#F4F1EC', green: '#ACD2A0', water: '#A9D3E0', build: '#E9E5DE', road: '#FCFBF9', roadCase: '#C6BFB5', main: '#FBD6A4', mainCase: '#E3B67C',
-             path: '#B9B2A8', rail: '#C9C4BC', border: '#B4ADA3', label: '#4A5563', labelSoft: '#727C89', labelWater: '#4F8FA6', halo: '#F4F1EC' },
-    night: { land: '#1D2226', green: '#1F3226', water: '#13313F', build: '#232930', road: '#3F474F', roadCase: '#12161A', main: '#6A5839', mainCase: '#12161A',
-             path: '#4A525B', rail: '#30363D', border: '#4A525B', label: '#C3CBD4', labelSoft: '#8A94A0', labelWater: '#5C93AA', halo: '#1D2226' }
+    day:   { land: '#F2EFE9', green: '#CFE4C1', water: '#AAD3DF', build: '#E8E4DC', road: '#FFFFFF', roadCase: '#D6D0C6', main: '#F3D2A2', mainCase: '#DDB67E',
+             path: '#B9B2A8', rail: '#C9C4BC', border: '#B4ADA3', label: '#3D4856', labelSoft: '#6B7684', labelWater: '#4F8FA6', halo: '#F2EFE9' },
+    night: { land: '#1E2226', green: '#213328', water: '#1B3442', build: '#242A30', road: '#30363D', roadCase: '#262B31', main: '#4D4232', mainCase: '#262B31',
+             path: '#4A525B', rail: '#30363D', border: '#4A525B', label: '#C3CBD4', labelSoft: '#8A94A0', labelWater: '#5C93AA', halo: '#1E2226' }
   };
   function w(a, b, c, d) { return ['interpolate', ['exponential', 1.5], ['zoom'], 6, a, 10, b, 14, c, 18, d]; }
   function cls() { return ['match', ['get', 'class'], Array.prototype.slice.call(arguments), true, false]; }
@@ -28,9 +28,9 @@
       L.push(l);
     }
     L.push({ id: 'bg', type: 'background', paint: { 'background-color': c.land } });
-    L.push({ id: 'verde', type: 'fill', source: 'omt', 'source-layer': 'landcover', filter: cls('wood', 'grass'), paint: { 'fill-color': c.green, 'fill-opacity': ['match', ['get', 'class'], 'wood', dark ? 0.75 : 0.6, dark ? 0.45 : 0.35], 'fill-antialias': false } });
-    L.push({ id: 'parque', type: 'fill', source: 'omt', 'source-layer': 'park', paint: { 'fill-color': c.green, 'fill-opacity': dark ? 0.55 : 0.45 } });
-    L.push({ id: 'jardin', type: 'fill', source: 'omt', 'source-layer': 'landuse', filter: cls('park', 'pitch', 'cemetery', 'stadium', 'playground'), paint: { 'fill-color': c.green, 'fill-opacity': dark ? 0.6 : 0.5 } });
+    L.push({ id: 'verde', type: 'fill', source: 'omt', 'source-layer': 'landcover', filter: cls('wood', 'grass'), paint: { 'fill-color': c.green, 'fill-opacity': ['match', ['get', 'class'], 'wood', dark ? 0.9 : 0.85, dark ? 0.6 : 0.55], 'fill-antialias': false } });
+    L.push({ id: 'parque', type: 'fill', source: 'omt', 'source-layer': 'park', paint: { 'fill-color': c.green, 'fill-opacity': dark ? 0.8 : 0.7 } });
+    L.push({ id: 'jardin', type: 'fill', source: 'omt', 'source-layer': 'landuse', filter: cls('park', 'pitch', 'cemetery', 'stadium', 'playground'), paint: { 'fill-color': c.green, 'fill-opacity': dark ? 0.9 : 0.85 } });
     L.push({ id: 'rio', type: 'line', source: 'omt', 'source-layer': 'waterway', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': c.water, 'line-width': ['interpolate', ['exponential', 1.4], ['zoom'], 8, 0.8, 13, 2.2, 18, 8] } });
     L.push({ id: 'agua', type: 'fill', source: 'omt', 'source-layer': 'water', paint: { 'fill-color': c.water } });
     L.push({ id: 'edificios', type: 'fill', source: 'omt', 'source-layer': 'building', minzoom: 14, paint: { 'fill-color': c.build, 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, 1] } });
@@ -44,7 +44,7 @@
     line('principal-borde', fMain, c.mainCase, w(1, 3.6, 8.5, 26), { minzoom: 6 });
     line('autovia-borde', fMw, c.mainCase, w(1.8, 4.6, 10, 30), { minzoom: 5 });
     line('calle', fMinor, c.road, w(0, 0, 2.8, 16), { minzoom: 12 });
-    line('via', fMid, dark ? '#454D56' : c.road, w(0, 1.6, 5.6, 21), { minzoom: 8 });
+    line('via', fMid, dark ? '#3A4149' : c.road, w(0, 1.6, 5.6, 21), { minzoom: 8 });
     line('principal', fMain, c.main, w(0.7, 2.4, 6.4, 23), { minzoom: 6 });
     line('autovia', fMw, c.main, w(1.2, 3.2, 7.8, 27), { minzoom: 5 });
     L.push({ id: 'frontera', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['all', ['<=', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': c.border, 'line-width': 1, 'line-dasharray': [3, 2], 'line-opacity': 0.7 } });

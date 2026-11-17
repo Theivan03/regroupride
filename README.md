@@ -155,3 +155,16 @@ Decisiones técnicas y pendientes: `docs/DECISIONES.md`.
 - **Menú lateral como antes**: un solo botón «•••» con todo dentro. Fuera solo quedan «centrar», que aparece únicamente cuando el mapa no está centrado en ti, y el grupo mientras ruedas en uno. La brújula desaparece.
 - **Nivel de motero en el Perfil**. En Ajustes queda solo el teléfono para las rutas, que es opcional.
 - **SOS · Avería · Gasolina siempre a la vista** (Android): mientras se graba, los tres botones van dentro del aviso del seguimiento por GPS, así la app enseña un solo aviso y el teléfono no los apila. Se recoloca solo cada pocos segundos y al encender la pantalla. El aviso de «enviado» lleva «Cancelar aviso» a la vista.
+
+## 0.15 · la estética «Quedada» de Design: violeta de marca, lima de acción, logotipo nuevo
+
+Se aplica el documento **«ReGroupRide · Pantallas y marca»** (78 láminas, 71 pantallas en día y noche) y el **kit de marca**.
+
+- **Marca.** Símbolo, logotipo e iconos nuevos: icono de la app (adaptable y temático en Android 13), icono de las notificaciones (silueta), pantalla de arranque, favicon e iconos de la web.
+- **Color.** Violeta `#5A2DB0` (de noche `#B9A2FF`) para la marca y la navegación; lima `#D9F21C` para **una sola acción principal por pantalla**, abajo. Ámbar para los avisos y rojo para parar, borrar y SOS. El mapa lleva los colores de la lámina (fondo, calles, carreteras, parques y agua) en día y en noche.
+- **Piezas.** Todo sale de `www/rg-quedada.css` (se carga el último): variables de la guía, botones de 60, campos de 52, tarjetas de radio 20, hojas inferiores con tirador para formularios y decisiones, ventanas centradas para lo que pide respuesta («¿Vienes?», plaza ofrecida, avisos de otro administrador) y alarma a pantalla completa solo para el administrador más cercano.
+- **Iconos.** Los 51 de la guía (trazo de 2 sobre 24) sustituyen a los anteriores.
+- **Pantallas.** Mapa, en ruta, rodar en grupo, comunidad (franja de estado en cada evento), rutas, datos, garaje, perfil y ajustes siguen las láminas. Las miniaturas de las rutas usan el color del trazado.
+- **Android.** Los tres botones de aviso de la notificación llevan los colores de la guía (rojo, ámbar y neutro), con versión de noche.
+
+Para comparar con las láminas: `scripts/pantallas.py` y `scripts/otras.sh` sacan todas las pantallas en día y en noche.
