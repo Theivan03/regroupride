@@ -256,7 +256,7 @@
       var set = function (status, companion, said) {
         return setStatus(e, mine, status, companion).then(function (got) {
           ring(c.id, { kind: 'att', eid: e.id });
-          if (got === 'waiting' && (!mine || mine.status !== 'waiting')) A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn');
+          if (got === 'waiting' && (!mine || mine.status !== 'waiting')) { A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn'); setTimeout(closedHelp, 1800); }
           else if (said) A.toast(said, 'ok');
           inbox(true); return paneEvents(c);
         }).catch(fail);
@@ -501,6 +501,7 @@
   function nid(evId, k) { return (parseInt(String(evId).replace(/-/g, '').slice(0, 7), 16) || 1) * 4 + k; }   // cabe en un entero de 32 bits
   function hhmm(ms) { return new Date(ms).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); }
   function inbox(force) {
+    if (IN.busy && force) { IN.again = true; return Promise.resolve(); }      // llegó un aviso mientras se consultaba: se repite al acabar
     if (!sb || !S.user || IN.busy || S.v6 === false) return Promise.resolve();
     if (!force && Date.now() - IN.at < 20000) return Promise.resolve();
     IN.busy = true; IN.at = Date.now();
@@ -509,7 +510,8 @@
       if (r.error) { if (/could not find|schema cache|does not exist/i.test(r.error.message || '')) S.v6 = false; return; }
       S.v6 = true; IN.events = (r.data && r.data.events) || [];
       remind(); watchWaiting(); newsWatch(); offers(); drain();
-    }, function () { IN.busy = false; });
+      if (IN.again) { IN.again = false; setTimeout(function () { inbox(true); }, 300); }
+    }, function () { IN.busy = false; if (IN.again) { IN.again = false; setTimeout(function () { inbox(true); }, 1500); } });
   }
   // Deja programados exactamente los recordatorios que tocan: quita los de eventos que ya no voy o que han cambiado de hora.
   function remind() {
@@ -579,18 +581,18 @@
     IN.events.forEach(function (e) {
       if (e.status !== 'offered') return;
       var k = e.id + ':' + e.offered_at, sn = seen[k] || (seen[k] = { at: now });
-      if (document.visibilityState === 'visible') {
-        if (sn.asked || A.isRec() || !$('#rgSheet').hidden) return;
-        sn.asked = 1; ch = true; offerSheet(e);
-        if (RA && RA.eventSeen) { try { RA.eventSeen({ eventId: e.id, offeredAt: e.offered_at || 0 }).catch(function () {}); } catch (x) {} }
-      } else if (RA && e.key && !sn.notified) {
+      var title = 'Hay una plaza para ti: ' + e.title, body = 'Alguien se ha desapuntado y te toca a ti. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.';
+      // La notificación sale siempre, también con la app delante (y si hay otra ventana abierta o se está grabando).
+      if (!sn.notified && RA && e.key) {
         sn.notified = 1; ch = true;
         if (!raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
-        try { RA.eventShow({ item: { id: nid(e.id, 2), at: 0, title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y te toca a ti. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', kind: 'offer', key: e.key, eventId: e.id, eventTitle: e.title, offeredAt: e.offered_at || 0, cid: e.community_id } }).catch(function () {}); } catch (x) {}
-      } else if (LN && !sn.notified) {
+        try { RA.eventShow({ item: { id: nid(e.id, 2), at: 0, title: title, body: body, kind: 'offer', key: e.key, eventId: e.id, eventTitle: e.title, offeredAt: e.offered_at || 0, cid: e.community_id } }).catch(function () {}); } catch (x) {}
+      } else if (!sn.notified && !RA && LN) {
         sn.notified = 1; ch = true;
-        try { LN.schedule({ notifications: [{ id: nid(e.id, 2), title: 'Hay una plaza para ti: ' + e.title, body: 'Alguien se ha desapuntado y te toca a ti. ¿Vienes? Contesta antes del ' + fmtWhen(e.deadline).toLowerCase() + '.', actionTypeId: 'RG_OFFER', extra: { eventId: e.id, title: e.title, kind: 'offer' } }] }).catch(function () {}); } catch (x) {}
+        try { LN.schedule({ notifications: [{ id: nid(e.id, 2), title: title, body: body, actionTypeId: 'RG_OFFER', extra: { eventId: e.id, title: e.title, kind: 'offer' } }] }).catch(function () {}); } catch (x) {}
       }
+      // Con la app delante, además, la ventana para contestar (si no hay otra abierta ni se está grabando).
+      if (document.visibilityState === 'visible' && !sn.asked && !A.isRec() && $('#rgSheet').hidden) { sn.asked = 1; ch = true; offerSheet(e); }
     });
     if (ch) jset('rg.offers', seen);
   }
@@ -608,6 +610,7 @@
     return sb.from('event_attendees').update({ status: yes ? 'going' : 'no' }).eq('event_id', evId).eq('user_id', S.user.id).select('status').then(function (r) {
       var d = ok(r), got = d && d[0] ? d[0].status : null;
       A.toast(yes ? (got === 'going' ? 'Confirmado: vas a «' + title + '».' : 'La plaza ya no estaba libre: sigues en la lista de espera.') : 'Vale. La plaza pasa al siguiente de la lista.', yes && got !== 'going' ? 'warn' : 'ok');
+      if (RA && RA.eventDone) { try { RA.eventDone({ id: nid(evId, 2) }).catch(function () {}); } catch (x) {} }      // contestado aquí: fuera la notificación
       refresh(); return inbox(true);
     });
   }
@@ -647,6 +650,54 @@
     try { RA.eventPending().then(function (r) { ((r && r.list) || []).forEach(function (p) { IN.pending.push({ act: p.act, ev: p.eventId, title: p.title }); }); drain(); }, function () {}); } catch (e) {}
   }
   setInterval(function () { inbox(false); }, 60000);
+  // En lista de espera y con la app delante: se mira cada 30 s por si el aviso en directo no llega (red mala).
+  setInterval(function () { if (document.visibilityState === 'visible' && IN.events.some(function (e) { return e.status === 'waiting'; })) inbox(true); }, 30000);
+
+  /* ---------- avisos con la app cerrada: qué los puede frenar en este móvil ---------- */
+  function noticeIssues(st) {
+    var out = [];
+    if (st.notifications === false) out.push(['notif', 'Las notificaciones de ReGroupRide están apagadas.', 'Activar']);
+    if (st.exact === false) out.push(['exact', 'Android no deja comprobar cada minuto (alarmas exactas).', 'Permitir']);
+    if (st.battery === false) out.push(['battery', 'El ahorro de batería puede retrasar o frenar los avisos.', 'Quitar el límite']);
+    return out;
+  }
+  function closedHelp() {
+    if (!RA || !RA.noticeStatus) return;
+    try { if (localStorage.getItem('rg.closedAsk')) return; } catch (x) {}
+    RA.noticeStatus().then(function (st) {
+      var is = noticeIssues(st || {}); if (!is.length || !$('#rgSheet').hidden) return;
+      try { localStorage.setItem('rg.closedAsk', '1'); } catch (x) {}
+      Cl.sheet('<h1>Para que te avise aunque cierres la app</h1><p>Si queda una plaza te llega una notificación. En este móvil hay algo que puede retrasarla:</p>' +
+        is.map(function (x) { return '<div class="rg-nrow"><span>' + x[1] + '</span><button class="btn small" data-w="' + x[0] + '" type="button">' + x[2] + '</button></div>'; }).join('') +
+        '<button class="btn rg-skip" id="chNo" type="button">Ahora no</button>');
+      $$('#rgSheet [data-w]').forEach(function (b) { b.addEventListener('click', function () { RA.openSetting({ what: b.dataset.w }).catch(function () {}); }); });
+      $('#chNo').addEventListener('click', Cl.closeSheet);
+    }, function () {});
+  }
+  function ago(t) { var m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'hace menos de un minuto' : m < 60 ? 'hace ' + m + ' min' : m < 1440 ? 'hace ' + Math.round(m / 60) + ' h' : 'hace ' + Math.round(m / 1440) + ' días'; }
+  function renderNotiCard() {
+    if (!RA || !RA.noticeStatus) return;
+    var box = $('#rgNoti');
+    if (!box) { var at = $('#rgPerms'); if (!at) return; box = document.createElement('div'); box.className = 'rg-account'; box.id = 'rgNoti'; at.parentNode.insertBefore(box, at.nextSibling); }
+    RA.noticeStatus().then(function (st) {
+      st = st || {};
+      var is = noticeIssues(st), r = st.lastResult || '', last;
+      if (!st.lastCheck) last = 'Aún no ha comprobado nada: empieza al apuntarte en una lista de espera o al entrar en una comunidad.';
+      else last = 'Última comprobación ' + ago(st.lastCheck) + ': ' + (r === 'falta08' ? 'falta ejecutar supabase/08_plaza_avisada.sql en Supabase, así que no puede avisar de plazas con la app cerrada.'
+        : r === 'sinred' ? 'sin conexión.' : r === 'plaza' ? 'te ha avisado de una plaza.' : /^ok:[1-9]/.test(r) ? 'en lista de espera en ' + r.slice(3) + (r.slice(3) === '1' ? ' evento' : ' eventos') + ', sin plaza todavía.' : 'todo en orden.');
+      box.innerHTML = '<span class="label">Avisos con la app cerrada</span><div class="card rg-noti">' +
+        (is.length ? is.map(function (x) { return '<div class="rg-nrow"><span>' + x[1] + '</span><button class="btn small" data-w="' + x[0] + '" type="button">' + x[2] + '</button></div>'; }).join('')
+          : '<p class="rg-nok"><svg><use href="#i-check"/></svg>Este móvil deja avisar con la app cerrada (comprueba cada minuto).</p>') +
+        '<p class="muted rg-small">' + last + '</p></div>';
+      box.hidden = false;
+      $$('[data-w]', box).forEach(function (b) { b.addEventListener('click', function () { RA.openSetting({ what: b.dataset.w }).catch(function () {}); }); });
+    }, function () {});
+  }
+  (function () {
+    var v = $('#view-settings'); if (!v || !window.MutationObserver) return;
+    new MutationObserver(function () { if (!v.hidden) renderNotiCard(); }).observe(v, { attributes: true, attributeFilter: ['hidden'] });
+  })();
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && $('#view-settings') && !$('#view-settings').hidden) renderNotiCard(); });
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(function () { nativePending(); inbox(true); refresh(); }, 1200); });
 
   Cl.onChange(function (u) {

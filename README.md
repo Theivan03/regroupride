@@ -201,3 +201,9 @@ Para comparar con las láminas: `scripts/pantallas.py` y `scripts/otras.sh` saca
 - **Editar eventos:** los administradores de la comunidad y, con el SQL 10, también los administradores de esa ruta.
 - **Mapas en las fichas:** grabadas, planificadas y de otros moteros llevan una miniatura con el mapa de verdad (se dibuja una vez y se guarda en el móvil; sin conexión, el dibujo de siempre).
 - SQL: **`supabase/10_tiempo_real.sql`** (terminar para todos por cualquier administrador, editar por administradores de la ruta, «Empieza la ruta» con la app cerrada y trazado de las rutas públicas).
+
+## 0.20 · el aviso de plaza siempre llega; los tres botones con la pantalla bloqueada en cualquier Android
+
+- **Plaza libre en lista de espera:** la notificación sale siempre, también con la app delante (antes, si la app estaba abierta, solo se intentaba la ventana y, con otra ventana abierta o grabando, no salía nada). Al contestar en la app se quita la notificación. Un aviso en directo que llega mientras la app ya consultaba no se pierde.
+- **Ajustes → Avisos con la app cerrada:** dice si algo de este móvil frena los avisos (notificaciones apagadas, alarmas exactas, ahorro de batería) con un botón para arreglarlo, y qué pasó en la última comprobación (por ejemplo, si falta ejecutar `supabase/08_plaza_avisada.sql`). Al quedar en lista de espera se ofrece una vez.
+- **SOS, Avería y Gasolina con la pantalla bloqueada:** durante una ruta en grupo la app se ve por encima de la pantalla de bloqueo (como un navegador) y al encender la pantalla salen solo los tres botones, en grande; «Usar la app» pide desbloquear. Si se estaba en otra app, queda el aviso fijo, ahora con una vista recogida que cabe en los 48 dp que deja Android 12+ (antes se cortaba en la pantalla de bloqueo de algunas marcas).

@@ -710,3 +710,27 @@ a.btn.rg-av{text-decoration:none}
 :root[data-theme="dark"] .club-card.ex .ex-thumb{background:#1E2226}
 .ev-admin .link svg{width:18px;height:18px}
 .club-card.ex .ex-thumb>svg.ex-pin{width:40px;height:40px;color:var(--marca)}
+
+/* ---- 0.20 ---- */
+/* Pantalla bloqueada en una ruta en grupo: solo los tres botones, en grande */
+.rg-lock{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) 20px max(24px,env(safe-area-inset-bottom,0px));background:var(--fondo);color:var(--texto)}
+.rg-lock[hidden]{display:none}
+.rg-lock-in{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px;text-align:center}
+.rg-lock h1{font:600 30px/36px var(--font-titulo);margin:0 0 6px;color:var(--marca)}
+.rg-lock-k{font:600 14px/18px var(--font-texto);color:var(--texto-2);margin:0}
+.rg-lock .btn.rg-lock-b{min-height:104px;border-radius:var(--r-tarjeta);font:700 32px/36px var(--font-titulo);box-shadow:none}
+.rg-lock .btn.rg-lock-b.sos{background:var(--alarma-sos,#A31919);color:var(--sobre-alarma,#fff)}
+.rg-lock .btn.rg-lock-b.averia{background:var(--alarma-averia,#FFB300);color:#1A1300}
+.rg-lock .btn.rg-lock-b.gasolina{background:var(--superficie-2);color:var(--texto)}
+.rg-lock .btn.rg-skip{margin-top:10px;min-height:56px;font-size:17px}
+html.rg-locked body{overflow:hidden}
+/* Ajustes · avisos con la app cerrada */
+.rg-noti{display:grid;gap:var(--e-3)}
+.rg-nrow{display:flex;align-items:center;gap:var(--e-3);justify-content:space-between;text-align:left}
+.rg-nrow span{flex:1;font:500 15px/21px var(--font-texto)}
+.rg-nrow .btn.small{flex:none}
+.rg-nok{display:flex;align-items:center;gap:var(--e-2);margin:0;font:600 15px/21px var(--font-texto)}
+.rg-nok svg{width:22px;height:22px;color:var(--marca);flex:none}
+.rg-lock .btn.rg-lock-b.averia{background:#FFB300;color:#1A1300}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rg-lock .btn.rg-lock-b.averia{background:#FFC24A}}
+:root[data-theme="dark"] .rg-lock .btn.rg-lock-b.averia{background:#FFC24A}

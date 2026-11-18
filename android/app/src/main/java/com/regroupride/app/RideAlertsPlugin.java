@@ -2,6 +2,8 @@ package com.regroupride.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlarmManager;
+import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -18,6 +20,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.service.notification.StatusBarNotification;
@@ -85,6 +88,7 @@ public class RideAlertsPlugin extends Plugin {
     private static Runnable silence;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static boolean bannerOn;
+    private static boolean alarmLock;      // la alarma del grupo enciende la pantalla y se ve encima del bloqueo
     private static String bannerSent = "";
     private static String bannerLabel = "";
     private static boolean bannerSeen;
@@ -159,6 +163,7 @@ public class RideAlertsPlugin extends Plugin {
         }
         placeBanner(c, true);
         watchBanner(c);
+        applyLock();
         call.resolve();
     }
 
@@ -176,12 +181,17 @@ public class RideAlertsPlugin extends Plugin {
             .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
             .setContentIntent(open(c, 20));
         if (merged) b.setSubText("Siguiendo tu ruta");
-        RemoteViews rv;
+        // Dos vistas: la recogida cabe en los 48 dp que Android 12+ deja a una notificación recogida (así sale en la
+        // pantalla de bloqueo de cualquier marca) y la desplegada es la grande de siempre.
+        RemoteViews rv, small;
         if (bannerSent.isEmpty()) {
             rv = new RemoteViews(c.getPackageName(), R.layout.rg_alert_banner);
-            rv.setOnClickPendingIntent(R.id.rg_sos, tap(c, "sos", 1));
-            rv.setOnClickPendingIntent(R.id.rg_averia, tap(c, "averia", 2));
-            rv.setOnClickPendingIntent(R.id.rg_gasolina, tap(c, "gasolina", 3));
+            small = new RemoteViews(c.getPackageName(), R.layout.rg_alert_banner_small);
+            for (RemoteViews v : new RemoteViews[] { rv, small }) {
+                v.setOnClickPendingIntent(R.id.rg_sos, tap(c, "sos", 1));
+                v.setOnClickPendingIntent(R.id.rg_averia, tap(c, "averia", 2));
+                v.setOnClickPendingIntent(R.id.rg_gasolina, tap(c, "gasolina", 3));
+            }
             b.setContentTitle("Avisar al grupo").setContentText("SOS · Avería · Gasolina");
         } else {
             String title = "Aviso enviado: " + bannerLabel;
@@ -190,9 +200,12 @@ public class RideAlertsPlugin extends Plugin {
             rv.setTextViewText(R.id.rg_sent_title, title);
             rv.setTextViewText(R.id.rg_sent_text, text);
             rv.setOnClickPendingIntent(R.id.rg_cancel, tap(c, "cancel", 4));
+            small = new RemoteViews(c.getPackageName(), R.layout.rg_alert_sent_small);
+            small.setTextViewText(R.id.rg_sent_title, title);
+            small.setOnClickPendingIntent(R.id.rg_cancel, tap(c, "cancel", 4));
             b.setContentTitle(title).setContentText(text);
         }
-        b.setCustomContentView(rv).setCustomBigContentView(rv);
+        b.setCustomContentView(small).setCustomBigContentView(rv).setCustomHeadsUpContentView(small);
         return b.build();
     }
 
@@ -262,11 +275,13 @@ public class RideAlertsPlugin extends Plugin {
                 @Override
                 public void onReceive(Context context, Intent intent) {
                     placeBanner(c, false);
+                    tellLock(c);
                 }
             };
             try {
                 IntentFilter f = new IntentFilter(Intent.ACTION_SCREEN_ON);
                 f.addAction(Intent.ACTION_USER_PRESENT);
+                f.addAction(Intent.ACTION_SCREEN_OFF);
                 ContextCompat.registerReceiver(c, screenRx, f, ContextCompat.RECEIVER_NOT_EXPORTED);
             } catch (Exception e) {
                 screenRx = null;
@@ -278,6 +293,7 @@ public class RideAlertsPlugin extends Plugin {
     private static synchronized void removeBanner(Context ctx) {
         Context c = ctx.getApplicationContext();
         bannerOn = false;
+        applyLock();
         if (bannerTick != null) { MAIN.removeCallbacks(bannerTick); bannerTick = null; }
         if (screenRx != null) {
             try { c.unregisterReceiver(screenRx); } catch (Exception ignored) { }
@@ -527,24 +543,139 @@ public class RideAlertsPlugin extends Plugin {
         call.resolve();
     }
 
-    /** Deja (o no) que la app se vea por encima de la pantalla de bloqueo y encienda la pantalla. */
+    /** La alarma del grupo: la app enciende la pantalla y se ve por encima del bloqueo (o deja de hacerlo). */
     private void overLock(final boolean on) {
-        final Activity a = getActivity();
+        alarmLock = on;
+        applyLock();
+    }
+
+    /**
+     * Durante una ruta en grupo la app se ve por encima de la pantalla de bloqueo (como un navegador): al encender la
+     * pantalla aparecen directamente SOS, Avería y Gasolina en grande, en cualquier marca de móvil. Solo la alarma del
+     * grupo enciende la pantalla por sí sola.
+     */
+    private static void applyLock() {
+        RideAlertsPlugin p = instance;
+        final Activity a = p == null ? null : p.getActivity();
         if (a == null) return;
+        final boolean show = bannerOn || alarmLock, wake = alarmLock;
         a.runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 try {
                     if (Build.VERSION.SDK_INT >= 27) {
-                        a.setShowWhenLocked(on);
-                        a.setTurnScreenOn(on);
+                        a.setShowWhenLocked(show);
+                        a.setTurnScreenOn(wake);
                     } else {
-                        int f = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
-                        if (on) a.getWindow().addFlags(f); else a.getWindow().clearFlags(f);
+                        int f1 = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED, f2 = WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
+                        if (show) a.getWindow().addFlags(f1); else a.getWindow().clearFlags(f1);
+                        if (wake) a.getWindow().addFlags(f2); else a.getWindow().clearFlags(f2);
                     }
                 } catch (Exception ignored) { }
             }
         });
+    }
+
+    private static boolean locked(Context c) {
+        try {
+            KeyguardManager km = (KeyguardManager) c.getSystemService(Context.KEYGUARD_SERVICE);
+            return km != null && km.isKeyguardLocked();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Le dice a la app si se está viendo con la pantalla bloqueada (para enseñar solo los tres botones grandes). */
+    private static void tellLock(Context c) {
+        RideAlertsPlugin p = instance;
+        if (p == null) return;
+        JSObject o = new JSObject();
+        o.put("locked", locked(c));
+        p.notifyListeners("lock", o, true);
+    }
+
+    @PluginMethod
+    public void lockState(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("locked", locked(getContext()));
+        call.resolve(o);
+    }
+
+    /** «Usar la app»: pide el PIN o la huella para quitar el bloqueo. */
+    @PluginMethod
+    public void unlock(PluginCall call) {
+        final Activity a = getActivity();
+        if (a != null && Build.VERSION.SDK_INT >= 26) {
+            a.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        KeyguardManager km = (KeyguardManager) a.getSystemService(Context.KEYGUARD_SERVICE);
+                        if (km != null) km.requestDismissKeyguard(a, null);
+                    } catch (Exception ignored) { }
+                }
+            });
+        }
+        call.resolve();
+    }
+
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+        applyLock();
+        tellLock(getContext());
+    }
+
+    /** Estado de los avisos con la app cerrada: notificaciones, alarmas exactas, ahorro de batería y última comprobación. */
+    @PluginMethod
+    public void noticeStatus(PluginCall call) {
+        Context c = getContext();
+        JSObject o = new JSObject();
+        try {
+            o.put("notifications", NotificationManagerCompat.from(c).areNotificationsEnabled());
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            o.put("exact", Build.VERSION.SDK_INT < 31 || (am != null && am.canScheduleExactAlarms()));
+            PowerManager pm = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
+            o.put("battery", pm != null && pm.isIgnoringBatteryOptimizations(c.getPackageName()));
+            android.content.SharedPreferences sp = EventNotices.prefsFor(c);
+            o.put("lastCheck", sp.getLong("lastCheck", 0));
+            o.put("lastResult", sp.getString("lastResult", ""));
+            o.put("nextCheck", sp.getLong("nextCheck", 0));
+            o.put("waiting", new org.json.JSONObject(sp.getString("watch", "{}")).length());
+            o.put("news", !sp.getString("newsKey", "").isEmpty());
+        } catch (Exception ignored) { }
+        call.resolve(o);
+    }
+
+    /** Abre el ajuste del sistema que hace falta: notificaciones, alarmas exactas o ahorro de batería. */
+    @PluginMethod
+    public void openSetting(PluginCall call) {
+        Context c = getContext();
+        String what = call.getString("what", "");
+        Intent i;
+        if ("battery".equals(what)) {
+            i = new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + c.getPackageName()));
+        } else if ("exact".equals(what) && Build.VERSION.SDK_INT >= 31) {
+            i = new Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + c.getPackageName()));
+        } else {
+            i = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, c.getPackageName());
+        }
+        try {
+            c.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception e) {
+            try {
+                c.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Exception ignored) { }
+        }
+        call.resolve();
+    }
+
+    /** El aviso de un evento ya se ha contestado en la app: fuera de la barra. */
+    @PluginMethod
+    public void eventDone(PluginCall call) {
+        Integer id = call.getInt("id", 0);
+        if (id != null && id != 0) EventNotices.done(getContext(), id);
+        call.resolve();
     }
 
     private static synchronized void startSound(Context ctx) {

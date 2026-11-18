@@ -62,6 +62,10 @@ final class EventNotices {
 
     private EventNotices() { }
 
+    static SharedPreferences prefsFor(Context c) {
+        return prefs(c);
+    }
+
     private static SharedPreferences prefs(Context c) {
         return c.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
@@ -343,6 +347,22 @@ final class EventNotices {
         } catch (Exception ignored) { }
     }
 
+    /** Lo ha contestado la app: se quita el aviso y su recuerdo. */
+    static synchronized void done(Context c, int id) {
+        try {
+            NotificationManagerCompat.from(c).cancel(id);
+        } catch (Exception ignored) { }
+        JSONObject all = items(c);
+        all.remove(String.valueOf(id));
+        save(c, all);
+        disarm(c, id);
+    }
+
+    /** Lo último que pasó al comprobar (se ve en Ajustes → Avisos con la app cerrada). */
+    private static void note(Context c, String r) {
+        prefs(c).edit().putLong("lastCheck", System.currentTimeMillis()).putString("lastResult", r).apply();
+    }
+
     /** Pregunta al servidor por cada evento en espera. Se ejecuta fuera del hilo principal. */
     static void check(Context c) {
         JSONObject w;
@@ -386,6 +406,7 @@ final class EventNotices {
                 break;      // sin conexión: no se insiste con los demás (el sistema da pocos segundos); se pregunta en la siguiente
             }
         }
+        note(c, unsupported ? "falta08" : offline ? "sinred" : (!offers.isEmpty() ? "plaza" : "ok:" + Math.max(0, w.length() - drop.size())));
         synchronized (EventNotices.class) {
             if (unsupported) {
                 prefs(c).edit().remove("watch").apply();

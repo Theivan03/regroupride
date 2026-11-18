@@ -146,7 +146,36 @@
     var on = !!(G.s && A.isRec() && !A.isDemo()), k = on ? 'on:' + (G.s.myAlert || '') + ':' + (G.s.mySeen ? 1 : 0) : '';
     if (k === G.bannerKey) return; G.bannerKey = k;
     if (on) RA.showBanner({ sent: G.s.myAlert || '', label: G.s.myAlert ? KIND[G.s.myAlert].t : '', seen: !!G.s.mySeen }).catch(noop); else RA.hideBanner().catch(noop);
+    lockPanel();
   }
+  /* Pantalla bloqueada durante una ruta en grupo: la app se ve por encima del bloqueo (lo pone RideAlerts) y aquí solo
+     quedan los tres botones, en grande. Para usar el resto hay que desbloquear el móvil. */
+  var LOCK = { on: false, key: '' };
+  function lockPanel() {
+    var want = !!(LOCK.on && G.s && A.isRec() && !A.isDemo()), el = $('#rgLock');
+    if (!want) { if (el) el.hidden = true; LOCK.key = ''; document.documentElement.classList.remove('rg-locked'); return; }
+    var sent = G.s.myAlert || '', k = sent + ':' + (G.s.mySeen ? 1 : 0) + ':' + G.s.name;
+    if (!el) { el = document.createElement('div'); el.id = 'rgLock'; el.className = 'rg-lock'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Avisar al grupo'); document.body.appendChild(el); }
+    if (k !== LOCK.key || el.hidden) {
+      LOCK.key = k;
+      el.innerHTML = '<div class="rg-lock-in"><p class="rg-lock-k">Ruta en grupo · ' + esc(G.s.name || '') + '</p>' +
+        (sent ? '<h1>Aviso enviado: ' + KIND[sent].t + '</h1><p>' + (G.s.mySeen ? 'El organizador lo ha visto.' : 'Enviado al organizador.') + '</p><button class="btn big" data-k="cancel" type="button">Cancelar aviso</button>'
+          : '<h1>Avisar al grupo</h1><button class="btn rg-lock-b sos" data-k="sos" type="button">SOS</button><button class="btn rg-lock-b averia" data-k="averia" type="button">Avería</button><button class="btn rg-lock-b gasolina" data-k="gasolina" type="button">Gasolina</button>') +
+        '<button class="btn rg-skip" data-k="unlock" type="button">Usar la app (desbloquear)</button></div>';
+      [].forEach.call(el.querySelectorAll('[data-k]'), function (b) { b.addEventListener('click', function () {
+        var x = b.dataset.k;
+        if (x === 'unlock') { if (RA && RA.unlock) RA.unlock().catch(noop); return; }
+        if (navigator.vibrate) try { navigator.vibrate(120); } catch (e) {}
+        sendAlert(x === 'cancel' ? null : x);
+      }); });
+    }
+    el.hidden = false; document.documentElement.classList.add('rg-locked');
+  }
+  function lockState(v) { LOCK.on = !!v; lockPanel(); }
+  if (RA && RA.addListener) RA.addListener('lock', function (e) { lockState(e && e.locked); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && RA && RA.lockState) RA.lockState().then(function (s) { lockState(s && s.locked); }, noop);
+  });
   // Enviar (o cancelar, con kind vacío) mi aviso. Si no hay cobertura se queda pendiente y se reintenta solo.
   function sendAlert(kind, again) {
     if (!G.s || !sb || !me()) return;
