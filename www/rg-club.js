@@ -292,7 +292,7 @@
         (st === 'offered' ? mineHtml + countHtml : countHtml + mineHtml) +
         (startBtn ? '<button class="btn big primary ev-start" data-act="start" type="button">' + ic('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
         ((iGo || st === 'offered') && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
-        (canRun ? '<button class="btn small" data-act="manage" type="button">' + ic('list') + 'Inscritos y llegada (web)</button>' : '') +
+        (canRun ? '<button class="btn small" data-act="manage" type="button">' + ic('people') + 'Inscritos y llegada</button>' : '') +
         (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
     if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
@@ -315,7 +315,7 @@
         else if (act === 'luma') openUrl(e.luma_url); else if (act === 'rurl') openUrl(e.route_url); else if (act === 'route') loadRoute(e);
         else if (act === 'meet') openUrl(meetOf(e).url); else if (act === 'gomeet') goMeet(e, b);
         else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
-        else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') openUrl(WEB + '/?m=' + e.id);
+        else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') manageSheet(e);
         else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
       }); });
     });
@@ -392,10 +392,85 @@
   // Mi entrada: el mismo código QR que sale en la web, para enseñarlo al llegar. El código lo da el servidor.
   var WEB = 'https://regroupride-eventos.netlify.app';
   function qrSvg(text) { try { var q = window.qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }); } catch (x) { return ''; } }
+  function icn(n) { return '<svg><use href="#i-' + n + '"/></svg>'; }
+  function rpcOk(fn, args) { return sb.rpc(fn, args).then(function (r) { if (r.error) throw r.error; return r.data; }); }
+  // Inscritos y llegada (administradores): apuntados de la app y de la web, aprobar, marcar la llegada y leer las entradas.
+  var MST = { going: 'Con plaza', offered: 'Plaza ofrecida', waiting: 'En espera', pending: 'Por aprobar', declined: 'Rechazado' }, MORD = ['pending', 'going', 'offered', 'waiting', 'declined'];
+  function manageSheet(e, find) {
+    find = find || '';
+    var shell = function (body) {
+      Cl.sheet('<div class="head"><h1>Inscritos</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p class="muted" style="text-align:left;margin:0">' + esc(e.title) + '</p>' + body);
+      $('#clX').addEventListener('click', Cl.closeSheet);
+    };
+    if ($('#rgSheet').hidden) shell('<p class="muted">Cargando…</p>');
+    rpcOk('event_manage', { p_event: e.id }).then(function (d) {
+      var rows = d.members.map(function (m) { m.kind = 'm'; return m; }).concat(d.guests.map(function (g) { g.kind = 'g'; return g; }));
+      rows.sort(function (a, b) { return MORD.indexOf(a.status) - MORD.indexOf(b.status) || a.joined_at - b.joined_at; });
+      var n = function (f) { return rows.filter(f).length; }, again = function () { manageSheet(e, find); };
+      shell('<div class="rg-mstats"><div><b>' + n(function (x) { return x.status === 'going' || x.status === 'offered'; }) + (e.capacity ? '<small> / ' + e.capacity + '</small>' : '') + '</b><span>Con plaza</span></div><div><b>' + n(function (x) { return x.status === 'waiting'; }) + '</b><span>En espera</span></div><div><b>' + n(function (x) { return x.status === 'pending'; }) + '</b><span>Por aprobar</span></div><div><b>' + n(function (x) { return x.checked_in; }) + '</b><span>Han llegado</span></div></div>' +
+        '<button class="btn big primary" id="mgScan" type="button">' + icn('qr') + 'Leer entradas (QR)</button>' +
+        '<input id="mgFind" placeholder="Buscar por nombre o teléfono" value="' + esc(find) + '" autocomplete="off">' +
+        '<div class="rg-list" id="mgList"></div><button class="btn small" id="mgWeb" type="button">' + icn('share') + 'Abrir en la web (respuestas y descarga)</button>');
+      var list = function () {
+        var f = find.toLowerCase(), vis = rows.filter(function (x) { return !f || (x.name + ' ' + (x.phone || '') + ' ' + (x.email || '')).toLowerCase().indexOf(f) >= 0; });
+        $('#mgList').innerHTML = vis.length ? vis.map(function (x) {
+          var b = '';
+          if (x.status === 'pending') b = '<button class="btn small primary" data-a="approve" type="button">Aprobar</button><button class="btn small" data-a="decline" type="button">Rechazar</button>';
+          else if (x.status === 'going') b = '<button class="btn small' + (x.checked_in ? '' : ' primary') + '" data-a="' + (x.checked_in ? 'uncheck' : 'checkin') + '" type="button">' + (x.checked_in ? 'Quitar llegada' : 'Ha llegado') + '</button>';
+          else if (x.kind === 'g') b = '<button class="btn small" data-a="approve" type="button">' + (x.status === 'declined' ? 'Aprobar' : 'Dar plaza') + '</button>';
+          return '<div class="club-person rg-mrow" data-i="' + rows.indexOf(x) + '"><span class="rg-ava ' + (x.checked_in ? 'rol-admin' : 'rol-comp') + '">' + esc((x.name || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + (x.companion ? ' <span class="mstatus">+1</span>' : '') + '</b>' +
+            '<span class="muted rg-small">' + MST[x.status] + ' · ' + (x.kind === 'm' ? 'App' : 'Web') + (x.checked_in ? ' · <b>ha llegado</b>' : '') + (x.phone ? ' · ' + esc(x.phone) : '') + '</span><div class="rg-row">' + b + '</div></div></div>';
+        }).join('') : '<div class="empty">' + (rows.length ? 'Nadie coincide con la búsqueda.' : 'Todavía no se ha apuntado nadie.') + '</div>';
+        $$('#mgList [data-a]').forEach(function (bt) {
+          bt.addEventListener('click', function () {
+            var x = rows[+bt.closest('.rg-mrow').dataset.i], a = bt.dataset.a;
+            Cl.busy(bt, function () { return (x.kind === 'g' ? rpcOk('guest_set', { p_guest: x.id, p_action: a }) : rpcOk('member_checkin', { p_event: e.id, p_user: x.id, p_on: a === 'checkin' })).then(again); });
+          });
+        });
+      };
+      list();
+      $('#mgFind').addEventListener('input', function () { find = this.value.trim(); list(); });
+      $('#mgWeb').addEventListener('click', function () { openUrl(WEB + '/?m=' + e.id); });
+      $('#mgScan').addEventListener('click', function () { scanTickets(e, again); });
+    }).catch(function (x) { shell('<div class="notice">' + esc(Cl.msg ? Cl.msg(x) : (x && x.message) || 'No se ha podido cargar la lista.') + '</div>'); });
+  }
+  // Lector de entradas: la cámara lee el QR y el servidor marca la llegada. Si no hay cámara, se escribe el código.
+  var jsqrJob = null;
+  function loadJsqr() { return jsqrJob || (jsqrJob = new Promise(function (ok, no) { var sc = document.createElement('script'); sc.src = 'vendor/jsqr.js'; sc.onload = ok; sc.onerror = function () { jsqrJob = null; no(new Error('No se ha podido cargar el lector.')); }; document.head.appendChild(sc); })); }
+  function scanTickets(e, done) {
+    var el = document.createElement('div'), stream = null, timer = 0, last = '', lastAt = 0, cv = document.createElement('canvas'), n = 0;
+    el.className = 'rg-scan';
+    el.innerHTML = '<div class="rg-scan-cam"><video playsinline muted></video><i></i></div><div class="rg-scan-r" id="scR">Apunta la cámara al código de la entrada.</div><span class="muted rg-small" id="scN"></span><form id="scF"><input id="scC" placeholder="…o escribe el código" autocomplete="off" autocapitalize="off"></form><button class="btn big" id="scX" type="button">Terminar</button>';
+    document.body.appendChild(el);
+    var v = el.querySelector('video'), out = el.querySelector('#scR'), say = function (t, k) { out.textContent = t; out.className = 'rg-scan-r' + (k ? ' ' + k : ''); };
+    var check = function (code) {
+      code = String(code || '').trim(); if (!code) return; var now = Date.now(); if (code === last && now - lastAt < 4000) return; last = code; lastAt = now;
+      rpcOk('event_checkin', { p_event: e.id, p_code: code }).then(function (r) {
+        if (r.ok) { if (!r.already) { n++; el.querySelector('#scN').textContent = n + (n === 1 ? ' llegada marcada' : ' llegadas marcadas'); } say((r.already ? 'Ya había llegado: ' : 'Bienvenido, ') + r.name + (r.companion ? ' (+1)' : ''), r.already ? 'warn' : 'ok'); }
+        else say((r.name ? r.name + ': ' : '') + r.error, 'bad');
+        try { if (navigator.vibrate) navigator.vibrate(r.ok ? 70 : [70, 60, 70]); } catch (x) {}
+      }, function (x) { say((x && x.message) || 'No se ha podido comprobar.', 'bad'); });
+    };
+    var close = function () { clearInterval(timer); if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); if (el.parentNode) el.parentNode.removeChild(el); done(); };
+    el.querySelector('#scX').addEventListener('click', close);
+    el.querySelector('#scF').addEventListener('submit', function (ev) { ev.preventDefault(); var i = el.querySelector('#scC'); check(i.value); i.value = ''; });
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { say('Aquí no se puede usar la cámara. Escribe el código o marca la llegada en la lista.', 'bad'); return; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }).then(function (st) {
+      stream = st; v.srcObject = st; var pl = v.play(); if (pl && pl.catch) pl.catch(function () {});
+      var det = null; try { if ('BarcodeDetector' in window) det = new window.BarcodeDetector({ formats: ['qr_code'] }); } catch (x) { det = null; }
+      (det ? Promise.resolve() : loadJsqr()).then(function () {
+        timer = setInterval(function () {
+          if (v.readyState < 2 || !v.videoWidth) return;
+          if (det) det.detect(v).then(function (c) { if (c && c[0]) check(c[0].rawValue); }, function () {});
+          else { var w = cv.width = 480, h = cv.height = Math.round(480 * v.videoHeight / v.videoWidth) || 480, x = cv.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, w, h); var q = window.jsQR(x.getImageData(0, 0, w, h).data, w, h); if (q && q.data) check(q.data); }
+        }, 280);
+      }, function (x) { say(x.message, 'bad'); });
+    }, function () { say('No hay permiso para usar la cámara. Dáselo a la app en los ajustes del móvil, o escribe el código.', 'bad'); });
+  }
   function ticketSheet(e) {
     Cl.sheet('<div class="head"><h1>Mi entrada</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
       '<div class="rg-ticket"><div class="rg-ticket-qr" id="tkQr"><span class="muted">Cargando…</span></div><b>' + esc(e.title) + '</b><span class="muted">' + fmtWhen(e.starts_at) + '</span><span class="muted rg-small">Enseña este código al llegar: el organizador lo lee y marca tu llegada.</span></div>' +
-      '<button class="btn" id="tkWeb" type="button">' + ic('share') + 'Compartir el evento</button>');
+      '<button class="btn" id="tkWeb" type="button">' + icn('share') + 'Compartir el evento</button>');
     $('#clX').addEventListener('click', Cl.closeSheet);
     $('#tkWeb').addEventListener('click', function () { var u = WEB + '/?e=' + e.id; if (navigator.share) navigator.share({ title: e.title, url: u }).catch(function () {}); else openUrl(u); });
     sb.rpc('event_public', { p_id: e.id }).then(function (r) {

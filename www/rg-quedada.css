@@ -828,9 +828,9 @@ html.rg-locked body{overflow:hidden}
 .tab:active{transform:scale(.85)}
 .tab[aria-selected="true"] svg{animation:rgTab .5s cubic-bezier(.2,.8,.2,1) both}
 .tab[aria-selected="true"]::after{animation:rgDot 1.8s ease-in-out infinite}
-.rg-rip-host{position:relative;overflow:hidden}
+.rg-rip-host{position:relative;overflow:clip}
 .rg-rip{position:absolute;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;background:currentColor;opacity:.3;transform:scale(0);animation:rgRip .6s ease-out forwards;pointer-events:none}
-.rg-sheet .btn.big.primary,.club .btn.big.primary{position:relative;overflow:hidden;animation:rgGlow 2.4s ease-in-out infinite}
+.rg-sheet .btn.big.primary,.club .btn.big.primary{position:relative;overflow:clip;animation:rgGlow 2.4s ease-in-out infinite}
 .rg-sheet .btn.big.primary::after,.club .btn.big.primary::after{content:"";position:absolute;top:0;bottom:0;left:0;width:42%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent);animation:rgSheen 2.8s ease-in-out infinite;pointer-events:none}
 .toast{animation:rgPop .4s cubic-bezier(.2,.9,.25,1.2) both}
 /* entrada con QR */
@@ -851,3 +851,16 @@ html.rg-locked body{overflow:hidden}
 .rg-sheet.rg-page>.rg-sheet-in{position:relative;z-index:1}
 body:has(#view-map:not([hidden])) .rg-bg,body.rg-rec .rg-bg{display:none}
 @media (prefers-reduced-motion:reduce){.view.rg-in,.view.rg-in *,.view h1,.rg-sheet,.rg-sheet *,.rg-sheet::before,.rg-sheet::after,.rg-bg *,.rg-bg::before,.rg-bg::after,.tab svg,.tab::after,.toast,.btn,.btn::after{animation:none!important}.btn,.tab,.link,.club-card,.seg button{transition:none}.view>h1,.view>.head>h1{-webkit-text-fill-color:currentColor;background:none}}
+
+/* 0.24.1 — inscritos y lector de entradas en la app */
+.rg-mstats{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--e-2)}
+.rg-mstats div{background:var(--superficie-2);border-radius:var(--r-m);padding:var(--e-2) var(--e-2);text-align:center}
+.rg-mstats b{display:block;font:700 22px/26px var(--font-titulo)}.rg-mstats small{font:600 13px var(--font-texto);color:var(--texto-2)}.rg-mstats span{font:500 11px/14px var(--font-texto);color:var(--texto-2)}
+.rg-mrow{align-items:flex-start}.rg-mrow .rg-row{margin-top:var(--e-2);gap:var(--e-2);flex-wrap:wrap}
+.rg-scan{position:fixed;inset:0;z-index:5000;background:#0b0b0e;color:#fff;display:flex;flex-direction:column;align-items:center;gap:14px;overflow-y:auto;padding:max(16px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px));animation:rgFade .25s ease both}
+.rg-scan-cam{position:relative;width:min(100%,440px);aspect-ratio:1/1;border-radius:24px;overflow:hidden;background:#000;flex:none}
+.rg-scan-cam video{width:100%;height:100%;object-fit:cover;display:block}
+.rg-scan-cam i{position:absolute;inset:14%;border:3px solid #D9F21C;border-radius:22px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35);animation:rgDot 1.6s ease-in-out infinite}
+.rg-scan-r{width:min(100%,440px);padding:14px 16px;border-radius:16px;background:#1d1d22;font:600 18px/24px var(--font-titulo);min-height:56px;text-align:center}
+.rg-scan-r.ok{background:#D9F21C;color:#14150F;animation:rgPop .35s cubic-bezier(.2,.9,.25,1.2) both}.rg-scan-r.warn{background:#5A2DB0}.rg-scan-r.bad{background:#8E1B1B;animation:rgPop .35s both}
+.rg-scan form,.rg-scan .btn{width:min(100%,440px)}.rg-scan input{width:100%}.rg-scan .muted{color:#b9b6c6}
