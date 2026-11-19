@@ -209,6 +209,7 @@ final class EventNotices {
                 return;
             }
             JSONArray items = r.optJSONArray("items");
+            sp.edit().putLong("lastNews", System.currentTimeMillis()).putInt("lastNewsN", items == null ? 0 : items.length()).apply();
             long last = since;
             for (int n = 0; items != null && n < items.length(); n++) {
                 JSONObject it = items.optJSONObject(n);
@@ -239,6 +240,25 @@ final class EventNotices {
 
     /** Un aviso de novedad: evento, tablón, info o «empieza la ruta». silent = solo apuntarlo (la app ya lo ha enseñado). */
     static void notifyNews(Context c, JSONObject it, boolean silent) {
+        if ("offer".equals(it.optString("kind"))) {
+            // Plaza ofrecida (supabase/12): el aviso con «Sí, voy» y «No puedo», sin depender de nada guardado antes.
+            if (silent) return;
+            try {
+                String ev = it.optString("event_id", ""), name = it.optString("title", "la ruta");
+                long dl = it.optLong("deadline", 0);
+                String until = dl > 0 ? " Contesta antes de las " + new java.text.SimpleDateFormat("HH:mm 'del' d/M", new java.util.Locale("es", "ES")).format(new java.util.Date(dl)) + "." : "";
+                int nid = 6;
+                try {
+                    nid = Integer.parseInt(ev.replace("-", "").substring(0, 7), 16) * 4 + 2;      // el mismo número que usa la app
+                } catch (Exception ignored) { }
+                put(c, new JSONObject().put("id", nid).put("at", 0).put("kind", "offer")
+                        .put("title", "Hay una plaza para ti: " + name)
+                        .put("body", "Alguien se ha desapuntado y te toca a ti. ¿Vienes?" + until)
+                        .put("key", it.optString("key", "")).put("eventId", ev).put("eventTitle", name)
+                        .put("offeredAt", it.optLong("offered_at", 0)).put("cid", it.optString("cid", "")));
+            } catch (Exception ignored) { }
+            return;
+        }
         String kind = it.optString("kind"), key = kind + ":" + it.optString("id");
         if (!firstTime(c, key) || silent) return;
         String com = it.optString("community", "Tu comunidad"), title = it.optString("title", "");
@@ -461,12 +481,7 @@ final class EventNotices {
             int id = it.getInt("id");
             if ("offer".equals(it.optString("kind"))) {          // una misma oferta solo suena una vez, la avise la app o el teléfono
                 long off = it.optLong("offeredAt", 0);
-                JSONObject w = watching(c), e = w.optJSONObject(it.optString("eventId", ""));
-                if (off > 0 && e != null) {
-                    if (e.optLong("seen", 0) == off) return;
-                    e.put("seen", off);
-                    prefs(c).edit().putString("watch", w.toString()).apply();
-                }
+                if (off > 0 && !firstTime(c, "offer:" + it.optString("eventId", "") + ":" + off)) return;
             }
             JSONObject all = items(c);
             all.put(String.valueOf(id), it);

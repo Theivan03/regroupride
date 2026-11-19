@@ -640,6 +640,8 @@ public class RideAlertsPlugin extends Plugin {
             android.content.SharedPreferences sp = EventNotices.prefsFor(c);
             o.put("push", !sp.getString("pushToken", "").isEmpty());
             o.put("lastPush", sp.getLong("lastPush", 0));
+            o.put("lastNews", sp.getLong("lastNews", 0));
+            o.put("configured", !sp.getString("url", "").isEmpty() && !sp.getString("newsKey", "").isEmpty());
             o.put("lastCheck", sp.getLong("lastCheck", 0));
             o.put("lastResult", sp.getString("lastResult", ""));
             o.put("nextCheck", sp.getLong("nextCheck", 0));

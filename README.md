@@ -214,3 +214,9 @@ Para comparar con las láminas: `scripts/pantallas.py` y `scripts/otras.sh` saca
 - **Web de eventos** (`web/`, estática, para Netlify; `netlify.toml` ya apunta a ella). Panel para crear y editar los eventos de tus comunidades con foto de portada, y página pública de cada evento (`/e/<id>`) para compartir y apuntarse, al estilo de Luma. Usa la misma cuenta y la misma base de datos: lo creado en la web sale en la app y al revés.
 - **Portada de los eventos** en la app (foto 16:9 con la fecha en una píldora y el título en blanco; sin foto, el mapa del punto de salida). También se puede subir desde la app.
 - **Mejoras visuales** (estudio de Tonit): cifras en rejilla 2×2 en el detalle de ruta y en Datos; miniaturas con el mapa apagado, trazado grueso (violeta de día, lima de noche) y marcas de salida y llegada; modo noche por escalones de gris; aros de rol en los avatares (siempre con su etiqueta); perfil con avatar de 96, insignia de nivel, la moto principal y tres cifras.
+
+## 0.22 · la plaza ofrecida llega con el push sin depender de nada guardado en el teléfono
+
+- `supabase/12_plaza_por_push.sql`: `community_news` devuelve también las plazas ofrecidas sin contestar, con la clave para responder. Al llegar el push, el teléfono construye con eso la notificación «Hay una plaza para ti» (antes dependía de que la app hubiera dejado apuntado el evento mientras se estaba en lista de espera).
+- Una misma oferta suena una sola vez, la detecte la app o el teléfono.
+- Ajustes → Avisos con la app cerrada dice cuándo llegó el último push.

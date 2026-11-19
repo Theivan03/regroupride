@@ -618,8 +618,9 @@
   // pregunta cada 15 minutos con la clave de novedades de la cuenta (supabase/09) y pone el aviso aunque la app esté cerrada.
   function newsWatch() {
     if (!RA || !RA.newsWatch || !S.user || IN.newsOn) return; IN.newsOn = true;
+    try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); raReady = true; } catch (x) {}
     sb.rpc('news_key').then(function (r) {
-      if (r.error || !r.data) return;                                              // falta supabase/09: sin avisos de novedades
+      if (r.error || !r.data) { IN.newsOn = false; return; }                                              // falta supabase/09: sin avisos de novedades
       if (!raReady) { raReady = true; try { RA.eventConfig({ url: Cl.cfg.url, apikey: Cl.cfg.key }).catch(function () {}); } catch (x) {} }
       try { RA.newsWatch({ key: r.data }).catch(function () {}); } catch (x) {}
     }, function () {});
@@ -739,7 +740,7 @@
       box.innerHTML = '<span class="label">Avisos con la app cerrada</span><div class="card rg-noti">' +
         (is.length ? is.map(function (x) { return '<div class="rg-nrow"><span>' + x[1] + '</span><button class="btn small" data-w="' + x[0] + '" type="button">' + x[2] + '</button></div>'; }).join('')
           : '<p class="rg-nok"><svg><use href="#i-check"/></svg>Este móvil deja avisar con la app cerrada (comprueba cada minuto).</p>') +
-        '<p class="rg-nok' + (st.push ? '' : ' off') + '"><svg><use href="#i-' + (st.push ? 'check' : 'info') + '"/></svg>' + (st.push ? 'Push activado: los avisos llegan al momento' + (st.lastPush ? ' (último ' + ago(st.lastPush) + ').' : '.') : 'Push sin activar en esta versión: los avisos pueden tardar hasta un minuto o más.') + '</p>' +
+        '<p class="rg-nok' + (st.push ? '' : ' off') + '"><svg><use href="#i-' + (st.push ? 'check' : 'info') + '"/></svg>' + (st.push ? 'Push activado' + (st.configured === false ? ', pero falta terminar de prepararlo: abre la pestaña Comunidad una vez.' : ': los avisos llegan al momento' + (st.lastPush ? ' (último recibido ' + ago(st.lastPush) + ').' : ' (aún no ha recibido ninguno).')) : 'Push sin activar en esta versión: los avisos pueden tardar hasta un minuto o más.') + '</p>' +
         '<p class="muted rg-small">' + last + '</p></div>';
       box.hidden = false;
       $$('[data-w]', box).forEach(function (b) { b.addEventListener('click', function () { RA.openSetting({ what: b.dataset.w }).catch(function () {}); }); });
