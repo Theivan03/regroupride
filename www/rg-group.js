@@ -298,7 +298,7 @@
   function showGroups(announce) {
     var gs = G.groups || [], uid = me(), mine = null;
     gs.forEach(function (g) { if ((g.members || []).some(function (m) { return m.id === uid; })) mine = g; });
-    var who = function (m, g) { return esc(m.name) + (m.id === uid ? ' <small>tú</small>' : (m.id === g.guide ? ' <small>guía</small>' : '')); };
+    var who = function (m, g) { return esc(m.name) + (m.id === uid ? ' <small>tú</small>' : (m.id === g.guide ? ' <small class="guia">guía</small>' : '')); };
     var html = '<span class="rg-pop-kind">Grupos de salida</span>' + (mine ? '<b>Vas en el grupo ' + mine.n + ' de ' + gs.length + '</b><p>' + (mine.n === 1 ? 'Salís los primeros.' : 'Salís después del grupo ' + (mine.n - 1) + '.') +
         (mine.guide ? ' Guía: ' + (mine.guide === uid ? 'tú' : esc(nameOf(mine.guide))) + '.' : '') + '</p>' : '<b>Reparto por grupos</b><p>No estás en ningún grupo: habla con un administrador.</p>') +
       '<div class="rg-groups">' + gs.map(function (g) { return '<div class="rg-grp' + (g === mine ? ' me' : '') + '"><span>Grupo ' + g.n + (g === mine ? ' · el tuyo' : '') + '</span>' + (g.members || []).map(function (m) { return '<i' + (m.id === g.guide ? ' class="guide"' : '') + '>' + who(m, g) + '</i>'; }).join('') + '</div>'; }).join('') + '</div>' +
@@ -331,7 +331,7 @@
   // Administradores de esta ruta: quién puede iniciarla, atender avisos y repartir grupos.
   function openAdmins() {
     Cl.sheet(head('Administradores de la ruta') + '<p class="muted">Pueden iniciar la ruta para todos, reciben los avisos de SOS, avería y gasolina y pueden repartir los grupos. Solo vale para esta ruta.</p><div class="rg-list">' +
-      G.rows.map(function (x) { return '<div class="club-person" data-u="' + x.user_id + '"><span class="rg-ava">' + esc((x.name || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + (x.admin ? ' <span class="mstatus ok">Admin</span>' : '') + '</b><span class="muted">' + (x.owner ? 'Inició la ruta' : '') + '</span></div>' +
+      G.rows.map(function (x) { return '<div class="club-person" data-u="' + x.user_id + '"><span class="rg-ava ' + (x.admin ? 'rol-admin' : 'rol-comp') + '">' + esc((x.name || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + (x.admin ? ' <span class="mstatus ok">Admin</span>' : '') + '</b><span class="muted">' + (x.owner ? 'Inició la ruta' : '') + '</span></div>' +
         (x.owner || x.user_id === me() ? '' : '<button class="link" type="button">' + (x.admin ? 'Quitar admin' : 'Hacer admin') + '</button>') + '</div>'; }).join('') + '</div>');
     $('#grX').addEventListener('click', function () { Cl.closeSheet(); });
     [].forEach.call(document.querySelectorAll('#rgSheet [data-u] .link'), function (b) { b.addEventListener('click', function () {
@@ -416,7 +416,7 @@
         var fx = A.lastFix && A.lastFix(), far = (x.gap == null || G.s.free) && fx && x.lat != null ? window.Geo.dist(fx.lat, fx.lon, x.lat, x.lon) : null;
         var gap = x.me ? 'tú' : (far != null ? (far < 150 ? 'contigo' : 'a ' + km(far) + ' de ti') : (x.gap == null ? '' : (Math.abs(x.gap) < 150 ? 'contigo' : km(x.gap) + (x.gap > 0 ? ' por delante' : ' por detrás'))));
         var rw = row(x.user_id), adm = rw && rw.admin ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '';
-        return '<div class="club-person"><span class="rg-ava' + (al || x.stale || x.off ? ' bad' : (x.behind ? ' warn' : '')) + '">' + esc(x.name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + adm + ' ' + tag + '</b><span class="muted">' + gap + '</span></div></div>';
+        return '<div class="club-person"><span class="rg-ava' + (al || x.stale || x.off ? ' bad' : (x.behind ? ' warn' : '')) + (rw && rw.admin ? ' rol-admin' : ' rol-comp') + '">' + esc(x.name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + adm + ' ' + tag + '</b><span class="muted">' + gap + '</span></div></div>';
       }).join('') + (waiting.length ? '<p class="muted">Sin iniciar la ruta: ' + waiting.map(function (x) { return esc(x.name); }).join(', ') + '.</p>' : '') + '</div>' +
       '<p class="muted rg-small" style="text-align:left">' + (amAdmin() ? 'Cuando pulses «Iniciar ruta», se les iniciará también a los demás que tengan la app abierta. ' : 'La ruta se te iniciará sola cuando la inicie un administrador: deja la app abierta en pantalla. ') + 'Tu posición solo se comparte con este grupo mientras tienes la ruta en marcha, y se borra al pararla.</p>' +
       (amAdmin() ? '<button class="btn big primary" id="grGroups" type="button">Organizar por grupos</button>' : '') + (G.groups ? '<button class="btn" id="grSeeGroups" type="button">Ver los grupos de salida</button>' : '') +

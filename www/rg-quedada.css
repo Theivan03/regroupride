@@ -24,7 +24,7 @@
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --fondo:#0B0F14; --superficie:#141A22; --superficie-2:#1C2430; --texto:#E8EDF2; --texto-2:#A8B3BF; --linea:#263040;
+    --fondo:#0F0F12; --superficie:#1A1A1F; --superficie-2:#26262C; --texto:#E8EDF2; --texto-2:#A8B3BF; --linea:#34343B;
     --marca:#B9A2FF; --sobre-marca:#160B33; --marca-suave:#2A1F4A; --bien:#B9A2FF;
     --accion:#D9F21C; --sobre-accion:#14150F; --accion-borde:transparent;
     --cartel:var(--marca-suave); --sobre-cartel:var(--texto);
@@ -37,7 +37,7 @@
   }
 }
 :root[data-theme="dark"]{
-  --fondo:#0B0F14; --superficie:#141A22; --superficie-2:#1C2430; --texto:#E8EDF2; --texto-2:#A8B3BF; --linea:#263040;
+  --fondo:#0F0F12; --superficie:#1A1A1F; --superficie-2:#26262C; --texto:#E8EDF2; --texto-2:#A8B3BF; --linea:#34343B;
   --marca:#B9A2FF; --sobre-marca:#160B33; --marca-suave:#2A1F4A; --bien:#B9A2FF;
   --accion:#D9F21C; --sobre-accion:#14150F; --accion-borde:transparent;
   --cartel:var(--marca-suave); --sobre-cartel:var(--texto);
@@ -734,3 +734,53 @@ html.rg-locked body{overflow:hidden}
 .rg-lock .btn.rg-lock-b.averia{background:#FFB300;color:#1A1300}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rg-lock .btn.rg-lock-b.averia{background:#FFC24A}}
 :root[data-theme="dark"] .rg-lock .btn.rg-lock-b.averia{background:#FFC24A}
+
+/* ---- 0.21 · mejoras visuales (estudio de Tonit) ---- */
+/* 1 · Cifras en rejilla de 2×2: etiqueta arriba (13, minúsculas, secundario) y cifra de 32 con la unidad a 14 */
+#detailSummary,#perRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--e-2);padding:0;background:none;box-shadow:none;justify-content:stretch}
+#detailSummary .fig,#perRow .fig{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;padding:var(--e-3) var(--e-4);border-radius:var(--r-tarjeta);background:var(--superficie);box-shadow:var(--sombra-1);text-align:left}
+#detailSummary .fig:last-child:nth-child(odd),#perRow .fig:last-child:nth-child(odd){grid-column:1/-1}
+#detailSummary .fig .label,#perRow .fig .label,#profileTotals .fig .label{font:500 13px/17px var(--font-texto);text-transform:none;letter-spacing:0;color:var(--texto-2)}
+#detailSummary .fig .val,#detailSummary .fig.m .val,#perRow .fig .val{font:700 32px/38px var(--font-titulo);white-space:nowrap}
+#detailSummary .fig .val .unit,#perRow .fig .val .unit,#detailSummary .fig .val::after{font:600 14px/18px var(--font-texto);margin-left:4px}
+/* 2 · Miniaturas: el dibujo de reserva, con el mismo color que el mapa (violeta de día, lima de noche) */
+.plan .thumb,.club-card.ex .ex-thumb{color:#5A2DB0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .plan .thumb,:root:not([data-theme="light"]) .club-card.ex .ex-thumb{color:#D9F21C;background:#1A1A1F}}
+:root[data-theme="dark"] .plan .thumb,:root[data-theme="dark"] .club-card.ex .ex-thumb{color:#D9F21C;background:#1A1A1F}
+/* 3 · Modo noche por escalones de gris: lo elevado (barra) un escalón más claro, sin sombra */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tabs{background:var(--superficie-2);box-shadow:none}}
+:root[data-theme="dark"] .tabs{background:var(--superficie-2);box-shadow:none}
+/* 4 · Aro del avatar según el rol (siempre con su etiqueta al lado) */
+.rg-ava.rol-admin{box-shadow:0 0 0 2px var(--fondo),0 0 0 4.5px var(--marca)}
+.rg-ava.rol-comp{box-shadow:0 0 0 2px var(--fondo),0 0 0 4px var(--linea)}
+.rg-ava.rol-guia,.rg-grp i:has(small.guia){box-shadow:0 0 0 2px var(--fondo),0 0 0 4.5px var(--accion)}
+.club-person{column-gap:calc(var(--e-3) + 2px)}
+/* 6 · Perfil: avatar de 96, nivel como insignia, la moto principal y tres cifras */
+.profile-head{flex-direction:column;align-items:center;text-align:center;gap:var(--e-3)}
+.profile-head .avatar.big{width:96px;height:96px;font-size:40px;box-shadow:0 0 0 3px var(--fondo),0 0 0 6px var(--marca)}
+.profile-head .name-input{text-align:center;width:100%}
+.profile-head .level-pill{display:inline-flex;margin:0 auto;background:var(--marca);color:var(--sobre-marca)}
+.rg-bike{display:flex;align-items:center;gap:var(--e-3);width:100%;padding:var(--e-3) var(--e-4);border:0;border-radius:var(--r-tarjeta);background:var(--superficie);box-shadow:var(--sombra-1);color:var(--texto);text-align:left;font:inherit;cursor:pointer;min-height:76px}
+.rg-bike-ic{flex:none;width:52px;height:52px;border-radius:var(--r-m);background:var(--marca-suave);color:var(--marca);display:flex;align-items:center;justify-content:center}
+.rg-bike-ic svg{width:28px;height:28px}
+.rg-bike>span:nth-child(2){flex:1;min-width:0;display:grid;gap:1px}
+.rg-bike b{font:600 19px/24px var(--font-titulo);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rg-bike .muted{font:500 13px/17px var(--font-texto)}
+.rg-bike .chev{width:22px;height:22px;color:var(--texto-2);flex:none}
+#profileTotals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--e-2)}
+#profileTotals .fig{display:flex;flex-direction:column;align-items:center;gap:2px;padding:var(--e-3) var(--e-2);border-radius:var(--r-tarjeta);background:var(--superficie);box-shadow:var(--sombra-1);text-align:center;min-width:0}
+#profileTotals .fig .val{font:700 28px/34px var(--font-titulo)}
+/* 7 · Evento con portada 16:9: degradado abajo, fecha en píldora y título en blanco; debajo, la franja de estado */
+.club-card.ev{overflow:hidden}
+.ev-cover{position:relative;aspect-ratio:16/9;margin:0;display:flex;flex-direction:column;justify-content:flex-end;padding:var(--e-3) var(--e-4);overflow:hidden;background:#1A1A1F}
+.ev-cover[hidden]{display:none}
+.ev-cover-img{position:absolute;inset:0;background-size:cover;background-position:center}
+.ev-cover-img img{width:100%;height:100%;object-fit:cover;display:block}
+.ev-cover::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 35%,rgba(0,0,0,.78) 100%)}
+.ev-cover-when{position:absolute;top:var(--e-3);left:var(--e-3);z-index:1;padding:5px 12px;border-radius:var(--r-pildora);background:rgba(15,15,18,.78);color:#fff;font:600 13px/18px var(--font-titulo)}
+.ev-cover>b{position:relative;z-index:1;color:#fff;font:600 24px/28px var(--font-titulo);text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.ev.has-cover .ev-cuerpo>.ev-when,.ev.has-cover .ev-cuerpo>.ev-when+b{display:none}
+.rg-nok.off svg{color:var(--texto-2)}
+.rg-nok.off{font-weight:500;color:var(--texto-2)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .row .thumb{color:#D9F21C;background:var(--superficie-2)}}
+:root[data-theme="dark"] .row .thumb{color:#D9F21C;background:var(--superficie-2)}

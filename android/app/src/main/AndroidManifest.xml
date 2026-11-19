@@ -21,6 +21,12 @@
         </activity>
 
         <!-- Botones de los avisos del grupo (SOS, avería, gasolina), también con el teléfono bloqueado. -->
+        <service android:name=".RgPushService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <receiver android:name=".RideAlertsReceiver" android:exported="false" />
         <!-- Recordatorios de eventos y plazas libres: sus botones actúan sin abrir la app. Se reponen al reiniciar el teléfono. -->
         <receiver android:name=".EventNoticeReceiver" android:exported="false">

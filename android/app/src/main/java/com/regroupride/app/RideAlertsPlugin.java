@@ -638,6 +638,8 @@ public class RideAlertsPlugin extends Plugin {
             PowerManager pm = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
             o.put("battery", pm != null && pm.isIgnoringBatteryOptimizations(c.getPackageName()));
             android.content.SharedPreferences sp = EventNotices.prefsFor(c);
+            o.put("push", !sp.getString("pushToken", "").isEmpty());
+            o.put("lastPush", sp.getLong("lastPush", 0));
             o.put("lastCheck", sp.getLong("lastCheck", 0));
             o.put("lastResult", sp.getString("lastResult", ""));
             o.put("nextCheck", sp.getLong("nextCheck", 0));
@@ -668,6 +670,29 @@ public class RideAlertsPlugin extends Plugin {
             } catch (Exception ignored) { }
         }
         call.resolve();
+    }
+
+    /** Identificador de este teléfono para el push de Firebase (vacío si la app se compiló sin google-services.json). */
+    @PluginMethod
+    public void pushToken(final PluginCall call) {
+        try {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken().addOnCompleteListener(
+                new com.google.android.gms.tasks.OnCompleteListener<String>() {
+                    @Override
+                    public void onComplete(com.google.android.gms.tasks.Task<String> task) {
+                        JSObject o = new JSObject();
+                        try {
+                            if (task.isSuccessful() && task.getResult() != null) {
+                                o.put("token", task.getResult());
+                                EventNotices.prefsFor(getContext()).edit().putString("pushToken", task.getResult()).apply();
+                            }
+                        } catch (Exception ignored) { }
+                        call.resolve(o);
+                    }
+                });
+        } catch (Throwable e) {
+            call.resolve(new JSObject());
+        }
     }
 
     /** El aviso de un evento ya se ha contestado en la app: fuera de la barra. */

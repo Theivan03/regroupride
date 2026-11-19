@@ -601,6 +601,7 @@
           $('#soNo').addEventListener('click', closeSheet);
           return;
         }
+        try { var RAp = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.RideAlerts; if (RAp && RAp.pushToken) RAp.pushToken().then(function (r) { if (r && r.token) sb.rpc('push_unregister', { p_token: r.token }).then(function () {}, function () {}); }, function () {}); } catch (e) {}
         try { var RAl = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.RideAlerts; if (RAl && RAl.eventClear) RAl.eventClear().catch(function () {}); } catch (e) {}
         return sb.auth.signOut().then(function () {}, function () {}).then(function () { return Sy ? Sy.wipeLocal() : null; }).then(function () { try { localStorage.setItem('rg.wall', '1'); } catch (e) {} location.reload(); });
       });

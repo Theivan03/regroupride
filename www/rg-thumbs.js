@@ -4,7 +4,7 @@
    dibujo de siempre (solo el trazado). */
 (function () {
   'use strict';
-  var W = 480, H = 270, VER = 'v1', mem = {}, queue = [], busy = false, map = null, mapDark = null, loaded = null, io = null, errs = 0, tiles = 0, loadErrs = 0;
+  var W = 480, H = 270, VER = 'v2', mem = {}, queue = [], busy = false, map = null, mapDark = null, loaded = null, io = null, errs = 0, tiles = 0, loadErrs = 0;
   var noop = function () {};
   function dark() {
     var t = document.documentElement.getAttribute('data-theme');
@@ -16,8 +16,10 @@
     if (!el || !el.isConnected) return;
     el.classList.add('rg-mapthumb');
     el.innerHTML = '<img alt="" src="' + data + '">';
+    try { el.dispatchEvent(new CustomEvent('rg-thumb', { bubbles: true })); } catch (e) {}
   }
-  function color() { var c = ''; try { c = getComputedStyle(document.documentElement).getPropertyValue('--ruta').trim(); } catch (e) {} return c || '#5A2DB0'; }
+  // Trazado en violeta de marca de día y en lima de noche, sobre el mapa apagado.
+  function color() { return dark() ? '#D9F21C' : '#5A2DB0'; }
 
   // pts: [[lon, lat], …] (uno solo = punto de salida)
   function attach(el, id, pts) {
@@ -56,9 +58,11 @@
       m.once('load', function () {
         clearTimeout(t); loadErrs = errs;
         m.addSource('rgt', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        m.addLayer({ id: 'rgt-case', type: 'line', source: 'rgt', filter: ['==', '$type', 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': dk ? '#0E141B' : '#FFFFFF', 'line-width': 8 } });
-        m.addLayer({ id: 'rgt-line', type: 'line', source: 'rgt', filter: ['==', '$type', 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': col, 'line-width': 4.5 } });
-        m.addLayer({ id: 'rgt-start', type: 'circle', source: 'rgt', filter: ['==', '$type', 'Point'], paint: { 'circle-radius': 7, 'circle-color': col, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 2.5 } });
+        m.addLayer({ id: 'rgt-veil', type: 'background', paint: { 'background-color': dk ? '#0F0F12' : '#FFFFFF', 'background-opacity': 0.42 } });      // mapa en tono apagado
+        m.addLayer({ id: 'rgt-case', type: 'line', source: 'rgt', filter: ['==', '$type', 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': dk ? '#0F0F12' : '#FFFFFF', 'line-width': 9 } });
+        m.addLayer({ id: 'rgt-line', type: 'line', source: 'rgt', filter: ['==', '$type', 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': col, 'line-width': 5.5 } });
+        m.addLayer({ id: 'rgt-end', type: 'circle', source: 'rgt', filter: ['all', ['==', '$type', 'Point'], ['==', 'k', 'end']], paint: { 'circle-radius': 6.5, 'circle-color': dk ? '#0F0F12' : '#FFFFFF', 'circle-stroke-color': col, 'circle-stroke-width': 3.5 } });
+        m.addLayer({ id: 'rgt-start', type: 'circle', source: 'rgt', filter: ['all', ['==', '$type', 'Point'], ['==', 'k', 'start']], paint: { 'circle-radius': 7.5, 'circle-color': col, 'circle-stroke-color': dk ? '#0F0F12' : '#FFFFFF', 'circle-stroke-width': 2.5 } });
         ok();
       });
     });
@@ -68,8 +72,8 @@
   function render(j) {
     return ensure(j.dk).then(function () {
       errs = 0; tiles = 0;
-      var line = j.pts.length > 1, f = [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: j.pts[0] } }];
-      if (line) f.unshift({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: j.pts } });
+      var line = j.pts.length > 1, f = [{ type: 'Feature', properties: { k: 'start' }, geometry: { type: 'Point', coordinates: j.pts[0] } }];
+      if (line) { f.unshift({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: j.pts } }); f.push({ type: 'Feature', properties: { k: 'end' }, geometry: { type: 'Point', coordinates: j.pts[j.pts.length - 1] } }); }
       map.getSource('rgt').setData({ type: 'FeatureCollection', features: f });
       if (line) {
         var b = j.pts.reduce(function (a, p) { return [[Math.min(a[0][0], p[0]), Math.min(a[0][1], p[1])], [Math.max(a[1][0], p[0]), Math.max(a[1][1], p[1])]]; }, [[j.pts[0][0], j.pts[0][1]], [j.pts[0][0], j.pts[0][1]]]);

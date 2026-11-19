@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.20.0';
+  var APP_VERSION = '0.21.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -1165,7 +1165,12 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     if (lv.next) { var span = lv.next.xp - lv.level.xp; $('#levelNext').textContent = (lv.next.xp - xp) + ' XP para nivel ' + lv.next.n; $('#levelBar').style.width = Math.round((xp - lv.level.xp) / span * 100) + '%'; }
     else { $('#levelNext').textContent = 'Nivel máximo'; $('#levelBar').style.width = '100%'; }
     var hours = rides.reduce(function (s, r) { return s + (r.movingS || 0); }, 0) / 3600;
-    $('#profileTotals').innerHTML = fig('Km', Math.round(ctx.km) + '') + fig('Rutas', String(ctx.rides)) + fig('En moto', hours.toFixed(0) + '<span class="unit">h</span>') + fig('Incl. máx', Math.round(ctx.leanMax) + '°');
+    var nCom = 0; try { var cu = window.RGCloud && RGCloud.user(); if (cu) nCom = (JSON.parse(localStorage.getItem('rg.club.list:' + cu.id) || '[]') || []).length; } catch (e) {}
+    $('#profileTotals').innerHTML = fig('Km totales', Math.round(ctx.km) + '') + fig('Rutas', String(ctx.rides)) + fig('Comunidades', String(nCom));
+    var mv = vehicles.filter(function (v) { return v.principal; })[0] || vehicles[0];
+    $('#profileBike').innerHTML = mv ? '<button class="rg-bike" type="button" id="pfBike"><span class="rg-bike-ic"><svg><use href="#i-garage"/></svg></span><span><span class="label">Mi ' + (mv.type === 'coche' ? 'coche' : 'moto') + '</span><b>' + esc(mv.name) + '</b>' + (mv.odo != null ? '<span class="muted">' + Math.round(mv.odo).toLocaleString('es-ES') + ' km</span>' : '') + '</span><svg class="chev"><use href="#i-chev"/></svg></button>'
+      : '<button class="rg-bike empty" type="button" id="pfBike"><span class="rg-bike-ic"><svg><use href="#i-plus"/></svg></span><span><span class="label">Mi moto</span><b>Añade tu moto al garaje</b></span><svg class="chev"><use href="#i-chev"/></svg></button>';
+    $('#pfBike').addEventListener('click', function () { showView('garage'); });
     var daysSet = {}; rides.forEach(function (r) { daysSet[new Date(r.start).toDateString()] = 1; });
     var streak = 0, cur = new Date(); cur.setHours(0, 0, 0, 0); if (!daysSet[cur.toDateString()]) cur.setDate(cur.getDate() - 1);
     while (daysSet[cur.toDateString()]) { streak++; cur.setDate(cur.getDate() - 1); }

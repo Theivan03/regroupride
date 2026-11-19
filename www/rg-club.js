@@ -180,6 +180,49 @@
     var o = new Date(a.offered_at).getTime(), st = new Date(e.starts_at).getTime();
     return o + Math.min(12 * 3600e3, Math.max((st - o) / 2, 600e3));
   }
+  /* Portada de los eventos (supabase/11): la foto que se subió o, si no hay, el mapa de donde sale la ruta. */
+  var COVERS = {};
+  function covers(c, evs) {
+    var put = function () {
+      evs.forEach(function (e) {
+        var card = document.querySelector('.ev[data-ev="' + e.id + '"]'), box = card && card.querySelector('.ev-cover'); if (!box || box.dataset.done) return;
+        var img = box.querySelector('.ev-cover-img'), on = function () { box.hidden = false; card.classList.add('has-cover'); }, url = COVERS[e.id];
+        if (url) { box.dataset.done = 1; var im = new Image(); im.onload = function () { img.style.backgroundImage = 'url("' + url.replace(/"/g, '') + '")'; on(); }; im.src = url; return; }
+        var pt = e.route_start && e.route_start.length > 1 ? [+e.route_start[0], +e.route_start[1]] : (e.meet_lon != null && e.meet_lat != null ? [e.meet_lon, e.meet_lat] : null);
+        if (pt && window.RGThumbs) { box.dataset.done = 1; img.addEventListener('rg-thumb', on); RGThumbs.attach(img, 'e' + e.id, [pt]); }
+      });
+    };
+    put();
+    COVERS._at = COVERS._at || {};
+    if (S.v11 === false || Date.now() - (COVERS._at[c.id] || 0) < 60000) return;      // las portadas, como mucho una vez por minuto
+    COVERS._at[c.id] = Date.now();
+    sb.from('events').select('id,cover_url').eq('community_id', c.id).then(function (r) {
+      if (r.error) { S.v11 = false; return; }
+      S.v11 = true; (r.data || []).forEach(function (x) { if (x.cover_url) COVERS[x.id] = x.cover_url; else delete COVERS[x.id]; });
+      [].forEach.call(document.querySelectorAll('.ev .ev-cover'), function (b) { if (COVERS[b.parentNode.dataset.ev] && !b.parentNode.classList.contains('has-cover')) delete b.dataset.done; });
+      put();
+    }, function () {});
+  }
+  // Foto elegida -> JPEG 16:9 de 1280 px -> almacén «covers». Devuelve su dirección pública (o null si no se puede).
+  function uploadCover(file) {
+    return new Promise(function (ok) {
+      var im = new Image(), u = URL.createObjectURL(file);
+      im.onerror = function () { ok(null); };
+      im.onload = function () {
+        var W = 1280, H = 720, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        var k = Math.max(W / im.width, H / im.height), w = im.width * k, h = im.height * k;
+        cv.getContext('2d').drawImage(im, (W - w) / 2, (H - h) / 2, w, h); URL.revokeObjectURL(u);
+        cv.toBlob(function (b) {
+          if (!b) { ok(null); return; }
+          var path = S.user.id + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + '.jpg';
+          sb.storage.from('covers').upload(path, b, { contentType: 'image/jpeg', upsert: false }).then(function (r) {
+            ok(r.error ? null : sb.storage.from('covers').getPublicUrl(path).data.publicUrl);
+          }, function () { ok(null); });
+        }, 'image/jpeg', 0.82);
+      };
+      im.src = u;
+    });
+  }
   function setStatus(e, mine, status, companion) {
     var q = mine ? sb.from('event_attendees').update({ status: status, companion: !!companion }).eq('event_id', e.id).eq('user_id', S.user.id).select('status')
       : sb.from('event_attendees').insert({ event_id: e.id, user_id: S.user.id, status: status, companion: !!companion }).select('status');
@@ -239,7 +282,7 @@
       else mineHtml = '<div class="ev-go"><button class="btn' + (startBtn ? ' small' : ' big primary') + '" data-act="go" type="button">' + ic('check') + (full ? 'Apuntarme a la lista de espera' : 'Voy') + '</button>';
       if (st !== 'offered') mineHtml += (e.luma_url ? '<button class="btn small" data-act="luma" type="button">Apuntarse en Luma</button>' : '') + '</div>';
       var countHtml = '<button class="link ev-count" data-act="who" type="button">' + count + '</button>';
-      return '<div class="club-card ev" data-ev="' + e.id + '"><div class="ev-estado ev-estado--' + strip[0] + '">' + ic(strip[1]) + '<span>' + strip[2] + '</span></div><div class="ev-cuerpo">' +
+      return '<div class="club-card ev" data-ev="' + e.id + '"><div class="ev-cover" hidden><div class="ev-cover-img"></div><span class="ev-cover-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b></div><div class="ev-estado ev-estado--' + strip[0] + '">' + ic(strip[1]) + '<span>' + strip[2] + '</span></div><div class="ev-cuerpo">' +
         '<span class="ev-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b>' +
         (m.url ? '<div class="ev-meet"><button class="link" data-act="meet" type="button">' + ic('gmaps') + '<span>Salida: ' + esc(m.name || 'ver en Maps') + '</span></button>' + (m.lat != null ? '<button class="btn small" data-act="gomeet" type="button">' + ic('compass') + 'Ir al punto de salida</button>' : '') + '</div>'
           : (e.meet_name ? '<span class="muted">Salida: ' + esc(e.meet_name) + '</span>' : '')) + (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
@@ -274,6 +317,7 @@
         else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
       }); });
     });
+    covers(c, evs);
   }
   // «Ir al punto de salida»: lo pone en el mapa de la app con el camino desde donde estás. «Iniciar ruta» te guía hasta allí.
   function goMeet(e, btn) {
@@ -345,7 +389,8 @@
   }
   function whoGoes(e, att) {
     var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), off = att.filter(function (x) { return x.event_id === e.id && x.status === 'offered'; }), queue = queueOf(att, e);
-    var person = function (g, tag) { return '<div class="club-person"><span class="rg-ava">' + esc(who(g.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(g.user_id)) + (g.companion ? ' <span class="mstatus">+1</span>' : '') + (tag ? ' <span class="mstatus">' + tag + '</span>' : '') + '</b><span class="muted">' + esc(bike(g.user_id)) + '</span></div></div>'; };
+    var evAd = S.evAdmins[e.id] || [];
+    var person = function (g, tag) { var ad = evAd.indexOf(g.user_id) >= 0; return '<div class="club-person"><span class="rg-ava ' + (ad ? 'rol-admin' : 'rol-comp') + '">' + esc(who(g.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(g.user_id)) + (ad ? ' <span class="mstatus ok">admin</span>' : '') + (g.companion ? ' <span class="mstatus">+1</span>' : '') + (tag ? ' <span class="mstatus">' + tag + '</span>' : '') + '</b><span class="muted">' + esc(bike(g.user_id)) + '</span></div></div>'; };
     Cl.sheet('<div class="head"><h1>Quién viene</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + (e.capacity ? ' · ' + e.capacity + (e.capacity === 1 ? ' plaza' : ' plazas') : '') + '</p><div class="rg-list">' +
       (going.length || off.length ? going.map(function (g) { return person(g); }).join('') + off.map(function (g) { return person(g, 'por confirmar'); }).join('') : '<p class="muted">Nadie apuntado todavía.</p>') + '</div>' +
       (queue.length && (isAdmin() || (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0) ? '<h2 class="rg-h2">Lista de espera</h2><p class="muted rg-small" style="text-align:left">Solo la ven los administradores.</p><div class="rg-list">' + queue.map(function (g, i) { return person(g, 'puesto ' + (i + 1)); }).join('') + '</div>' : ''));
@@ -367,6 +412,7 @@
       '<label>Descripción<textarea id="evDesc" maxlength="4000" placeholder="Paradas, nivel, normas, lo que quieras contar">' + esc(e ? e.description : '') + '</textarea></label>' +
       '<label>Ruta<select id="evRoute"><option value="">Sin ruta</option>' + keep + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
       '<p class="muted rg-small" style="text-align:left">Salen tus rutas planificadas. Para añadir una, créala en el mapa (pegando el enlace de Google Maps) y guárdala.</p>' +
+      '<label>Foto de portada (opcional)<input id="evCover" type="file" accept="image/*"></label>' +
       '<label>Enlace de Luma (opcional)<input id="evLuma" inputmode="url" maxlength="300" value="' + esc(e && e.luma_url ? e.luma_url : '') + '" placeholder="https://luma.com/…"></label>' +
       '<button class="btn big primary" type="submit">' + (e ? 'Guardar cambios' : 'Publicar') + '</button></form>');
     $('#clX').addEventListener('click', Cl.closeSheet);
@@ -390,7 +436,12 @@
             if (pt.url && pt.lat == null) warn = 'El enlace se abrirá en Google Maps, pero no trae coordenadas: no podré marcar la salida en el mapa de la app.';
             if (pt.name && !row.meet_name) row.meet_name = pt.name;
           }
-          var save = function () { return (e ? sb.from('events').update(row).eq('id', e.id).select('id') : sb.from('events').insert(row)); };
+          var save0 = function () { return (e ? sb.from('events').update(row).eq('id', e.id).select('id') : sb.from('events').insert(row)); };
+          var cf = $('#evCover') && $('#evCover').files && $('#evCover').files[0];
+          var save = function () {
+            if (!cf) return save0();
+            return uploadCover(cf).then(function (url) { cf = null; if (url) row.cover_url = url; else warn = 'Guardado, pero la foto no se ha podido subir (falta ejecutar supabase/11_push_y_web.sql).'; return save0(); });
+          };
           return save().then(function (r) {
             if (r.error && pt && /capacity|meet_(url|lat|lon)/i.test(r.error.message || '')) {     // el servidor aún no tiene el 06
               S.v6 = false; delete row.capacity; delete row.meet_url; delete row.meet_lat; delete row.meet_lon; warn = 'Guardado sin plazas ni enlace de salida: falta ejecutar supabase/06_plazas_y_salida.sql.';
@@ -468,7 +519,7 @@
         var pane = $('#clPane'); if (!pane || S.tab !== 'members' || !cur() || cur().id !== c.id) return;
         pane.innerHTML = '<span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span><div class="club-card club-people">' + ms.map(function (m) {
           var me = m.user_id === S.user.id;
-          return '<div class="club-person" data-u="' + m.user_id + '"><span class="rg-ava">' + esc(who(m.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
+          return '<div class="club-person" data-u="' + m.user_id + '"><span class="rg-ava ' + (m.role === 'admin' ? 'rol-admin' : 'rol-comp') + '">' + esc(who(m.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
             (isAdmin() && !me ? '<span class="rg-macts"><button class="link" data-act="role" type="button">' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</button><button class="link danger" data-act="kick" type="button">Expulsar</button></span>' : '') + '</div>';
         }).join('') + '</div><button class="btn" id="clLeave" type="button"><svg><use href="#i-exit"/></svg>Salir de esta comunidad</button>';
         $$('[data-act]', pane).forEach(function (b) { b.addEventListener('click', function () {
@@ -688,6 +739,7 @@
       box.innerHTML = '<span class="label">Avisos con la app cerrada</span><div class="card rg-noti">' +
         (is.length ? is.map(function (x) { return '<div class="rg-nrow"><span>' + x[1] + '</span><button class="btn small" data-w="' + x[0] + '" type="button">' + x[2] + '</button></div>'; }).join('')
           : '<p class="rg-nok"><svg><use href="#i-check"/></svg>Este móvil deja avisar con la app cerrada (comprueba cada minuto).</p>') +
+        '<p class="rg-nok' + (st.push ? '' : ' off') + '"><svg><use href="#i-' + (st.push ? 'check' : 'info') + '"/></svg>' + (st.push ? 'Push activado: los avisos llegan al momento' + (st.lastPush ? ' (último ' + ago(st.lastPush) + ').' : '.') : 'Push sin activar en esta versión: los avisos pueden tardar hasta un minuto o más.') + '</p>' +
         '<p class="muted rg-small">' + last + '</p></div>';
       box.hidden = false;
       $$('[data-w]', box).forEach(function (b) { b.addEventListener('click', function () { RA.openSetting({ what: b.dataset.w }).catch(function () {}); }); });
@@ -700,8 +752,13 @@
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && $('#view-settings') && !$('#view-settings').hidden) renderNotiCard(); });
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(function () { nativePending(); inbox(true); refresh(); }, 1200); });
 
+  function pushRegister() {
+    if (!RA || !RA.pushToken || !S.user) return;
+    RA.pushToken().then(function (r) { if (r && r.token) sb.rpc('push_register', { p_token: r.token }).then(function () {}, function () {}); }, function () {});
+  }
   Cl.onChange(function (u) {
     var changed = (S.user && S.user.id) !== (u && u.id); S.user = u;
+    if (u) setTimeout(pushRegister, 2500);
     if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) { forgetReminders(); liveSync(); } else setTimeout(function () { nativePending(); inbox(true); if (!S.loaded) load().catch(function () {}); else liveSync(); }, 1500); if (!$('#view-club').hidden) show(); }
   });
   window.RGClub = { show: show, inbox: inbox, state: S, mine: function () { return IN.events.slice(); } };
