@@ -1,3 +1,0 @@
-# Web de eventos de ReGroupRide (carpeta web/). Netlify la publica tal cual: no hay nada que compilar.
-[build]
-  publish = "web"

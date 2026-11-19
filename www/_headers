@@ -1,0 +1,9 @@
+# Versión web de la app (Netlify). El arranque y el service worker no se guardan en caché, para que las versiones nuevas lleguen al momento.
+/index.html
+  Cache-Control: no-cache
+/
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache

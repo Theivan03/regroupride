@@ -327,7 +327,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
         (e.description ? '<h2>Acerca del evento</h2><div class="md">' + md(e.description) + '</div>' : '') +
         (where && (hasLL || e.meet_note) ? '<h2>Ubicación</h2><p style="margin:0 0 8px"><b class="t">' + esc(where) + '</b>' + (e.meet_note ? '<br><span class="muted">' + esc(e.meet_note) + '</span>' : '') + '</p>' + (hasLL ? '<iframe class="map" loading="lazy" title="Mapa del punto de salida" src="https://www.openstreetmap.org/export/embed.html?bbox=' + (e.meet_lon - 0.006) + ',' + (e.meet_lat - 0.004) + ',' + (e.meet_lon + 0.006) + ',' + (e.meet_lat + 0.004) + '&layer=mapnik&marker=' + e.meet_lat + ',' + e.meet_lon + '"></iframe>' : '') : '') +
         faces +
-        '<h2>En la app</h2><p class="muted">Con ReGroupRide ves al grupo en el mapa durante la ruta, avisas de una avería o de que necesitas gasolina y te reenganchas si te quedas atrás.</p></div></div>';
+        '<h2>En la app</h2><p class="muted">Con ReGroupRide ves al grupo en el mapa durante la ruta, avisas de una avería o de que necesitas gasolina y te reenganchas si te quedas atrás.</p><div class="acts2"><a class="btn mar" target="_blank" rel="noopener" href="https://regroupride-app.netlify.app">Abrir ReGroupRide en el navegador</a></div><p class="muted small">Funciona en iPhone, Android y ordenador, sin instalar nada.</p></div></div>';
       var again = function () { eventView(id); }, link = location.origin + '/?e=' + id;
       if ($('#qr')) drawQr($('#qr'), G ? G.code : e.ticket);
       $('#share').onclick = function () { var b = this; if (navigator.share) navigator.share({ title: e.title, url: link }).catch(function () {}); else copy(b, link, 'Enlace del evento'); };
@@ -439,7 +439,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
           else { var w = cv.width = 480, h = cv.height = Math.round(480 * v.videoHeight / v.videoWidth) || 480, x = cv.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, w, h); var q = jsQR(x.getImageData(0, 0, w, h).data, w, h); if (q) check(q.data); }
         }, 300);
       }, function (x) { say(err(x), 'bad'); });
-    }, function () { say('No hay permiso para usar la cámara. Escribe el código o marca la llegada en la lista.', 'bad'); });
+    }, function () { if (!last) say('No hay permiso para usar la cámara. Escribe el código o marca la llegada en la lista.', 'bad'); });
   }
 
   /* ---------- panel: mis comunidades y sus eventos ---------- */

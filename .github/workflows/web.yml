@@ -1,0 +1,37 @@
+# Publica en Netlify las dos webs en cada push a main:
+#   · web/  → la web de eventos            (regroupride-eventos.netlify.app)
+#   · www/  → la app en versión navegador   (regroupride-app.netlify.app)
+# Necesita un secreto del repositorio llamado NETLIFY_AUTH_TOKEN (Netlify → User settings → Applications →
+# Personal access tokens → New access token; GitHub → Settings → Secrets and variables → Actions → New repository secret).
+# Si el secreto no existe, este trabajo no hace nada y no falla.
+name: Webs en Netlify
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'www/**', '.github/workflows/web.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: webs
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Web de eventos
+        if: env.NETLIFY_AUTH_TOKEN != ''
+        run: npx --yes netlify-cli@17 deploy --prod --dir=web --site=c7a79f44-b24c-4062-b384-41c08167f46d --message "${{ github.sha }}"
+      - name: App en el navegador
+        if: env.NETLIFY_AUTH_TOKEN != ''
+        run: npx --yes netlify-cli@17 deploy --prod --dir=www --site=a9c5b0e9-6aac-4f0b-b08a-77c5e289b9d5 --message "${{ github.sha }}"
+      - name: Falta el secreto
+        if: env.NETLIFY_AUTH_TOKEN == ''
+        run: echo "::warning::No hay NETLIFY_AUTH_TOKEN en los secretos del repositorio; no se ha publicado nada."

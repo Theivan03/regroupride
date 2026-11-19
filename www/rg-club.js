@@ -409,7 +409,7 @@
       var n = function (f) { return rows.filter(f).length; }, again = function () { manageSheet(e, find); };
       shell('<div class="rg-mstats"><div><b>' + n(function (x) { return x.status === 'going' || x.status === 'offered'; }) + (e.capacity ? '<small> / ' + e.capacity + '</small>' : '') + '</b><span>Con plaza</span></div><div><b>' + n(function (x) { return x.status === 'waiting'; }) + '</b><span>En espera</span></div><div><b>' + n(function (x) { return x.status === 'pending'; }) + '</b><span>Por aprobar</span></div><div><b>' + n(function (x) { return x.checked_in; }) + '</b><span>Han llegado</span></div></div>' +
         '<button class="btn big primary" id="mgScan" type="button">' + icn('qr') + 'Leer entradas (QR)</button>' +
-        '<input id="mgFind" placeholder="Buscar por nombre o teléfono" value="' + esc(find) + '" autocomplete="off">' +
+        '<div class="rg-form"><input id="mgFind" placeholder="Buscar por nombre o teléfono" value="' + esc(find) + '" autocomplete="off"></div>' +
         '<div class="rg-list" id="mgList"></div><button class="btn small" id="mgWeb" type="button">' + icn('share') + 'Abrir en la web (respuestas y descarga)</button>');
       var list = function () {
         var f = find.toLowerCase(), vis = rows.filter(function (x) { return !f || (x.name + ' ' + (x.phone || '') + ' ' + (x.email || '')).toLowerCase().indexOf(f) >= 0; });
@@ -440,7 +440,7 @@
   function scanTickets(e, done) {
     var el = document.createElement('div'), stream = null, timer = 0, last = '', lastAt = 0, cv = document.createElement('canvas'), n = 0;
     el.className = 'rg-scan';
-    el.innerHTML = '<div class="rg-scan-cam"><video playsinline muted></video><i></i></div><div class="rg-scan-r" id="scR">Apunta la cámara al código de la entrada.</div><span class="muted rg-small" id="scN"></span><form id="scF"><input id="scC" placeholder="…o escribe el código" autocomplete="off" autocapitalize="off"></form><button class="btn big" id="scX" type="button">Terminar</button>';
+    el.innerHTML = '<div class="rg-scan-cam"><video playsinline muted></video><i></i></div><div class="rg-scan-r" id="scR">Apunta la cámara al código de la entrada.</div><span class="muted rg-small" id="scN"></span><form id="scF" class="rg-form"><input id="scC" placeholder="…o escribe el código" autocomplete="off" autocapitalize="off"></form><button class="btn big" id="scX" type="button">Terminar</button>';
     document.body.appendChild(el);
     var v = el.querySelector('video'), out = el.querySelector('#scR'), say = function (t, k) { out.textContent = t; out.className = 'rg-scan-r' + (k ? ' ' + k : ''); };
     var check = function (code) {
@@ -465,7 +465,7 @@
           else { var w = cv.width = 480, h = cv.height = Math.round(480 * v.videoHeight / v.videoWidth) || 480, x = cv.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, w, h); var q = window.jsQR(x.getImageData(0, 0, w, h).data, w, h); if (q && q.data) check(q.data); }
         }, 280);
       }, function (x) { say(x.message, 'bad'); });
-    }, function () { say('No hay permiso para usar la cámara. Dáselo a la app en los ajustes del móvil, o escribe el código.', 'bad'); });
+    }, function () { if (!last) say('No hay permiso para usar la cámara. Dáselo a la app en los ajustes del móvil, o escribe el código.', 'bad'); });
   }
   function ticketSheet(e) {
     Cl.sheet('<div class="head"><h1>Mi entrada</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
