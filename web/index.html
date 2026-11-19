@@ -14,7 +14,7 @@
 @media (prefers-color-scheme:dark){:root{--fondo:#0F0F12;--sup:#1A1A1F;--sup2:#26262C;--texto:#EEEAF6;--texto2:#A9A3B8;--linea:#34343B;--marca:#B9A2FF;--sobre:#160B33;--suave:#2A1F4A;--error:#FF7A7A;--aviso:#FFC24A;--sombra:none}}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{font:500 16px/1.5 Manrope,system-ui,sans-serif;color:var(--texto);background:var(--fondo);min-height:100vh;background-image:radial-gradient(900px 500px at 85% -10%,color-mix(in srgb,var(--marca) 18%,transparent),transparent),radial-gradient(700px 420px at -10% 10%,color-mix(in srgb,var(--accion) 12%,transparent),transparent);background-attachment:fixed}
+body{font:500 16px/1.5 Manrope,system-ui,sans-serif;color:var(--texto);background:var(--fondo);min-height:100vh}
 h1,h2,h3,button,.t{font-family:Outfit,system-ui,sans-serif}
 a{color:var(--marca)}
 [hidden]{display:none!important}
@@ -94,12 +94,51 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
 .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--sup2);font:700 11px/16px Manrope;color:var(--texto2);margin-left:6px;vertical-align:2px}.tag.ok{background:color-mix(in srgb,var(--accion) 55%,var(--sup));color:var(--sobreacc)}.tag.w{background:color-mix(in srgb,var(--aviso) 22%,var(--sup));color:var(--aviso)}
 .scan{position:fixed;inset:0;z-index:20;background:#0b0b0e;color:#fff;display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px;overflow:auto}.scan video{width:min(100%,460px);aspect-ratio:1/1;object-fit:cover;border-radius:20px;background:#000}.scan .r{width:min(100%,460px);padding:14px 16px;border-radius:16px;background:#1d1d22;font:600 18px Outfit;min-height:56px}.scan .r.ok{background:#D9F21C;color:#14150F}.scan .r.bad{background:#7a1616}.scan input{max-width:460px}
 .qrow{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:8px;align-items:center}.qrow input,.qrow select{min-height:44px}.sec{font:700 18px Outfit;margin:10px 0 0}
+/* movimiento: fondo vivo, entrada de cada pantalla y botones */
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.bg i{position:absolute;border-radius:50%;filter:blur(70px);will-change:transform}
+.bg i:nth-child(1){width:560px;height:560px;right:-160px;top:-220px;background:color-mix(in srgb,var(--marca) 30%,transparent);animation:drift1 26s ease-in-out infinite alternate}
+.bg i:nth-child(2){width:460px;height:460px;left:-200px;top:8%;background:color-mix(in srgb,var(--accion) 20%,transparent);animation:drift2 32s ease-in-out infinite alternate}
+.bg i:nth-child(3){width:420px;height:420px;right:10%;bottom:-260px;background:color-mix(in srgb,var(--marca) 16%,transparent);animation:drift1 38s ease-in-out infinite alternate-reverse}
+.bg::before,.bg::after{content:"";position:absolute;left:0;will-change:transform}
+.bg::before{top:6%;width:calc(100% + 1200px);height:320px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='320' viewBox='0 0 1200 320'%3E%3Cg fill='none' stroke-width='1.6'%3E%3Cpath d='M0 120 Q300 20 600 120 T1200 120' stroke='%237B5CF0' stroke-opacity='.34'/%3E%3Cpath d='M0 170 Q300 250 600 170 T1200 170' stroke='%237B5CF0' stroke-opacity='.2'/%3E%3Cpath d='M0 215 Q300 150 600 215 T1200 215' stroke='%23A9C40C' stroke-opacity='.3'/%3E%3C/g%3E%3C/svg%3E") repeat-x;animation:wave1 46s linear infinite}
+.bg::after{top:58%;width:calc(100% + 900px);height:260px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='260' viewBox='0 0 900 260'%3E%3Cg fill='none' stroke-width='1.4'%3E%3Cpath d='M0 90 Q225 150 450 90 T900 90' stroke='%23A9C40C' stroke-opacity='.26'/%3E%3Cpath d='M0 150 Q225 70 450 150 T900 150' stroke='%237B5CF0' stroke-opacity='.3'/%3E%3Cpath d='M0 200 Q225 240 450 200 T900 200' stroke='%237B5CF0' stroke-opacity='.16'/%3E%3C/g%3E%3C/svg%3E") repeat-x;animation:wave2 64s linear infinite}
+@keyframes wave1{to{transform:translateX(-1200px)}}
+@keyframes wave2{from{transform:translateX(-900px)}to{transform:none}}
+@keyframes drift1{to{transform:translate(-90px,70px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(120px,-40px) scale(.9)}}
+@keyframes up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+@keyframes sheen{0%,70%{transform:translateX(-140%) skewX(-20deg)}100%{transform:translateX(260%) skewX(-20deg)}}
+@keyframes ring{0%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 55%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+@keyframes fall{0%{transform:translateY(-10vh) rotate(0);opacity:1}100%{transform:translateY(105vh) rotate(720deg);opacity:.9}}
+.in>*:not(.ev):not(.edit),.in .ev>div>*,.in .edit>div>*,.in .list>*,.in .stats>*,.in .form>*{animation:up .6s cubic-bezier(.2,.8,.2,1) both}
+.in .cover{animation:pop .7s cubic-bezier(.2,.8,.2,1) both}
+.in :nth-child(2){animation-delay:.06s}.in :nth-child(3){animation-delay:.12s}.in :nth-child(4){animation-delay:.18s}.in :nth-child(5){animation-delay:.24s}.in :nth-child(6){animation-delay:.3s}.in :nth-child(7){animation-delay:.36s}.in :nth-child(n+8){animation-delay:.42s}
+.btn{position:relative;overflow:hidden;transition:transform .16s cubic-bezier(.2,.8,.2,1),box-shadow .2s,filter .2s,background-color .2s}
+.btn:hover:not([disabled]){transform:translateY(-2px);filter:brightness(1.04)}
+.btn:active:not([disabled]){transform:scale(.96)}
+.btn.pri:hover:not([disabled]){box-shadow:inset 0 0 0 1.5px rgba(20,21,15,.16),0 10px 26px color-mix(in srgb,var(--accion) 45%,transparent)}
+.btn.pri::after{content:"";position:absolute;top:0;bottom:0;left:0;width:38%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);animation:sheen 4.2s ease-in-out infinite;pointer-events:none}
+.btn.txt{overflow:visible}
+a.item,.item{transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s}
+a.item:hover{transform:translateY(-3px)}
+input,textarea,select{transition:border-color .2s,box-shadow .2s}
+.dot{color:var(--marca);animation:ring 1.8s ease-out infinite}.dot.w{color:var(--aviso)}
+.tk{animation:pop .5s cubic-bezier(.2,.9,.25,1.2) both}
+.msg:not([hidden]){animation:up .3s both}
+.tile,.faces i{transition:transform .2s}.row:hover .tile{transform:scale(1.06) rotate(-3deg)}
+.logo img{transition:transform .5s cubic-bezier(.2,.8,.2,1)}.logo:hover img{transform:rotate(-12deg) scale(1.08)}
+#bk{width:44px;min-height:44px;padding:0;border-radius:50%;background:var(--sup);box-shadow:var(--sombra);font-size:22px;line-height:1;color:var(--texto)}
+.party{position:fixed;inset:0;z-index:30;pointer-events:none;overflow:hidden}.party i{position:absolute;top:0;width:10px;height:14px;border-radius:2px;animation:fall 2.2s cubic-bezier(.3,.6,.6,1) both}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}.g{grid-template-columns:1fr}.qrow{grid-template-columns:1fr 1fr}}
 @media (max-width:760px){#who{display:none}.ev,.edit{grid-template-columns:1fr;gap:22px}.cover{aspect-ratio:16/9}.item{grid-template-columns:104px minmax(0,1fr);gap:12px}.two{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<header class="top"><a class="logo" href="/"><img src="/simbolo.svg" alt=""><span>ReGroup<i>Ride</i></span></a><span class="sp"></span><span id="who" class="muted small"></span><button class="btn txt" id="out" hidden>Salir</button></header>
+<div class="bg" aria-hidden="true"><i></i><i></i><i></i></div>
+<header class="top"><button class="btn" id="bk" type="button" aria-label="Atrás" title="Atrás" hidden>←</button><a class="logo" href="/"><img src="/simbolo.svg" alt=""><span>ReGroup<i>Ride</i></span></a><span class="sp"></span><span id="who" class="muted small"></span><button class="btn txt" id="out" hidden>Salir</button></header>
 <main class="wrap" id="app"><p class="muted">Cargando…</p></main>
 <script src="/supabase.js"></script>
 
@@ -128,10 +167,21 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
   function rpc(fn, args) { return sb.rpc(fn, args).then(function (r) { if (r.error) throw r.error; return r.data; }); }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} return null; }
   function copy(b, text, label) { (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { var t = b.textContent; b.textContent = 'Copiado'; setTimeout(function () { b.textContent = t; }, 1600); }, function () { window.prompt(label || 'Enlace', text); }); }
+  /* ---------- navegación: historial del navegador y botón «atrás» en todas las pantallas ---------- */
+  var depth = 0, fresh = true, backFn = null, inT = 0;
+  function nav(url, rep) { history[rep ? 'replaceState' : 'pushState'](null, '', url); if (!rep) depth++; route(); }
+  function route() { fresh = true; window.scrollTo(0, 0); start(); }
+  function setBack(f) { backFn = f || null; $('#bk').hidden = !backFn; }
+  function back(fallback) { return depth > 0 ? function () { history.back(); } : (fallback ? function () { nav(fallback, true); } : null); }
+  $('#bk').onclick = function () { if (backFn) backFn(); };
+  window.addEventListener('popstate', function () { depth = Math.max(0, depth - 1); route(); });
+  document.addEventListener('click', function (ev) { var a = ev.target.closest && ev.target.closest('a'); if (!a || a.target || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button) return; var h = a.getAttribute('href') || ''; if (h.charAt(0) === '/') { ev.preventDefault(); nav(h); } });
+  new MutationObserver(function () { if (!fresh) return; fresh = false; app.classList.remove('in'); void app.offsetWidth; app.classList.add('in'); clearTimeout(inT); inT = setTimeout(function () { app.classList.remove('in'); }, 1300); }).observe(app, { childList: true });
+  function party() { var el = document.createElement('div'), c = ['#D9F21C', '#7B5CF0', '#B9A2FF', '#FFFFFF', '#5A2DB0'], h = ''; for (var i = 0; i < 36; i++) h += '<i style="left:' + Math.round(Math.random() * 100) + '%;background:' + c[i % c.length] + ';animation-delay:' + (Math.random() * .5).toFixed(2) + 's;animation-duration:' + (1.6 + Math.random()).toFixed(2) + 's"></i>'; el.className = 'party'; el.innerHTML = h; document.body.appendChild(el); setTimeout(function () { el.remove(); }, 3200); }
   var libs = {};
   function lib(k) { return libs[k] || (libs[k] = new Promise(function (ok, no) { var s = document.createElement('script'); s.src = LIB[k]; s.onload = ok; s.onerror = function () { libs[k] = null; no(new Error('No se ha podido cargar. Revisa la conexión.')); }; document.head.appendChild(s); })); }
   function coverHtml(u, cls) { var cv = safeUrl(u); return '<div class="cover' + (cls || '') + '"' + (cv ? ' style="background-image:url(&quot;' + esc(cv) + '&quot;)"' : '') + '>' + (cv ? '' : '<img class="sym" src="' + SYM + '" alt="">') + '</div>'; }
-  function notFound(t) { app.innerHTML = '<div class="auth card"><h1>' + t + '</h1><p class="muted">Puede que el enlace esté mal o que ya no exista.</p><a class="btn" href="/">Ir al inicio</a></div>'; }
+  function notFound(t) { setBack(back(user ? '/' : null)); app.innerHTML = '<div class="auth card"><h1>' + t + '</h1><p class="muted">Puede que el enlace esté mal o que ya no exista.</p><a class="btn" href="/">Ir al inicio</a></div>'; }
 
   /* ---------- texto con formato (negrita, cursiva, listas, títulos y enlaces) ---------- */
   function inline(s) {
@@ -159,8 +209,8 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
   }
 
   /* ---------- sesión ---------- */
-  function authView(then, intro) {
-    var mode = 'login';
+  function authView(then, intro, backTo) {
+    var mode = 'login'; setBack(backTo || null);
     (function draw() {
       app.innerHTML = '<div class="auth card"><h1>' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</h1><p class="muted">' + esc(intro || 'Con la misma cuenta que usas en la app de ReGroupRide.') + '</p><form class="form" id="f">' +
         (mode === 'signup' ? '<label>Nombre<input id="n" required maxlength="24" autocomplete="name"></label><label>Teléfono<input id="t" type="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel"></label>' : '') +
@@ -201,7 +251,7 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
     var tk = (/[?&]t=([0-9a-f]{32})/i.exec(location.search) || [])[1] || store('rg-t-' + id) || null;
     rpc('event_public', tk ? { p_id: id, p_code: tk } : { p_id: id }).then(function (e) {
       if (!e) { notFound('Evento no encontrado'); return; }
-      document.title = e.title + ' · ReGroupRide';
+      document.title = e.title + ' · ReGroupRide'; setBack(back(e.community_public ? '/?com=' + e.community_id : (user ? '/' : null)));
       var w = whenText(e), past = (e.ends_at || e.starts_at + 4 * 36e5) < Date.now(), started = e.starts_at < Date.now(), taken = e.taken == null ? e.going : e.taken, full = e.capacity && taken >= e.capacity;
       var st = e.mine === 'no' ? null : e.mine, G = e.guest && e.guest.status !== 'no' ? e.guest : null, reg, qs = e.questions || [];
       if (G) store('rg-t-' + id, G.code); else if (tk && !e.guest) store('rg-t-' + id, null);
@@ -232,7 +282,7 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
       else if (!user) reg = '<p style="margin:0">Para apuntarte, entra con tu cuenta de ReGroupRide o crea una.</p><button class="btn pri big" id="login" type="button">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button>';
       else reg = '<p style="margin:0">Este evento es de la comunidad <b>' + esc(e.community) + '</b>. Para apuntarte tienes que estar en ella: escribe el código de invitación que te han pasado.</p><form class="form" id="jf"><input id="code" required maxlength="12" placeholder="Código de la comunidad" autocomplete="off" style="text-transform:uppercase"><button class="btn pri big" type="submit">Unirme y apuntarme</button></form>';
       var where = e.meet_name || (e.meet_url || e.meet_lat != null ? 'Punto de salida' : ''), hasLL = e.meet_lat != null && e.meet_lon != null;
-      var go = safeUrl(e.meet_url) || (hasLL ? 'https://www.google.com/maps/search/?api=1&query=' + e.meet_lat + ',' + e.meet_lon : ''), cal = calData(e);
+      var rurl = /^https?:\/\//i.test(e.route_url || '') ? e.route_url : '', go = safeUrl(e.meet_url) || (hasLL ? 'https://www.google.com/maps/search/?api=1&query=' + e.meet_lat + ',' + e.meet_lon : ''), cal = calData(e);
       var hd = 'Inscripción' + (e.capacity ? ' · ' + Math.min(taken, e.capacity) + ' de ' + e.capacity + ' plazas' : '') + (e.require_approval ? ' · con aprobación' : '');
       var faces = e.going ? '<h2>Asistentes</h2><div class="faces">' + (e.faces || []).map(function (f) { return '<i>' + esc(f) + '</i>'; }).join('') + '<span>' + e.going + (e.going === 1 ? ' persona va' : ' personas van') + '</span></div>' + (e.names && e.names.length ? '<p class="muted small">' + esc(e.names.join(', ')) + '</p>' : '') : '';
       app.innerHTML = '<div class="ev"><div>' + coverHtml(e.cover_url) +
@@ -242,7 +292,7 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
         '<div><h1>' + esc(e.title) + '</h1>' +
         '<div class="row"><div class="tile"><small>' + M[w.d.getMonth()] + '</small>' + w.d.getDate() + '</div><div><b>' + w.day + '</b><span>' + w.hour + '</span></div></div>' +
         (where ? '<div class="row"><div class="tile"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.500C5 14.900 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></svg></div><div><b>' + esc(where) + '</b>' + (go ? '<span><a href="' + esc(go) + '" target="_blank" rel="noopener">Cómo llegar</a></span>' : '<span>Punto de salida</span>') + '</div></div>' : '') +
-        (e.route_name ? '<div class="row"><div class="tile"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.500"/><circle cx="18" cy="6" r="2.500"/><path d="M8.500 18H14a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8"/></svg></div><div><b>' + esc(e.route_name) + '</b><span>' + (e.route_km ? String(e.route_km).replace('.', ',') + ' km · ' : '') + 'la ruta se carga en la app</span></div></div>' : '') +
+        (e.route_name || rurl ? '<div class="row"><div class="tile"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.500"/><circle cx="18" cy="6" r="2.500"/><path d="M8.500 18H14a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8"/></svg></div><div><b>' + esc(e.route_name || 'Recorrido') + '</b><span>' + (e.route_name ? (e.route_km ? String(e.route_km).replace('.', ',') + ' km · ' : '') + 'la ruta se carga en la app' : '') + (rurl ? (e.route_name ? ' · ' : '') + '<a href="' + esc(rurl) + '" target="_blank" rel="noopener">Ver la ruta en Google Maps</a>' : '') + '</span></div></div>' : '') +
         '<div class="card reg"><div class="hd">' + hd + '</div><div class="bd">' + reg + '<div id="msg" class="msg" hidden></div></div></div>' +
         (e.description ? '<h2>Acerca del evento</h2><div class="md">' + md(e.description) + '</div>' : '') +
         (where && (hasLL || e.meet_note) ? '<h2>Ubicación</h2><p style="margin:0 0 8px"><b class="t">' + esc(where) + '</b>' + (e.meet_note ? '<br><span class="muted">' + esc(e.meet_note) + '</span>' : '') + '</p>' + (hasLL ? '<iframe class="map" loading="lazy" title="Mapa del punto de salida" src="https://www.openstreetmap.org/export/embed.html?bbox=' + (e.meet_lon - 0.006) + ',' + (e.meet_lat - 0.004) + ',' + (e.meet_lon + 0.006) + ',' + (e.meet_lat + 0.004) + '&layer=mapnik&marker=' + e.meet_lat + ',' + e.meet_lon + '"></iframe>' : '') : '') +
@@ -256,8 +306,8 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
         var q = e.mine ? sb.from('event_attendees').update({ status: status }).eq('event_id', id).eq('user_id', user.id).select('status') : sb.from('event_attendees').insert({ event_id: id, user_id: user.id, status: status }).select('status');
         return q.then(function (r2) { if (r2.error) throw r2.error; ring(e.community_id, { kind: 'att', eid: id }); again(); });
       };
-      if ($('#login')) $('#login').onclick = function () { authView(again, 'Para apuntarte a «' + e.title + '».'); };
-      if ($('#go')) $('#go').onclick = function () { busy(this, function () { return set('going'); }); };
+      if ($('#login')) $('#login').onclick = function () { authView(again, 'Para apuntarte a «' + e.title + '».', again); };
+      if ($('#go')) $('#go').onclick = function () { busy(this, function () { return set('going').then(function () { if (!full) party(); }); }); };
       if ($('#yes')) $('#yes').onclick = function () { busy(this, function () { return set('going'); }); };
       if ($('#leave')) $('#leave').onclick = function () { busy(this, function () { return set('no'); }); };
       if ($('#jf')) $('#jf').onsubmit = function (ev) { ev.preventDefault(); busy($('#jf button'), function () { return rpc('join_community', { p_code: $('#code').value.trim().toUpperCase() }).then(function (cid) { if (cid !== e.community_id) throw new Error('Ese código es de otra comunidad.'); return set('going'); }); }); };
@@ -266,7 +316,7 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
         busy($('#gf button[type=submit]'), function () {
           var ans = {}; $$('[data-q]', $('#gf')).forEach(function (el) { var q = qs[+el.dataset.q]; ans[q.id] = el.type === 'checkbox' ? el.checked : el.value.trim(); });
           return rpc('event_register', { p_event: id, p_name: $('#gn').value.trim(), p_email: $('#ge').value.trim(), p_phone: $('#gp').value.trim(), p_companion: $('#gc').checked, p_answers: ans }).then(function (r) {
-            store('rg-t-' + id, r.code); history.replaceState(null, '', '/?e=' + id + '&t=' + r.code); ring(e.community_id, { kind: 'att', eid: id }); again();
+            store('rg-t-' + id, r.code); history.replaceState(null, '', '/?e=' + id + '&t=' + r.code); if (!r.again && r.status === 'going') party(); ring(e.community_id, { kind: 'att', eid: id }); again();
           });
         });
       };
@@ -279,7 +329,7 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
   function communityView(id) {
     rpc('community_public', { p_id: id }).then(function (c) {
       if (!c) { notFound('Comunidad no encontrada'); return; }
-      document.title = c.name + ' · ReGroupRide';
+      document.title = c.name + ' · ReGroupRide'; setBack(back(user ? '/' : null));
       var now = Date.now(), up = c.events.filter(function (e) { return (e.ends_at || e.starts_at + 4 * 36e5) >= now; }), old = c.events.filter(function (e) { return up.indexOf(e) < 0; }).reverse();
       var card = function (e) { var d = new Date(e.starts_at), left = e.capacity ? e.capacity - e.taken : null; return '<a class="card item" style="text-decoration:none;color:inherit" href="/?e=' + e.id + '">' + coverHtml(e.cover_url, ' wide') + '<div><span class="muted small">' + D[d.getDay()] + ' ' + d.getDate() + ' ' + M[d.getMonth()] + ' · ' + hhmm(d) + ' h</span><h3>' + esc(e.title) + '</h3><span class="muted small">' + esc(e.meet_name || '') + (left != null && e.starts_at > now ? (e.meet_name ? ' · ' : '') + (left > 0 ? (left === 1 ? 'queda 1 plaza' : 'quedan ' + left + ' plazas') : 'completo, con lista de espera') : '') + '</span></div></a>'; };
       var feed = SB_URL.replace(/^https/, 'webcal') + '/functions/v1/ical?c=' + id;
@@ -300,7 +350,8 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
       rows.sort(function (a, b) { return ORD.indexOf(a.status) - ORD.indexOf(b.status) || a.joined_at - b.joined_at; });
       var n = function (f) { return rows.filter(f).length; }, has = function (s) { return function (x) { return x.status === s; }; };
       document.title = 'Inscritos · ' + e.title;
-      app.innerHTML = '<p><a class="btn txt" href="/?e=' + id + '">← ' + esc(e.title) + '</a></p><div class="hd1"><h1>Inscritos</h1><button class="btn pri" id="scan" type="button">Leer entradas (QR)</button></div>' +
+      setBack(back('/?e=' + id));
+      app.innerHTML = '<p class="muted" style="margin:0">' + esc(e.title) + '</p><div class="hd1"><h1>Inscritos</h1><button class="btn pri" id="scan" type="button">Leer entradas (QR)</button></div>' +
         '<div class="stats"><div><b>' + n(function (x) { return x.status === 'going' || x.status === 'offered'; }) + (e.capacity ? '<span> / ' + e.capacity + '</span>' : '') + '</b><span>Con plaza</span></div><div><b>' + n(has('waiting')) + '</b><span>En espera</span></div><div><b>' + n(has('pending')) + '</b><span>Por aprobar</span></div><div><b>' + n(function (x) { return x.checked_in; }) + '</b><span>Han llegado</span></div></div>' +
         '<div class="acts2" style="margin:0 0 14px"><button class="btn" id="csv" type="button">Descargar lista (CSV)</button><button class="btn" id="cp" type="button">Copiar enlace del evento</button></div>' +
         '<input id="find" placeholder="Buscar por nombre, teléfono o correo" style="margin:0 0 14px"><div id="msg" class="msg" hidden></div><div class="card" style="padding:4px 6px" id="gl"></div>';
@@ -332,7 +383,7 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
         var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + t], { type: 'text/csv' })); a.download = 'inscritos.csv'; a.click();
       };
       $('#scan').onclick = function () { scanner(id, again); };
-    }, function (x) { app.innerHTML = '<div class="auth card"><h1>No se puede abrir</h1><p class="msg bad">' + esc(err(x)) + '</p><a class="btn" href="/">Ir al inicio</a></div>'; });
+    }, function (x) { setBack(back('/')); app.innerHTML = '<div class="auth card"><h1>No se puede abrir</h1><p class="msg bad">' + esc(err(x)) + '</p><a class="btn" href="/">Ir al inicio</a></div>'; });
   }
   function scanner(id, done) {
     var el = document.createElement('div'), stream = null, timer = null, last = '', lastAt = 0, cv = document.createElement('canvas');
@@ -373,14 +424,14 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
   }
   function com() { return S.coms.filter(function (c) { return c.id === S.cid; })[0]; }
   function panel() {
-    var c = com();
+    var c = com(); setBack(null);
     if (!c) { app.innerHTML = '<div class="auth card"><h1>Aún no estás en ninguna comunidad</h1><p class="muted">Crea tu comunidad o únete a una desde la app de ReGroupRide (pestaña Comunidad). Después podrás crear sus eventos aquí.</p></div>'; return; }
     app.innerHTML = '<div class="hd1"><h1>Eventos</h1><a class="btn" href="/?com=' + c.id + '">Página pública</a>' + (c.admin ? '<button class="btn pri" id="new" type="button">+ Crear evento</button>' : '') + '</div>' +
       (S.coms.length > 1 ? '<div class="coms">' + S.coms.map(function (x) { return '<button type="button" data-c="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '</div>' : '<p class="muted" style="margin-top:-8px">' + esc(c.name) + '</p>') +
       (c.admin ? '' : '<p class="msg">En esta comunidad no eres administrador: puedes ver los eventos y apuntarte, pero no crearlos.</p>') +
       '<div id="msg" class="msg" hidden></div><div class="list" id="list"><p class="muted">Cargando…</p></div>';
-    $$('.coms button').forEach(function (b) { b.onclick = function () { S.cid = b.dataset.c; panel(); }; });
-    if ($('#new')) $('#new').onclick = function () { editor(null); };
+    $$('.coms button').forEach(function (b) { b.onclick = function () { S.cid = b.dataset.c; fresh = true; panel(); }; });
+    if ($('#new')) $('#new').onclick = function () { nav('/?c=' + c.id + '&new=1'); };
     sb.from('events').select('id,title,starts_at,meet_name,cover_url,capacity,listed,open_reg').eq('community_id', c.id).order('starts_at', { ascending: false }).limit(60).then(function (r) {
       if (r.error) { $('#list').innerHTML = '<p class="msg bad">' + esc(err(r.error)) + '</p>'; return; }
       var evs = r.data || [], now = Date.now();
@@ -395,10 +446,8 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
       $$('.item').forEach(function (it) {
         var id = it.dataset.id, cp = $('[data-a=copy]', it), ed = $('[data-a=edit]', it);
         cp.onclick = function () { copy(cp, location.origin + '/?e=' + id, 'Enlace del evento'); };
-        if (ed) ed.onclick = function () { editor(id); };
+        if (ed) ed.onclick = function () { nav('/?c=' + c.id + '&edit=' + id); };
       });
-      var we = param('edit');
-      if (we && c.admin) { history.replaceState(null, '', '/'); editor(we); }
     });
   }
 
@@ -422,7 +471,8 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
     var draw = function (e) {
       var d = e ? new Date(e.starts_at) : (function () { var x = new Date(Date.now() + 7 * 864e5); x.setHours(10, 0, 0, 0); return x; })(), cv = e && safeUrl(e.cover_url), blob = null, ll = null, N = !e;
       var on = function (k, def) { return (e ? e[k] !== false && (e[k] || def) : def) ? ' checked' : ''; }, qs = (e && e.questions || []).map(function (q) { return { id: q.id, label: q.label, type: q.type || 'text', options: q.options || [], required: !!q.required }; });
-      app.innerHTML = '<p><button class="btn txt" id="back" type="button">← Eventos de ' + esc(c.name) + '</button></p><form class="edit" id="ef">' +
+      setBack(back('/?c=' + c.id));
+      app.innerHTML = '<p class="muted" style="margin:0 0 10px">' + (e ? 'Editar evento' : 'Nuevo evento') + ' · ' + esc(c.name) + '</p><form class="edit" id="ef">' +
         '<div><label class="pick"><div class="cover wide" id="cv"' + (cv ? ' style="background-image:url(&quot;' + esc(cv) + '&quot;)"' : '') + '>' + (cv ? '' : '<img class="sym" src="' + SYM + '" alt="">') + '</div><span>' + (cv ? 'Cambiar portada' : 'Subir portada') + '</span><input id="file" type="file" accept="image/*" hidden></label><p class="muted small">Foto apaisada (16:9). Si no pones ninguna, en la app se ve el mapa del punto de salida.</p></div>' +
         '<div class="form"><input class="title-in" id="title" required maxlength="120" placeholder="Nombre del evento" value="' + esc(e ? e.title : '') + '">' +
         '<div class="two"><label>Empieza<input id="when" type="datetime-local" required value="' + localInput(d) + '"></label><label>Termina (opcional)<input id="end" type="datetime-local" value="' + (e && e.ends_at ? localInput(new Date(e.ends_at)) : '') + '"></label></div>' +
@@ -430,6 +480,7 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
         '<label>Indicaciones para encontrarse (opcional)<input id="note" maxlength="300" placeholder="Entrando por la entrada principal, a mano izquierda" value="' + esc(e && e.meet_note || '') + '"></label>' +
         '<label>Enlace de Google Maps del punto de salida (opcional)<input id="murl" inputmode="url" maxlength="600" placeholder="https://maps.app.goo.gl/…" value="' + esc(e && e.meet_url ? e.meet_url : '') + '"></label>' +
         '<div class="acts2"><button class="btn" id="geo" type="button">Buscar el punto de salida en el mapa</button><span class="muted small" id="geot" style="align-self:center">' + (e && e.meet_lat != null ? 'Mapa: punto guardado' : 'Sirve para enseñar el mapa en la página') + '</span></div>' +
+        '<label>Enlace de la ruta en Google Maps (opcional)<input id="rurl" inputmode="url" maxlength="600" placeholder="https://maps.app.goo.gl/…" value="' + esc(e && e.route_url ? e.route_url : '') + '"><span class="small">En Google Maps: crea la ruta → Compartir → Copiar enlace. En la página del evento saldrá «Ver la ruta en Google Maps».</span></label>' +
         '<label>Descripción<textarea id="desc" maxlength="4000" placeholder="Recorrido, paradas, ritmo, qué hay que llevar…">' + esc(e ? e.description : '') + '</textarea><span class="small">Formato: **negrita**, *cursiva*, listas con «- » o «1. », títulos con «# » y enlaces pegados tal cual.</span></label>' +
         '<p class="sec">Inscripción</p>' +
         '<label>Plazas, en motos (vacío = sin límite)<input id="cap" type="number" min="1" max="1000" inputmode="numeric" value="' + (e && e.capacity ? e.capacity : '') + '"></label>' +
@@ -459,7 +510,6 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
       };
       drawQs();
       $('#qadd').onclick = function () { if (qs.length >= 12) return; qs.push({ id: 'q' + Date.now().toString(36) + qs.length, label: '', type: 'text', options: [], required: false }); drawQs(); };
-      $('#back').onclick = panel;
       $('#geo').onclick = function () {
         var q = $('#meet').value.trim(); if (!q) { msg('Escribe primero el punto de salida.', true); return; }
         busy(this, function () { return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=es&q=' + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (a) { if (!a.length) throw new Error('No se ha encontrado ese sitio. Prueba con la dirección o pega el enlace de Google Maps.'); ll = [+a[0].lat, +a[0].lon]; msg(''); $('#geot').textContent = 'Encontrado: ' + a[0].display_name.slice(0, 90); }); });
@@ -471,23 +521,24 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
           var t = new Date($('#when').value); if (isNaN(t)) throw new Error('Pon la fecha y la hora.');
           var f = $('#end').value ? new Date($('#end').value) : null; if (f && !(f > t)) throw new Error('La hora de fin tiene que ser posterior a la de inicio.');
           var murl = $('#murl').value.trim(); if (murl && !/^https?:\/\//i.test(murl)) throw new Error('El enlace del punto de salida tiene que empezar por https://');
+          var rurl = $('#rurl').value.trim(); if (rurl && !/^https?:\/\//i.test(rurl)) throw new Error('El enlace de la ruta tiene que empezar por https://');
           var good = qs.filter(function (q) { return q.label.trim(); }); if (good.some(function (q) { return q.type === 'select' && q.options.length < 2; })) throw new Error('Las preguntas de opciones necesitan al menos dos opciones.');
           var cap = parseInt($('#cap').value, 10), pin = ll || (murl ? coords(murl) : null);
-          var row = { community_id: c.id, title: $('#title').value.trim(), starts_at: t.toISOString(), ends_at: f ? f.toISOString() : null, meet_name: $('#meet').value.trim(), meet_note: $('#note').value.trim(), meet_url: murl || null, description: $('#desc').value.trim(), capacity: cap > 0 ? cap : null,
+          var row = { community_id: c.id, title: $('#title').value.trim(), starts_at: t.toISOString(), ends_at: f ? f.toISOString() : null, meet_name: $('#meet').value.trim(), meet_note: $('#note').value.trim(), meet_url: murl || null, route_url: rurl || null, description: $('#desc').value.trim(), capacity: cap > 0 ? cap : null,
             open_reg: $('#o_open').checked, allow_guests: $('#o_guests').checked, require_approval: $('#o_appr').checked, show_guests: $('#o_show').checked, listed: $('#o_list').checked,
             questions: good.map(function (q) { return { id: q.id, label: q.label.trim(), type: q.type, options: q.type === 'select' ? q.options : [], required: q.required }; }) };
           if (pin) { row.meet_lat = pin[0]; row.meet_lon = pin[1]; } else if (N || murl !== (e.meet_url || '')) { row.meet_lat = null; row.meet_lon = null; }
           var up = blob ? (function () { var path = user.id + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + '.jpg'; return sb.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg' }).then(function (r) { if (r.error) throw new Error('No se ha podido subir la portada: ' + err(r.error)); row.cover_url = sb.storage.from('covers').getPublicUrl(path).data.publicUrl; }); })() : Promise.resolve();
           return up.then(function () { return e ? sb.from('events').update(row).eq('id', e.id).select('id') : sb.from('events').insert(row).select('id'); }).then(function (r) {
             if (r.error) throw r.error; if (!r.data || !r.data.length) throw new Error('No se ha guardado: no tienes permiso para editar este evento.');
-            ring(c.id, { kind: e ? 'edit' : 'event' }); location.href = '/?e=' + r.data[0].id;
+            ring(c.id, { kind: e ? 'edit' : 'event' }); nav('/?e=' + r.data[0].id, true);
           });
         });
       };
-      if ($('#del')) $('#del').onclick = function () { var b = this; if (b.dataset.sure) busy(b, function () { return sb.from('events').delete().eq('id', e.id).then(function (r) { if (r.error) throw r.error; ring(c.id, { kind: 'edit' }); panel(); }); }); else { b.dataset.sure = 1; b.textContent = 'Pulsa otra vez para borrarlo (no se puede deshacer)'; } };
+      if ($('#del')) $('#del').onclick = function () { var b = this; if (b.dataset.sure) busy(b, function () { return sb.from('events').delete().eq('id', e.id).then(function (r) { if (r.error) throw r.error; ring(c.id, { kind: 'edit' }); nav('/?c=' + c.id, true); }); }); else { b.dataset.sure = 1; b.textContent = 'Pulsa otra vez para borrarlo (no se puede deshacer)'; } };
     };
     if (!id) { draw(null); return; }
-    sb.from('events').select('id,title,description,starts_at,ends_at,meet_name,meet_note,meet_url,meet_lat,capacity,cover_url,open_reg,allow_guests,require_approval,show_guests,listed,questions').eq('id', id).maybeSingle().then(function (r) { if (r.error || !r.data) { panel(); return; } draw(r.data); });
+    sb.from('events').select('id,title,description,starts_at,ends_at,meet_name,meet_note,meet_url,route_url,meet_lat,capacity,cover_url,open_reg,allow_guests,require_approval,show_guests,listed,questions').eq('id', id).maybeSingle().then(function (r) { if (r.error || !r.data) { nav('/?c=' + c.id, true); return; } draw(r.data); });
   }
 
   /* ---------- arranque ---------- */
@@ -495,9 +546,9 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
     var id = eventId(), cm = comId(), mg = param('m');
     if (id) { eventView(id); return; }
     if (cm) { communityView(cm); return; }
-    if (!user) { authView(start, mg ? 'Entra con tu cuenta de administrador para ver los inscritos.' : 'Entra para crear y gestionar los eventos de tu comunidad. Es la misma cuenta de la app.'); return; }
+    if (!user) { authView(start, mg ? 'Entra con tu cuenta de administrador para ver los inscritos.' : 'Entra para crear y gestionar los eventos de tu comunidad. Es la misma cuenta de la app.', mg ? back('/?e=' + mg) : null); return; }
     if (mg) { manageView(mg); return; }
-    loadComs().then(panel, function (e) { app.innerHTML = '<p class="msg bad">' + esc(err(e)) + '</p>'; });
+    loadComs().then(function () { var ed = param('edit'), nw = /[?&]new=1/.test(location.search), c = com(); if ((ed || nw) && c && c.admin) editor(ed); else panel(); }, function (e) { app.innerHTML = '<p class="msg bad">' + esc(err(e)) + '</p>'; });
   }
   sb.auth.getSession().then(function (r) { user = r.data && r.data.session ? r.data.session.user : null; head(); start(); }, function () { start(); });
 })();

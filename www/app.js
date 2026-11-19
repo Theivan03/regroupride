@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.22.0';
+  var APP_VERSION = '0.23.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -625,9 +625,12 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   /* ---------- vistas ---------- */
   var views = { map: $('#view-map'), rides: $('#view-rides'), detail: $('#view-detail'), stats: $('#view-stats'), garage: $('#view-garage'), settings: $('#view-settings'), profile: $('#view-profile'), club: $('#view-club') };
   var currentView = 'map';
+  var inTimer = 0;
   function showView(name) {
+    var changed = name !== currentView;
     currentView = name;
     for (var k in views) views[k].hidden = k !== name;
+    if (changed) { var vw = views[name]; vw.classList.remove('rg-in'); void vw.offsetWidth; vw.classList.add('rg-in'); clearTimeout(inTimer); inTimer = setTimeout(function () { vw.classList.remove('rg-in'); }, 900); }
     $$('.tab').forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.view === (name === 'detail' ? 'rides' : (name === 'profile' ? 'map' : name)))); });
     if (name === 'map') { if (!rec) startGps('fg'); if (map) setTimeout(function () { map.resize(); }, 50); }
     else if (!rec && gpsMode === 'fg' && name !== 'detail') stopGps();
@@ -1323,6 +1326,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   Platform.onBack(function () {
     if (!$('#lightbox').hidden) { $('#lightbox').hidden = true; return true; }
     if (!$('#leanFull').hidden) { closeLeanFull(); return true; }
+    if (window.RGCloud && RGCloud.sheetBack && RGCloud.sheetBack()) return true;
     if (currentView === 'detail') { showView('rides'); return true; }
     if (currentView === 'profile') { showView('map'); return true; }
     if (currentView !== 'map') { showView('map'); return true; }

@@ -489,10 +489,20 @@
   function sheet(html, kind) {
     if (!kind && (/^<div class="rg-logo"/.test(html) || /<h1>(Un permiso más|Falta algo para rodar|Permiso de ubicación)<\/h1>/.test(html))) kind = 'page';
     var s = $('#rgSheet'), v = document.querySelector('.app > .view:not([hidden])'), eq = !!(v && (v.id === 'view-map' || v.id === 'view-club')) && kind !== 'page';
-    s.className = 'rg-sheet' + (kind === 'page' ? ' rg-page' : '') + (kind === 'win' ? ' rg-win' : '') + (eq ? ' rg-eq' : '');
+    var still = !s.hidden;      // si ya estaba abierta (se redibuja), no repite la animación de entrada
+    s.className = 'rg-sheet' + (kind === 'page' ? ' rg-page' : '') + (kind === 'win' ? ' rg-win' : '') + (eq ? ' rg-eq' : '') + (still ? ' rg-still' : '');
     s.innerHTML = '<div class="rg-sheet-in">' + html + '</div>'; s.hidden = false; s.scrollTop = 0; var inn = s.firstChild; if (inn) inn.scrollTop = 0; return s;
   }
   function closeSheet() { var s = $('#rgSheet'); s.hidden = true; s.innerHTML = ''; }
+  // «Atrás» en cualquier hoja: pulsa su botón de cerrar o de cancelar. Lo usan el botón atrás de Android y el toque fuera de la hoja.
+  function sheetBack() {
+    var s = $('#rgSheet'); if (!s || s.hidden) return false;
+    var b = s.querySelector('.head .btn.icon, #rgSkip, #ofNo, #gxNo, #lnNo'); if (b) b.click();
+    return true;      // si la hoja pide una respuesta (permisos, avisos), se queda: no se cambia la pantalla de debajo
+  }
+  document.addEventListener('click', function (ev) { var s = $('#rgSheet'); if (ev.target === s && !s.classList.contains('rg-page') && !s.classList.contains('rg-win')) sheetBack(); });
+  // Fondo vivo (líneas que se mueven despacio) detrás de las pantallas que no son el mapa.
+  (function () { var b = document.createElement('div'); b.className = 'rg-bg'; b.setAttribute('aria-hidden', 'true'); document.body.insertBefore(b, document.body.firstChild); })();
   function busy(btn, f) { var old = btn.innerHTML; btn.disabled = true; btn.textContent = 'Un momento…'; return Promise.resolve().then(f).catch(function (e) { A.toast(msg(e), 'bad'); }).then(function () { btn.disabled = false; btn.innerHTML = old; }); }
   var LOGO = '<div class="rg-logo"><img class="rg-sym" src="simbolo.svg" alt=""><b>ReGroup<i>Ride</i></b></div>';
 
@@ -838,5 +848,5 @@
   if (sb) sb.auth.onAuthStateChange(function (ev, session) { var had = !!user; user = (session && session.user) || null; if (had !== !!user) renderAccount(); });
   sync();
   window.RGCloud = { sb: sb, cfg: { url: SB_URL, key: SB_KEY }, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profile: function () { return profile; }, openRider: openRider, saveName: saveName, signOut: signOut, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
-    onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, busy: busy, msg: msg, esc: esc };
+    onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, sheetBack: sheetBack, busy: busy, msg: msg, esc: esc };
 })();

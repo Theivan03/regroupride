@@ -784,3 +784,43 @@ html.rg-locked body{overflow:hidden}
 .rg-nok.off{font-weight:500;color:var(--texto-2)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .row .thumb{color:#D9F21C;background:var(--superficie-2)}}
 :root[data-theme="dark"] .row .thumb{color:#D9F21C;background:var(--superficie-2)}
+
+/* ============ 0.23 — movimiento: transiciones entre pantallas, hojas, botones y fondo vivo ============ */
+@keyframes rgUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes rgFade{from{opacity:0}to{opacity:1}}
+@keyframes rgSheetUp{from{transform:translateY(48px);opacity:.3}to{transform:none;opacity:1}}
+@keyframes rgPop{from{transform:scale(.9);opacity:0}to{transform:none;opacity:1}}
+@keyframes rgTab{0%{transform:scale(.8)}60%{transform:scale(1.14)}100%{transform:none}}
+@keyframes rgSheen{0%,72%{transform:translateX(-140%) skewX(-20deg)}100%{transform:translateX(280%) skewX(-20deg)}}
+@keyframes rgWave1{to{transform:translateX(-1200px)}}
+@keyframes rgWave2{from{transform:translateX(-900px)}to{transform:none}}
+/* pantallas: al cambiar de pestaña el contenido entra de abajo arriba, escalonado; el mapa solo se funde */
+.view.rg-in{animation:rgFade .26s ease both}
+.view.rg-in:not(.map)>*,.view.rg-in .club-card,.view.rg-in .row{animation:rgUp .46s cubic-bezier(.2,.8,.2,1) both}
+.view.rg-in:not(.map)>:nth-child(2),.view.rg-in .club-card:nth-child(2),.view.rg-in .row:nth-child(2){animation-delay:.05s}
+.view.rg-in:not(.map)>:nth-child(3),.view.rg-in .club-card:nth-child(3),.view.rg-in .row:nth-child(3){animation-delay:.1s}
+.view.rg-in:not(.map)>:nth-child(4),.view.rg-in .club-card:nth-child(4),.view.rg-in .row:nth-child(4){animation-delay:.15s}
+.view.rg-in:not(.map)>:nth-child(n+5),.view.rg-in .club-card:nth-child(n+5),.view.rg-in .row:nth-child(n+5){animation-delay:.2s}
+/* hojas: el velo se funde y la hoja sube; las ventanas de aviso aparecen con un pequeño rebote */
+.rg-sheet:not(.rg-still){animation:rgFade .2s ease both}
+.rg-sheet:not(.rg-still):not(.rg-page):not(.rg-win) .rg-sheet-in{animation:rgSheetUp .36s cubic-bezier(.2,.9,.25,1) both}
+.rg-sheet.rg-win:not(.rg-still) .rg-sheet-in{animation:rgPop .32s cubic-bezier(.2,.9,.25,1.25) both}
+.rg-sheet.rg-page:not(.rg-still) .rg-sheet-in>*{animation:rgUp .5s cubic-bezier(.2,.8,.2,1) both}
+.rg-sheet.rg-page:not(.rg-still) .rg-sheet-in>:nth-child(2){animation-delay:.07s}.rg-sheet.rg-page:not(.rg-still) .rg-sheet-in>:nth-child(3){animation-delay:.14s}
+.rg-sheet.rg-page:not(.rg-still) .rg-sheet-in>:nth-child(4){animation-delay:.21s}.rg-sheet.rg-page:not(.rg-still) .rg-sheet-in>:nth-child(n+5){animation-delay:.28s}
+/* botones y pestañas: responden al dedo */
+.btn,.tab,.link,.club-card,.seg button{transition:transform .14s cubic-bezier(.2,.8,.2,1),background-color .2s,color .2s,filter .2s}
+.btn:active:not(:disabled){transform:scale(.95);filter:brightness(.97)}
+.tab:active{transform:scale(.9)}
+.tab[aria-selected="true"] svg{animation:rgTab .34s cubic-bezier(.2,.8,.2,1) both}
+.rg-sheet .btn.big.primary,.club .btn.big.primary{position:relative;overflow:hidden}
+.rg-sheet .btn.big.primary::after,.club .btn.big.primary::after{content:"";position:absolute;top:0;bottom:0;left:0;width:36%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:rgSheen 4.4s ease-in-out infinite;pointer-events:none}
+.toast{animation:rgUp .3s cubic-bezier(.2,.8,.2,1) both}
+/* fondo vivo: líneas que se desplazan muy despacio. No se pinta con el mapa a la vista ni mientras se graba una ruta. */
+.rg-bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.rg-bg::before,.rg-bg::after,.rg-sheet.rg-page::before,.rg-sheet.rg-page::after{content:"";position:fixed;left:0;pointer-events:none;will-change:transform}
+.rg-bg::before,.rg-sheet.rg-page::before{top:5%;width:calc(100% + 1200px);height:320px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='320' viewBox='0 0 1200 320'%3E%3Cg fill='none' stroke-width='1.6'%3E%3Cpath d='M0 120 Q300 20 600 120 T1200 120' stroke='%237B5CF0' stroke-opacity='.34'/%3E%3Cpath d='M0 170 Q300 250 600 170 T1200 170' stroke='%237B5CF0' stroke-opacity='.2'/%3E%3Cpath d='M0 215 Q300 150 600 215 T1200 215' stroke='%23A9C40C' stroke-opacity='.3'/%3E%3C/g%3E%3C/svg%3E") repeat-x;animation:rgWave1 48s linear infinite}
+.rg-bg::after,.rg-sheet.rg-page::after{top:60%;width:calc(100% + 900px);height:260px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='260' viewBox='0 0 900 260'%3E%3Cg fill='none' stroke-width='1.4'%3E%3Cpath d='M0 90 Q225 150 450 90 T900 90' stroke='%23A9C40C' stroke-opacity='.26'/%3E%3Cpath d='M0 150 Q225 70 450 150 T900 150' stroke='%237B5CF0' stroke-opacity='.3'/%3E%3Cpath d='M0 200 Q225 240 450 200 T900 200' stroke='%237B5CF0' stroke-opacity='.16'/%3E%3C/g%3E%3C/svg%3E") repeat-x;animation:rgWave2 66s linear infinite}
+.rg-sheet.rg-page>.rg-sheet-in{position:relative;z-index:1}
+body:has(#view-map:not([hidden])) .rg-bg,body.rg-rec .rg-bg{display:none}
+@media (prefers-reduced-motion:reduce){.view.rg-in,.view.rg-in *,.rg-sheet,.rg-sheet *,.rg-sheet::before,.rg-sheet::after,.rg-bg::before,.rg-bg::after,.tab svg,.toast,.btn::after{animation:none!important}.btn,.tab,.link,.club-card,.seg button{transition:none}}

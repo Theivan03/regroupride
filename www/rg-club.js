@@ -230,13 +230,13 @@
   }
   // Una sola petición para la pestaña: los eventos con sus apuntados y sus administradores. La ruta completa de cada
   // evento (decenas de KB) no se baja aquí: solo su nombre, sus km y dónde empieza; el resto, al pulsar «Cargar ruta».
-  var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon',
+  var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon,route_url',
     EV_ROUTE = ',route_name:route->>name,route_dist:route->dist,route_start:route->coords->0,route_wp0:route->wps->0', EV_EMBED = ',event_attendees(*),event_admins(user_id)';
   function fetchEvents(c) {
     var since = new Date(Date.now() - 12 * 3600e3).toISOString();
     var q = function (v6) { return sb.from('events').select(EV_COLS + (v6 ? EV_V6 : '') + EV_ROUTE + EV_EMBED).eq('community_id', c.id).gte('starts_at', since).order('starts_at').limit(40); };
     return q(S.v6 !== false).then(function (r) {
-      if (r.error && S.v6 !== false && /capacity|meet_(url|lat|lon)/i.test(r.error.message || '')) { S.v6 = false; return q(false); }
+      if (r.error && S.v6 !== false && /capacity|route_url|meet_(url|lat|lon)/i.test(r.error.message || '')) { S.v6 = false; return q(false); }
       if (!r.error && S.v6 !== false) S.v6 = true;
       return r;
     }).then(function (r) {
@@ -287,6 +287,7 @@
         (m.url ? '<div class="ev-meet"><button class="link" data-act="meet" type="button">' + ic('gmaps') + '<span>Salida: ' + esc(m.name || 'ver en Maps') + '</span></button>' + (m.lat != null ? '<button class="btn small" data-act="gomeet" type="button">' + ic('compass') + 'Ir al punto de salida</button>' : '') + '</div>'
           : (e.meet_name ? '<span class="muted">Salida: ' + esc(e.meet_name) + '</span>' : '')) + (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
         (e.route ? '<div class="ev-route"><span>' + ic('route') + esc(e.route.name || 'Ruta') + ' · ' + String(e.route.dist || 0).replace('.', ',') + ' km</span><button class="btn small" data-act="route" type="button">Cargar ruta</button></div>' : '') +
+        (/^https?:\/\//i.test(e.route_url || '') ? '<div class="ev-route"><span>' + ic('gmaps') + 'Ruta en Google Maps</span><button class="btn small" data-act="rurl" type="button">Abrir</button></div>' : '') +
         (routeAdm && !isAdmin() ? '<div class="ev-admin"><span class="muted rg-small">Eres administrador de esta ruta.</span><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button></div>' : '') +
         (st === 'offered' ? mineHtml + countHtml : countHtml + mineHtml) +
         (startBtn ? '<button class="btn big primary ev-start" data-act="start" type="button">' + ic('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
@@ -310,7 +311,7 @@
         else if (act === 'confirm') set('going', mine && mine.companion, 'Confirmado: la plaza es tuya.');
         else if (act === 'no') set('no', false, st === 'offered' ? 'Vale. La plaza pasa al siguiente de la lista.' : (st === 'waiting' ? 'Has salido de la lista de espera.' : 'Desapuntado.'));
         else if (act === 'comp') set(st, !(mine && mine.companion));
-        else if (act === 'luma') openUrl(e.luma_url); else if (act === 'route') loadRoute(e);
+        else if (act === 'luma') openUrl(e.luma_url); else if (act === 'rurl') openUrl(e.route_url); else if (act === 'route') loadRoute(e);
         else if (act === 'meet') openUrl(meetOf(e).url); else if (act === 'gomeet') goMeet(e, b);
         else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
         else if (act === 'who') whoGoes(e, att);
@@ -412,6 +413,7 @@
       '<label>Descripción<textarea id="evDesc" maxlength="4000" placeholder="Paradas, nivel, normas, lo que quieras contar">' + esc(e ? e.description : '') + '</textarea></label>' +
       '<label>Ruta<select id="evRoute"><option value="">Sin ruta</option>' + keep + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
       '<p class="muted rg-small" style="text-align:left">Salen tus rutas planificadas. Para añadir una, créala en el mapa (pegando el enlace de Google Maps) y guárdala.</p>' +
+      (v6 ? '<label>Enlace de la ruta en Google Maps (opcional)<input id="evRouteUrl" inputmode="url" maxlength="600" value="' + esc(e && e.route_url ? e.route_url : '') + '" placeholder="Pega aquí el enlace de la ruta"></label>' : '') +
       '<label>Foto de portada (opcional)<input id="evCover" type="file" accept="image/*"></label>' +
       '<label>Enlace de Luma (opcional)<input id="evLuma" inputmode="url" maxlength="300" value="' + esc(e && e.luma_url ? e.luma_url : '') + '" placeholder="https://luma.com/…"></label>' +
       '<button class="btn big primary" type="submit">' + (e ? 'Guardar cambios' : 'Publicar') + '</button></form>');
@@ -427,12 +429,14 @@
       var sel = $('#evRoute').value, route = e ? e.route : null;
       if (sel !== 'keep') { var p = plans.filter(function (x) { return String(x.id) === sel; })[0]; row.route = route = p ? { name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } : null; }
       var link = v6 ? $('#evMeetUrl').value.trim() : '', cap = v6 ? parseInt($('#evCap').value, 10) : NaN, warn = '';
+      var rurl = v6 && $('#evRouteUrl') ? (L.extractUrl($('#evRouteUrl').value) || $('#evRouteUrl').value.trim()) : '';
+      if (rurl && !/^https?:\/\//i.test(rurl)) { A.toast('El enlace de la ruta tiene que empezar por https://', 'warn'); return; }
       if (v6 && $('#evCap').value.trim() && !(cap >= 1 && cap <= 1000)) { A.toast('Las plazas tienen que ser un número entre 1 y 1000.', 'warn'); return; }
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
         var point = !v6 ? Promise.resolve(null) : (link ? (e && link === link0 && e.meet_lat != null ? Promise.resolve({ url: e.meet_url, lat: e.meet_lat, lon: e.meet_lon }) : window.RGNav.resolvePoint(link)) : Promise.resolve({ url: null, lat: null, lon: null }));
         return point.then(function (pt) {
           if (pt) {
-            row.capacity = cap >= 1 ? cap : null; row.meet_url = pt.url || null; row.meet_lat = pt.lat != null ? pt.lat : null; row.meet_lon = pt.lon != null ? pt.lon : null;
+            row.route_url = rurl || null; row.capacity = cap >= 1 ? cap : null; row.meet_url = pt.url || null; row.meet_lat = pt.lat != null ? pt.lat : null; row.meet_lon = pt.lon != null ? pt.lon : null;
             if (pt.url && pt.lat == null) warn = 'El enlace se abrirá en Google Maps, pero no trae coordenadas: no podré marcar la salida en el mapa de la app.';
             if (pt.name && !row.meet_name) row.meet_name = pt.name;
           }
@@ -443,8 +447,8 @@
             return uploadCover(cf).then(function (url) { cf = null; if (url) row.cover_url = url; else warn = 'Guardado, pero la foto no se ha podido subir (falta ejecutar supabase/11_push_y_web.sql).'; return save0(); });
           };
           return save().then(function (r) {
-            if (r.error && pt && /capacity|meet_(url|lat|lon)/i.test(r.error.message || '')) {     // el servidor aún no tiene el 06
-              S.v6 = false; delete row.capacity; delete row.meet_url; delete row.meet_lat; delete row.meet_lon; warn = 'Guardado sin plazas ni enlace de salida: falta ejecutar supabase/06_plazas_y_salida.sql.';
+            if (r.error && pt && /capacity|route_url|meet_(url|lat|lon)/i.test(r.error.message || '')) {     // el servidor aún no tiene el 06
+              S.v6 = false; delete row.capacity; delete row.route_url; delete row.meet_url; delete row.meet_lat; delete row.meet_lon; warn = 'Guardado sin plazas ni enlace de salida: falta ejecutar supabase/06_plazas_y_salida.sql.';
               return save();
             }
             return r;
