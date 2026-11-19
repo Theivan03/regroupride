@@ -83,6 +83,18 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
 .title-in:focus{outline:0}
 .auth{max-width:420px;margin:6vh auto 0}
 .auth h1{font:700 30px/1.15 Outfit;margin:0 0 6px}
+.md p{margin:0 0 12px}.md ul,.md ol{margin:0 0 12px;padding-left:22px}.md li{margin:2px 0}.md h3,.md h4{font:700 19px/1.25 Outfit;margin:18px 0 8px}.md h4{font-size:17px}.md{overflow-wrap:anywhere}
+.map{width:100%;height:190px;border:0;border-radius:16px;margin:4px 0 14px;display:block;background:var(--sup2)}
+.chk{display:flex;align-items:flex-start;gap:10px;font:500 15px/1.35 Manrope;color:var(--texto)}.chk input{width:22px;height:22px;min-height:0;flex:none;margin:0;accent-color:var(--marca)}
+.faces{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.faces i{font-style:normal;width:30px;height:30px;border-radius:50%;background:var(--suave);color:var(--marca);display:inline-flex;align-items:center;justify-content:center;font:700 14px Outfit;margin-right:-12px;border:2px solid var(--fondo)}.faces span{margin-left:10px}
+.tk{display:grid;gap:10px;justify-items:center;text-align:center;padding:16px;border:1.5px dashed var(--linea);border-radius:18px}.tk .qr{width:200px;height:200px;background:#fff;border-radius:12px;padding:8px}.tk .qr svg{width:100%;height:100%;display:block}
+.acts2{display:flex;gap:8px;flex-wrap:wrap}.acts2 .btn{min-height:42px;padding:0 14px;font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 16px}.stats div{background:var(--sup);border-radius:16px;padding:12px 14px;box-shadow:var(--sombra)}.stats b{display:block;font:700 26px/1.1 Outfit}.stats span{font-size:13px;color:var(--texto2)}
+.g{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--linea)}.g:last-child{border-bottom:0}.g b{font:600 16px Outfit}.g .acts2 .btn{min-height:38px}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--sup2);font:700 11px/16px Manrope;color:var(--texto2);margin-left:6px;vertical-align:2px}.tag.ok{background:color-mix(in srgb,var(--accion) 55%,var(--sup));color:var(--sobreacc)}.tag.w{background:color-mix(in srgb,var(--aviso) 22%,var(--sup));color:var(--aviso)}
+.scan{position:fixed;inset:0;z-index:20;background:#0b0b0e;color:#fff;display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px;overflow:auto}.scan video{width:min(100%,460px);aspect-ratio:1/1;object-fit:cover;border-radius:20px;background:#000}.scan .r{width:min(100%,460px);padding:14px 16px;border-radius:16px;background:#1d1d22;font:600 18px Outfit;min-height:56px}.scan .r.ok{background:#D9F21C;color:#14150F}.scan .r.bad{background:#7a1616}.scan input{max-width:460px}
+.qrow{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:8px;align-items:center}.qrow input,.qrow select{min-height:44px}.sec{font:700 18px Outfit;margin:10px 0 0}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}.g{grid-template-columns:1fr}.qrow{grid-template-columns:1fr 1fr}}
 @media (max-width:760px){#who{display:none}.ev,.edit{grid-template-columns:1fr;gap:22px}.cover{aspect-ratio:16/9}.item{grid-template-columns:104px minmax(0,1fr);gap:12px}.two{grid-template-columns:1fr}}
 </style>
 </head>
@@ -90,13 +102,16 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
 <header class="top"><a class="logo" href="/"><img src="/simbolo.svg" alt=""><span>ReGroup<i>Ride</i></span></a><span class="sp"></span><span id="who" class="muted small"></span><button class="btn txt" id="out" hidden>Salir</button></header>
 <main class="wrap" id="app"><p class="muted">Cargando…</p></main>
 <script src="/supabase.js"></script>
+
 <script>
 (function () {
   'use strict';
   // Claves públicas del proyecto (las mismas que lleva la app; lo que cada uno puede ver lo decide el servidor).
   var SB_URL = 'https://lpkeaxtzfbuqjkkusjit.supabase.co', SB_KEY = 'sb_publishable_lUo3IlFV8X0pVL5HUfbgNA_VLeizTOw';
+  var LIB = { qr: '/qrcode.js', scan: '/jsqr.js' }, SYM = '/simbolo.svg';
   var sb = supabase.createClient(SB_URL, SB_KEY), app = document.getElementById('app'), user = null, S = { coms: [], cid: null };
   var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return [].slice.call((r || document).querySelectorAll(s)); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
   function safeUrl(u) { return /^https:\/\//i.test(u || '') ? u : ''; }
   var D = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'], DL = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'], M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'], ML = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -104,10 +119,44 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
   function hhmm(d) { return p2(d.getHours()) + ':' + p2(d.getMinutes()); }
   function localInput(d) { return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + 'T' + hhmm(d); }
   function err(e) { var m = (e && e.message) || String(e); if (/row-level security|permission denied/i.test(m)) m = 'No tienes permiso para hacer eso.'; if (/Invalid login/i.test(m)) m = 'Correo o contraseña incorrectos.'; return m; }
-  function eventId() { var m = /^\/e\/([0-9a-f-]{36})/i.exec(location.pathname) || /[?&]e=([0-9a-f-]{36})/i.exec(location.search); return m ? m[1] : null; }
+  function param(k) { var m = new RegExp('[?&]' + k + '=([0-9a-f-]{36})', 'i').exec(location.search); return m ? m[1] : null; }
+  function eventId() { var m = /^\/e\/([0-9a-f-]{36})/i.exec(location.pathname); return m ? m[1] : param('e'); }
+  function comId() { var m = /^\/c\/([0-9a-f-]{36})/i.exec(location.pathname); return m ? m[1] : param('com'); }
   function ring(cid, p) { try { var ch = sb.channel('rg-c-' + cid); ch.send({ type: 'broadcast', event: 'ping', payload: p }).then(function () { sb.removeChannel(ch); }, function () {}); } catch (e) {} }
   function busy(b, fn) { b.disabled = true; var t = b.innerHTML; return Promise.resolve().then(fn).catch(function (e) { msg(err(e), true); }).then(function () { b.disabled = false; b.innerHTML = t; }); }
   function msg(t, bad) { var m = $('#msg'); if (m) { m.textContent = t; m.className = 'msg' + (bad ? ' bad' : ''); m.hidden = !t; m.scrollIntoView({ block: 'nearest' }); } }
+  function rpc(fn, args) { return sb.rpc(fn, args).then(function (r) { if (r.error) throw r.error; return r.data; }); }
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} return null; }
+  function copy(b, text, label) { (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { var t = b.textContent; b.textContent = 'Copiado'; setTimeout(function () { b.textContent = t; }, 1600); }, function () { window.prompt(label || 'Enlace', text); }); }
+  var libs = {};
+  function lib(k) { return libs[k] || (libs[k] = new Promise(function (ok, no) { var s = document.createElement('script'); s.src = LIB[k]; s.onload = ok; s.onerror = function () { libs[k] = null; no(new Error('No se ha podido cargar. Revisa la conexión.')); }; document.head.appendChild(s); })); }
+  function coverHtml(u, cls) { var cv = safeUrl(u); return '<div class="cover' + (cls || '') + '"' + (cv ? ' style="background-image:url(&quot;' + esc(cv) + '&quot;)"' : '') + '>' + (cv ? '' : '<img class="sym" src="' + SYM + '" alt="">') + '</div>'; }
+  function notFound(t) { app.innerHTML = '<div class="auth card"><h1>' + t + '</h1><p class="muted">Puede que el enlace esté mal o que ya no exista.</p><a class="btn" href="/">Ir al inicio</a></div>'; }
+
+  /* ---------- texto con formato (negrita, cursiva, listas, títulos y enlaces) ---------- */
+  function inline(s) {
+    var keep = [], put = function (h) { keep.push(h); return '\u0001' + (keep.length - 1) + '\u0001'; }, a = function (u, t) { return '<a href="' + u + '" target="_blank" rel="noopener nofollow">' + t + '</a>'; };
+    s = esc(s).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (m, t, u) { return put(a(u, t)); })
+      .replace(/https?:\/\/[^\s<]*[^\s<.,;:!?)]/g, function (u) { return put(a(u, u)); })
+      .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>').replace(/__([^_\n]+)__/g, '<b>$1</b>')
+      .replace(/(^|[\s(>])[*_]([^*_\n]+)[*_](?=$|[\s).,;:!?<])/g, '$1<i>$2</i>');
+    return s.replace(/\u0001(\d+)\u0001/g, function (m, i) { return keep[+i]; });
+  }
+  function md(src) {
+    var out = [], list = null, par = [], m;
+    var flush = function () { if (par.length) { out.push('<p>' + par.join('<br>') + '</p>'); par = []; } if (list) { out.push('</' + list + '>'); list = null; } };
+    String(src || '').replace(/\r/g, '').split('\n').forEach(function (ln) {
+      var t = ln.replace(/\\$/, '').trim();
+      if (!t) { flush(); return; }
+      if ((m = /^(#{1,3})\s+(.*)$/.exec(t))) { flush(); out.push((m[1].length === 1 ? '<h3>' : '<h4>') + inline(m[2]) + (m[1].length === 1 ? '</h3>' : '</h4>')); return; }
+      var ul = /^[-*•]\s+(.*)$/.exec(t), ol = /^\d+[.)]\s+(.*)$/.exec(t);
+      if (ul || ol) { var k = ul ? 'ul' : 'ol'; if (par.length || (list && list !== k)) flush(); if (!list) { out.push('<' + k + '>'); list = k; } out.push('<li>' + inline((ul || ol)[1]) + '</li>'); return; }
+      if (list) flush();
+      par.push(inline(t));
+    });
+    flush();
+    return out.join('');
+  }
 
   /* ---------- sesión ---------- */
   function authView(then, intro) {
@@ -137,42 +186,179 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
   $('#out').onclick = function () { sb.auth.signOut().then(function () { user = null; head(); start(); }); };
 
   /* ---------- página pública de un evento ---------- */
+  function whenText(e) {
+    var d = new Date(e.starts_at), f = e.ends_at ? new Date(e.ends_at) : null, same = f && f.toDateString() === d.toDateString();
+    return { d: d, day: DL[d.getDay()] + ', ' + d.getDate() + ' de ' + ML[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' de ' + d.getFullYear() : ''), hour: hhmm(d) + (f ? (same ? ' – ' + hhmm(f) + ' h' : ' h → ' + D[f.getDay()] + ' ' + f.getDate() + ' ' + M[f.getMonth()] + ', ' + hhmm(f) + ' h') : ' h') };
+  }
+  function calStamp(ms) { return new Date(ms).toISOString().replace(/[-:]|\.\d{3}/g, ''); }
+  function calData(e) { var end = e.ends_at || e.starts_at + 3 * 36e5, url = location.origin + '/?e=' + e.id; return { s: calStamp(e.starts_at), f: calStamp(end), loc: e.meet_name || '', det: url, url: url }; }
+  function icsText(e) {
+    var c = calData(e), x = function (t) { return String(t).replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n'); };
+    return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ReGroupRide//Eventos//ES', 'BEGIN:VEVENT', 'UID:' + e.id + '@regroupride', 'DTSTAMP:' + calStamp(Date.now()), 'DTSTART:' + c.s, 'DTEND:' + c.f, 'SUMMARY:' + x(e.title), 'LOCATION:' + x(c.loc), 'DESCRIPTION:' + x(c.det), 'URL:' + c.url, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  }
+  function drawQr(el, code) { lib('qr').then(function () { var q = qrcode(0, 'M'); q.addData(code); q.make(); el.innerHTML = q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }); }, function () { el.textContent = code; }); }
   function eventView(id) {
-    sb.rpc('event_public', { p_id: id }).then(function (r) {
-      var e = r.data;
-      if (r.error || !e) { app.innerHTML = '<div class="auth card"><h1>Evento no encontrado</h1><p class="muted">Puede que el enlace esté mal o que el evento se haya borrado.</p><a class="btn" href="/">Ir al inicio</a></div>'; return; }
+    var tk = (/[?&]t=([0-9a-f]{32})/i.exec(location.search) || [])[1] || store('rg-t-' + id) || null;
+    rpc('event_public', tk ? { p_id: id, p_code: tk } : { p_id: id }).then(function (e) {
+      if (!e) { notFound('Evento no encontrado'); return; }
       document.title = e.title + ' · ReGroupRide';
-      var d = new Date(e.starts_at), past = e.starts_at < Date.now(), cover = safeUrl(e.cover_url), full = e.capacity && e.going >= e.capacity;
-      var st = e.mine, reg;
-      if (past) reg = '<div class="state"><span class="dot w"></span>Este evento ya ha pasado</div>';
-      else if (st === 'going') reg = '<div class="state"><span class="dot"></span>Estás apuntado</div><p class="muted small" style="margin:0">Te lo recordaremos en la app un día y una hora antes.</p><button class="btn" id="leave" type="button">No puedo ir</button>';
+      var w = whenText(e), past = (e.ends_at || e.starts_at + 4 * 36e5) < Date.now(), started = e.starts_at < Date.now(), taken = e.taken == null ? e.going : e.taken, full = e.capacity && taken >= e.capacity;
+      var st = e.mine === 'no' ? null : e.mine, G = e.guest && e.guest.status !== 'no' ? e.guest : null, reg, qs = e.questions || [];
+      if (G) store('rg-t-' + id, G.code); else if (tk && !e.guest) store('rg-t-' + id, null);
+      var ticket = function (name, extra) { return '<div class="tk"><div class="qr" id="qr"></div><b class="t">' + esc(name) + '</b><span class="muted small">Tu entrada: enseña este código al llegar.' + (extra || '') + '</span></div>'; };
+      var join = full ? 'Apuntarme a la lista de espera' : (e.require_approval ? 'Solicitar plaza' : 'Apuntarme');
+      if (st === 'going') reg = '<div class="state"><span class="dot"></span>Estás apuntado</div>' + ticket(user.email, '') + '<p class="muted small" style="margin:0">Te lo recordaremos en la app un día y una hora antes.</p>' + (started ? '' : '<button class="btn" id="leave" type="button">No puedo ir</button>');
       else if (st === 'waiting') reg = '<div class="state"><span class="dot w"></span>Estás en lista de espera</div><p class="muted small" style="margin:0">Si queda una plaza, la app te avisa al momento para que confirmes.</p><button class="btn" id="leave" type="button">Salir de la lista</button>';
       else if (st === 'offered') reg = '<div class="state"><span class="dot"></span>Hay una plaza para ti</div><button class="btn pri big" id="yes" type="button">Sí, voy</button><button class="btn" id="leave" type="button">No puedo, que pase al siguiente</button>';
+      else if (G) {
+        var mylink = '<p class="muted small" style="margin:0">Guarda el enlace de tu entrada: es la forma de volver a verla o de anular la plaza.</p><div class="acts2"><button class="btn" id="mylink" type="button">Copiar enlace de mi entrada</button>' + (started ? '' : '<button class="btn" id="gcancel" type="button">' + (G.status === 'going' ? 'No puedo ir' : 'Anular') + '</button>') + '</div>';
+        if (G.status === 'going') reg = '<div class="state"><span class="dot"></span>' + (G.checked_in ? 'Llegada registrada' : 'Estás apuntado') + '</div>' + ticket(G.name + (G.companion ? ' + acompañante' : '')) + mylink;
+        else if (G.status === 'waiting') reg = '<div class="state"><span class="dot w"></span>Estás en lista de espera</div><p style="margin:0">Si queda una plaza libre, pasa a ser tuya automáticamente. Vuelve a abrir tu enlace para comprobarlo.</p>' + mylink;
+        else if (G.status === 'pending') reg = '<div class="state"><span class="dot w"></span>Solicitud enviada</div><p style="margin:0">El organizador tiene que aprobarla. Vuelve a abrir tu enlace para ver si ya tienes plaza.</p>' + mylink;
+        else reg = '<div class="state"><span class="dot w"></span>Solicitud no aceptada</div><p style="margin:0">El organizador no ha aceptado esta inscripción.</p>';
+      }
+      else if (past || started) reg = '<div class="state"><span class="dot w"></span>' + (past ? 'Este evento ya ha pasado' : 'El evento ya ha empezado') + '</div>';
+      else if (!e.open_reg) reg = '<div class="state"><span class="dot w"></span>Inscripciones cerradas</div>';
+      else if (user && e.member) reg = '<button class="btn pri big" id="go" type="button">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button>';
+      else if (e.allow_guests) reg = '<form class="form" id="gf"><label>Nombre y apellidos<input id="gn" required minlength="2" maxlength="60" autocomplete="name"></label><div class="two"><label>Correo<input id="ge" type="email" required maxlength="120" autocomplete="email" value="' + esc(user ? user.email : '') + '"></label><label>Teléfono<input id="gp" type="tel" required minlength="9" maxlength="20" autocomplete="tel"></label></div>' +
+        qs.map(function (q, i) {
+          var rq = q.required ? ' required' : '', lb = esc(q.label) + (q.required ? '' : ' (opcional)');
+          if (q.type === 'check') return '<label class="chk"><input type="checkbox" data-q="' + i + '"' + rq + '><span>' + esc(q.label) + '</span></label>';
+          if (q.type === 'select') return '<label>' + lb + '<select data-q="' + i + '"' + rq + '><option value="">Elige…</option>' + (q.options || []).map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select></label>';
+          return '<label>' + lb + '<input data-q="' + i + '" maxlength="300"' + rq + '></label>';
+        }).join('') +
+        '<label class="chk"><input type="checkbox" id="gc"><span>Llevo acompañante (pasajero en mi moto)</span></label>' +
+        '<button class="btn pri big" type="submit">' + join + '</button></form>' + (user ? '' : '<p class="small muted" style="margin:0;text-align:center">¿Usas la app de ReGroupRide? <button class="btn txt" id="login" type="button" style="min-height:0">Entrar con mi cuenta</button></p>');
       else if (!user) reg = '<p style="margin:0">Para apuntarte, entra con tu cuenta de ReGroupRide o crea una.</p><button class="btn pri big" id="login" type="button">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button>';
-      else if (!e.member) reg = '<p style="margin:0">Este evento es de la comunidad <b>' + esc(e.community) + '</b>. Para apuntarte tienes que estar en ella: escribe el código de invitación que te han pasado.</p><form class="form" id="jf"><input id="code" required maxlength="12" placeholder="Código de la comunidad" autocomplete="off" style="text-transform:uppercase"><button class="btn pri big" type="submit">Unirme y apuntarme</button></form>';
-      else reg = '<button class="btn pri big" id="go" type="button">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button>';
-      var where = e.meet_name || (e.meet_url ? 'Punto de salida' : '');
-      app.innerHTML = '<div class="ev"><div><div class="cover"' + (cover ? ' style="background-image:url(&quot;' + esc(cover) + '&quot;)"' : '') + '>' + (cover ? '' : '<img class="sym" src="/simbolo.svg" alt="">') + '</div>' +
-        '<div class="host"><span class="av">' + esc((e.community || '?').charAt(0).toUpperCase()) + '</span><div><span class="muted small">Organiza</span><br><b class="t">' + esc(e.community) + '</b></div></div>' +
-        (e.admin ? '<p><a class="btn" href="/?c=' + e.community_id + '&edit=' + e.id + '">Editar evento</a></p>' : '') + '</div>' +
+      else reg = '<p style="margin:0">Este evento es de la comunidad <b>' + esc(e.community) + '</b>. Para apuntarte tienes que estar en ella: escribe el código de invitación que te han pasado.</p><form class="form" id="jf"><input id="code" required maxlength="12" placeholder="Código de la comunidad" autocomplete="off" style="text-transform:uppercase"><button class="btn pri big" type="submit">Unirme y apuntarme</button></form>';
+      var where = e.meet_name || (e.meet_url || e.meet_lat != null ? 'Punto de salida' : ''), hasLL = e.meet_lat != null && e.meet_lon != null;
+      var go = safeUrl(e.meet_url) || (hasLL ? 'https://www.google.com/maps/search/?api=1&query=' + e.meet_lat + ',' + e.meet_lon : ''), cal = calData(e);
+      var hd = 'Inscripción' + (e.capacity ? ' · ' + Math.min(taken, e.capacity) + ' de ' + e.capacity + ' plazas' : '') + (e.require_approval ? ' · con aprobación' : '');
+      var faces = e.going ? '<h2>Asistentes</h2><div class="faces">' + (e.faces || []).map(function (f) { return '<i>' + esc(f) + '</i>'; }).join('') + '<span>' + e.going + (e.going === 1 ? ' persona va' : ' personas van') + '</span></div>' + (e.names && e.names.length ? '<p class="muted small">' + esc(e.names.join(', ')) + '</p>' : '') : '';
+      app.innerHTML = '<div class="ev"><div>' + coverHtml(e.cover_url) +
+        '<div class="host"><span class="av">' + esc((e.community || '?').charAt(0).toUpperCase()) + '</span><div><span class="muted small">Organiza</span><br>' + (e.community_public ? '<a class="t" style="font-weight:700;text-decoration:none" href="/?com=' + e.community_id + '">' + esc(e.community) + '</a>' : '<b class="t">' + esc(e.community) + '</b>') + '</div></div>' +
+        (e.admin ? '<div class="acts2" style="margin-top:14px"><a class="btn mar" href="/?m=' + e.id + '">Inscritos y llegada</a><a class="btn" href="/?c=' + e.community_id + '&edit=' + e.id + '">Editar evento</a></div>' : '') +
+        '<div class="acts2" style="margin-top:14px"><button class="btn" id="share" type="button">Compartir</button><a class="btn" target="_blank" rel="noopener" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(e.title) + '&dates=' + cal.s + '/' + cal.f + '&location=' + encodeURIComponent(cal.loc) + '&details=' + encodeURIComponent(cal.det) + '">Google Calendar</a><button class="btn" id="ics" type="button">Archivo de calendario</button></div></div>' +
         '<div><h1>' + esc(e.title) + '</h1>' +
-        '<div class="row"><div class="tile"><small>' + M[d.getMonth()] + '</small>' + d.getDate() + '</div><div><b>' + DL[d.getDay()] + ', ' + d.getDate() + ' de ' + ML[d.getMonth()] + '</b><span>' + hhmm(d) + ' h</span></div></div>' +
-        (where ? '<div class="row"><div class="tile"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.500C5 14.900 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></svg></div><div><b>' + esc(where) + '</b>' + (safeUrl(e.meet_url) ? '<span><a href="' + esc(e.meet_url) + '" target="_blank" rel="noopener">Cómo llegar</a></span>' : '<span>Punto de salida</span>') + '</div></div>' : '') +
+        '<div class="row"><div class="tile"><small>' + M[w.d.getMonth()] + '</small>' + w.d.getDate() + '</div><div><b>' + w.day + '</b><span>' + w.hour + '</span></div></div>' +
+        (where ? '<div class="row"><div class="tile"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.500C5 14.900 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></svg></div><div><b>' + esc(where) + '</b>' + (go ? '<span><a href="' + esc(go) + '" target="_blank" rel="noopener">Cómo llegar</a></span>' : '<span>Punto de salida</span>') + '</div></div>' : '') +
         (e.route_name ? '<div class="row"><div class="tile"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.500"/><circle cx="18" cy="6" r="2.500"/><path d="M8.500 18H14a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8"/></svg></div><div><b>' + esc(e.route_name) + '</b><span>' + (e.route_km ? String(e.route_km).replace('.', ',') + ' km · ' : '') + 'la ruta se carga en la app</span></div></div>' : '') +
-        '<div class="card reg"><div class="hd">Inscripción' + (e.capacity ? ' · ' + e.going + ' de ' + e.capacity + ' plazas' : (e.going ? ' · ' + e.going + (e.going === 1 ? ' persona va' : ' personas van') : '')) + '</div><div class="bd">' + reg + '<div id="msg" class="msg" hidden></div></div></div>' +
-        (e.description ? '<h2>Acerca del evento</h2><div class="desc">' + esc(e.description) + '</div>' : '') +
+        '<div class="card reg"><div class="hd">' + hd + '</div><div class="bd">' + reg + '<div id="msg" class="msg" hidden></div></div></div>' +
+        (e.description ? '<h2>Acerca del evento</h2><div class="md">' + md(e.description) + '</div>' : '') +
+        (where && (hasLL || e.meet_note) ? '<h2>Ubicación</h2><p style="margin:0 0 8px"><b class="t">' + esc(where) + '</b>' + (e.meet_note ? '<br><span class="muted">' + esc(e.meet_note) + '</span>' : '') + '</p>' + (hasLL ? '<iframe class="map" loading="lazy" title="Mapa del punto de salida" src="https://www.openstreetmap.org/export/embed.html?bbox=' + (e.meet_lon - 0.006) + ',' + (e.meet_lat - 0.004) + ',' + (e.meet_lon + 0.006) + ',' + (e.meet_lat + 0.004) + '&layer=mapnik&marker=' + e.meet_lat + ',' + e.meet_lon + '"></iframe>' : '') : '') +
+        faces +
         '<h2>En la app</h2><p class="muted">Con ReGroupRide ves al grupo en el mapa durante la ruta, avisas de una avería o de que necesitas gasolina y te reenganchas si te quedas atrás.</p></div></div>';
-      var again = function () { eventView(id); };
+      var again = function () { eventView(id); }, link = location.origin + '/?e=' + id;
+      if ($('#qr')) drawQr($('#qr'), G ? G.code : e.ticket);
+      $('#share').onclick = function () { var b = this; if (navigator.share) navigator.share({ title: e.title, url: link }).catch(function () {}); else copy(b, link, 'Enlace del evento'); };
+      $('#ics').onclick = function () { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([icsText(e)], { type: 'text/calendar' })); a.download = 'evento.ics'; a.click(); };
       var set = function (status) {
-        var q = st ? sb.from('event_attendees').update({ status: status }).eq('event_id', id).eq('user_id', user.id).select('status') : sb.from('event_attendees').insert({ event_id: id, user_id: user.id, status: status }).select('status');
+        var q = e.mine ? sb.from('event_attendees').update({ status: status }).eq('event_id', id).eq('user_id', user.id).select('status') : sb.from('event_attendees').insert({ event_id: id, user_id: user.id, status: status }).select('status');
         return q.then(function (r2) { if (r2.error) throw r2.error; ring(e.community_id, { kind: 'att', eid: id }); again(); });
       };
       if ($('#login')) $('#login').onclick = function () { authView(again, 'Para apuntarte a «' + e.title + '».'); };
       if ($('#go')) $('#go').onclick = function () { busy(this, function () { return set('going'); }); };
       if ($('#yes')) $('#yes').onclick = function () { busy(this, function () { return set('going'); }); };
       if ($('#leave')) $('#leave').onclick = function () { busy(this, function () { return set('no'); }); };
-      if ($('#jf')) $('#jf').onsubmit = function (ev) { ev.preventDefault(); busy($('#jf button'), function () { return sb.rpc('join_community', { p_code: $('#code').value.trim().toUpperCase() }).then(function (r2) { if (r2.error) throw r2.error; if (r2.data !== e.community_id) throw new Error('Ese código es de otra comunidad.'); return set('going'); }); }); };
-    });
+      if ($('#jf')) $('#jf').onsubmit = function (ev) { ev.preventDefault(); busy($('#jf button'), function () { return rpc('join_community', { p_code: $('#code').value.trim().toUpperCase() }).then(function (cid) { if (cid !== e.community_id) throw new Error('Ese código es de otra comunidad.'); return set('going'); }); }); };
+      if ($('#gf')) $('#gf').onsubmit = function (ev) {
+        ev.preventDefault();
+        busy($('#gf button[type=submit]'), function () {
+          var ans = {}; $$('[data-q]', $('#gf')).forEach(function (el) { var q = qs[+el.dataset.q]; ans[q.id] = el.type === 'checkbox' ? el.checked : el.value.trim(); });
+          return rpc('event_register', { p_event: id, p_name: $('#gn').value.trim(), p_email: $('#ge').value.trim(), p_phone: $('#gp').value.trim(), p_companion: $('#gc').checked, p_answers: ans }).then(function (r) {
+            store('rg-t-' + id, r.code); history.replaceState(null, '', '/?e=' + id + '&t=' + r.code); ring(e.community_id, { kind: 'att', eid: id }); again();
+          });
+        });
+      };
+      if ($('#mylink')) $('#mylink').onclick = function () { copy(this, link + '&t=' + G.code, 'Enlace de tu entrada'); };
+      if ($('#gcancel')) $('#gcancel').onclick = function () { var b = this; if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Pulsa otra vez para anular'; return; } busy(b, function () { return rpc('guest_cancel', { p_code: G.code }).then(function () { store('rg-t-' + id, null); history.replaceState(null, '', '/?e=' + id); ring(e.community_id, { kind: 'att', eid: id }); again(); }); }); };
+    }, function (x) { app.innerHTML = '<p class="msg bad">' + esc(err(x)) + '</p>'; });
+  }
+
+  /* ---------- página pública de la comunidad ---------- */
+  function communityView(id) {
+    rpc('community_public', { p_id: id }).then(function (c) {
+      if (!c) { notFound('Comunidad no encontrada'); return; }
+      document.title = c.name + ' · ReGroupRide';
+      var now = Date.now(), up = c.events.filter(function (e) { return (e.ends_at || e.starts_at + 4 * 36e5) >= now; }), old = c.events.filter(function (e) { return up.indexOf(e) < 0; }).reverse();
+      var card = function (e) { var d = new Date(e.starts_at), left = e.capacity ? e.capacity - e.taken : null; return '<a class="card item" style="text-decoration:none;color:inherit" href="/?e=' + e.id + '">' + coverHtml(e.cover_url, ' wide') + '<div><span class="muted small">' + D[d.getDay()] + ' ' + d.getDate() + ' ' + M[d.getMonth()] + ' · ' + hhmm(d) + ' h</span><h3>' + esc(e.title) + '</h3><span class="muted small">' + esc(e.meet_name || '') + (left != null && e.starts_at > now ? (e.meet_name ? ' · ' : '') + (left > 0 ? (left === 1 ? 'queda 1 plaza' : 'quedan ' + left + ' plazas') : 'completo, con lista de espera') : '') + '</span></div></a>'; };
+      var feed = SB_URL.replace(/^https/, 'webcal') + '/functions/v1/ical?c=' + id;
+      app.innerHTML = '<div class="hd1"><span class="host" style="border:0;margin:0;padding:0"><span class="av" style="width:56px;height:56px;font-size:26px">' + esc(c.name.charAt(0).toUpperCase()) + '</span></span><h1>' + esc(c.name) + '</h1></div>' +
+        (c.description ? '<div class="md" style="max-width:720px">' + md(c.description) + '</div>' : '') +
+        '<div class="acts2" style="margin:0 0 22px"><a class="btn mar" href="' + feed + '">Suscribirme al calendario</a><button class="btn" id="share" type="button">Compartir</button>' + (c.admin ? '<a class="btn" href="/?c=' + id + '">Gestionar eventos</a>' : '') + '</div>' +
+        '<h2>Próximos eventos</h2><div class="list">' + (up.length ? up.map(card).join('') : '<p class="muted">Ahora mismo no hay eventos previstos.</p>') + '</div>' +
+        (old.length ? '<h2>Eventos pasados</h2><div class="list">' + old.slice(0, 12).map(card).join('') + '</div>' : '');
+      $('#share').onclick = function () { var u = location.origin + '/?com=' + id; if (navigator.share) navigator.share({ title: c.name, url: u }).catch(function () {}); else copy(this, u, 'Enlace de la comunidad'); };
+    }, function (x) { app.innerHTML = '<p class="msg bad">' + esc(err(x)) + '</p>'; });
+  }
+
+  /* ---------- inscritos, aprobación y llegada (administradores) ---------- */
+  var STN = { going: 'Con plaza', offered: 'Plaza ofrecida', waiting: 'En espera', pending: 'Por aprobar', declined: 'Rechazado' }, ORD = ['pending', 'going', 'offered', 'waiting', 'declined'];
+  function manageView(id) {
+    Promise.all([rpc('event_public', { p_id: id }), rpc('event_manage', { p_event: id })]).then(function (r) {
+      var e = r[0], rows = r[1].members.map(function (m) { m.kind = 'm'; return m; }).concat(r[1].guests.map(function (g) { g.kind = 'g'; return g; })), qs = e.questions || [], find = '';
+      rows.sort(function (a, b) { return ORD.indexOf(a.status) - ORD.indexOf(b.status) || a.joined_at - b.joined_at; });
+      var n = function (f) { return rows.filter(f).length; }, has = function (s) { return function (x) { return x.status === s; }; };
+      document.title = 'Inscritos · ' + e.title;
+      app.innerHTML = '<p><a class="btn txt" href="/?e=' + id + '">← ' + esc(e.title) + '</a></p><div class="hd1"><h1>Inscritos</h1><button class="btn pri" id="scan" type="button">Leer entradas (QR)</button></div>' +
+        '<div class="stats"><div><b>' + n(function (x) { return x.status === 'going' || x.status === 'offered'; }) + (e.capacity ? '<span> / ' + e.capacity + '</span>' : '') + '</b><span>Con plaza</span></div><div><b>' + n(has('waiting')) + '</b><span>En espera</span></div><div><b>' + n(has('pending')) + '</b><span>Por aprobar</span></div><div><b>' + n(function (x) { return x.checked_in; }) + '</b><span>Han llegado</span></div></div>' +
+        '<div class="acts2" style="margin:0 0 14px"><button class="btn" id="csv" type="button">Descargar lista (CSV)</button><button class="btn" id="cp" type="button">Copiar enlace del evento</button></div>' +
+        '<input id="find" placeholder="Buscar por nombre, teléfono o correo" style="margin:0 0 14px"><div id="msg" class="msg" hidden></div><div class="card" style="padding:4px 6px" id="gl"></div>';
+      var again = function () { manageView(id); };
+      var list = function () {
+        var f = find.toLowerCase(), vis = rows.filter(function (x) { return !f || (x.name + ' ' + (x.phone || '') + ' ' + (x.email || '')).toLowerCase().indexOf(f) >= 0; });
+        $('#gl').innerHTML = vis.length ? vis.map(function (x) {
+          var i = rows.indexOf(x), ans = x.kind === 'g' ? qs.map(function (q) { var v = (x.answers || {})[q.id]; return v === '' || v == null || v === false ? '' : esc(q.label) + ': ' + (v === true ? 'sí' : esc(v)); }).filter(Boolean).join(' · ') : '', b = '';
+          if (x.status === 'pending') b = '<button class="btn pri" data-a="approve">Aprobar</button><button class="btn" data-a="decline">Rechazar</button>';
+          else if (x.status === 'going') b = '<button class="btn' + (x.checked_in ? '' : ' pri') + '" data-a="' + (x.checked_in ? 'uncheck' : 'checkin') + '">' + (x.checked_in ? 'Quitar llegada' : 'Ha llegado') + '</button>' + (x.kind === 'g' ? '<button class="btn del" data-a="remove">Quitar</button>' : '');
+          else if (x.kind === 'g') b = (x.status === 'declined' ? '<button class="btn" data-a="approve">Aprobar</button>' : '<button class="btn" data-a="approve">Dar plaza</button><button class="btn del" data-a="remove">Quitar</button>');
+          return '<div class="g" data-i="' + i + '"><div><b>' + esc(x.name) + '</b>' + (x.companion ? '<span class="tag">+1</span>' : '') + '<span class="tag' + (x.status === 'going' ? '' : ' w') + '">' + STN[x.status] + '</span>' + (x.checked_in ? '<span class="tag ok">Ha llegado</span>' : '') + '<span class="tag">' + (x.kind === 'm' ? 'App' : 'Web') + '</span>' +
+            '<br><span class="muted small">' + [x.phone ? '<a href="tel:' + esc(x.phone) + '">' + esc(x.phone) + '</a>' : '', esc(x.email || '')].filter(Boolean).join(' · ') + (ans ? '<br>' + ans : '') + '</span></div><div class="acts2">' + b + '</div></div>';
+        }).join('') : '<p class="muted" style="padding:12px">' + (rows.length ? 'Nadie coincide con la búsqueda.' : 'Todavía no se ha apuntado nadie.') + '</p>';
+        $$('#gl [data-a]').forEach(function (bt) {
+          bt.onclick = function () {
+            var x = rows[+bt.closest('.g').dataset.i], a = bt.dataset.a;
+            if (a === 'remove' && !bt.dataset.sure) { bt.dataset.sure = 1; bt.textContent = '¿Seguro?'; return; }
+            busy(bt, function () { return (x.kind === 'g' ? rpc('guest_set', { p_guest: x.id, p_action: a }) : rpc('member_checkin', { p_event: id, p_user: x.id, p_on: a === 'checkin' })).then(function () { ring(e.community_id, { kind: 'att', eid: id }); again(); }); });
+          };
+        });
+      };
+      list();
+      $('#find').oninput = function () { find = this.value.trim(); list(); };
+      $('#cp').onclick = function () { copy(this, location.origin + '/?e=' + id, 'Enlace del evento'); };
+      $('#csv').onclick = function () {
+        var c = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+        var t = [['Nombre', 'Origen', 'Estado', 'Teléfono', 'Correo', 'Acompañante', 'Ha llegado'].concat(qs.map(function (q) { return q.label; })).map(c).join(';')].concat(rows.map(function (x) { return [x.name, x.kind === 'm' ? 'App' : 'Web', STN[x.status], x.phone, x.email, x.companion ? 'Sí' : 'No', x.checked_in ? 'Sí' : 'No'].concat(qs.map(function (q) { var v = (x.answers || {})[q.id]; return v === true ? 'Sí' : v === false ? 'No' : v; })).map(c).join(';'); })).join('\r\n');
+        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + t], { type: 'text/csv' })); a.download = 'inscritos.csv'; a.click();
+      };
+      $('#scan').onclick = function () { scanner(id, again); };
+    }, function (x) { app.innerHTML = '<div class="auth card"><h1>No se puede abrir</h1><p class="msg bad">' + esc(err(x)) + '</p><a class="btn" href="/">Ir al inicio</a></div>'; });
+  }
+  function scanner(id, done) {
+    var el = document.createElement('div'), stream = null, timer = null, last = '', lastAt = 0, cv = document.createElement('canvas');
+    el.className = 'scan';
+    el.innerHTML = '<video playsinline muted></video><div class="r" id="sr">Apunta la cámara al código de la entrada.</div><form class="form" style="width:min(100%,460px)" id="sf"><input id="sc" placeholder="…o escribe el código de la entrada" autocomplete="off"></form><button class="btn" id="sx" type="button">Terminar</button>';
+    document.body.appendChild(el);
+    var v = $('video', el), out = $('#sr', el), say = function (t, k) { out.textContent = t; out.className = 'r' + (k ? ' ' + k : ''); };
+    var check = function (code) {
+      code = String(code || '').trim(); if (!code) return; var now = Date.now(); if (code === last && now - lastAt < 4000) return; last = code; lastAt = now;
+      rpc('event_checkin', { p_event: id, p_code: code }).then(function (r) { if (r.ok) say((r.already ? 'Ya había llegado: ' : 'Bienvenido, ') + r.name + (r.companion ? ' (+1)' : ''), r.already ? '' : 'ok'); else say((r.name ? r.name + ': ' : '') + r.error, 'bad'); if (navigator.vibrate) navigator.vibrate(r.ok ? 60 : [60, 60, 60]); }, function (x) { say(err(x), 'bad'); });
+    };
+    var close = function () { clearInterval(timer); if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); el.remove(); done(); };
+    $('#sx', el).onclick = close;
+    $('#sf', el).onsubmit = function (ev) { ev.preventDefault(); check($('#sc', el).value); $('#sc', el).value = ''; };
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { say('Este navegador no deja usar la cámara. Escribe el código o marca la llegada en la lista.', 'bad'); return; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (s) {
+      stream = s; v.srcObject = s; v.play();
+      var det = 'BarcodeDetector' in window ? new BarcodeDetector({ formats: ['qr_code'] }) : null, ready = det ? Promise.resolve() : lib('scan');
+      ready.then(function () {
+        timer = setInterval(function () {
+          if (v.readyState < 2) return;
+          if (det) det.detect(v).then(function (c) { if (c[0]) check(c[0].rawValue); }, function () {});
+          else { var w = cv.width = 480, h = cv.height = Math.round(480 * v.videoHeight / v.videoWidth) || 480, x = cv.getContext('2d', { willReadFrequently: true }); x.drawImage(v, 0, 0, w, h); var q = jsQR(x.getImageData(0, 0, w, h).data, w, h); if (q) check(q.data); }
+        }, 300);
+      }, function (x) { say(err(x), 'bad'); });
+    }, function () { say('No hay permiso para usar la cámara. Escribe el código o marca la llegada en la lista.', 'bad'); });
   }
 
   /* ---------- panel: mis comunidades y sus eventos ---------- */
@@ -180,8 +366,8 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
     return sb.from('community_members').select('role,communities(id,name)').eq('user_id', user.id).then(function (r) {
       if (r.error) throw r.error;
       S.coms = (r.data || []).filter(function (x) { return x.communities; }).map(function (x) { return { id: x.communities.id, name: x.communities.name, admin: x.role === 'admin' }; });
-      var want = /[?&]c=([0-9a-f-]{36})/i.exec(location.search);
-      if (want && S.coms.some(function (c) { return c.id === want[1]; })) S.cid = want[1];
+      var want = param('c');
+      if (want && S.coms.some(function (c) { return c.id === want; })) S.cid = want;
       if (!S.cid || !S.coms.some(function (c) { return c.id === S.cid; })) S.cid = (S.coms.filter(function (c) { return c.admin; })[0] || S.coms[0] || {}).id || null;
     });
   }
@@ -189,31 +375,30 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
   function panel() {
     var c = com();
     if (!c) { app.innerHTML = '<div class="auth card"><h1>Aún no estás en ninguna comunidad</h1><p class="muted">Crea tu comunidad o únete a una desde la app de ReGroupRide (pestaña Comunidad). Después podrás crear sus eventos aquí.</p></div>'; return; }
-    app.innerHTML = '<div class="hd1"><h1>Eventos</h1>' + (c.admin ? '<button class="btn pri" id="new" type="button">+ Crear evento</button>' : '') + '</div>' +
+    app.innerHTML = '<div class="hd1"><h1>Eventos</h1><a class="btn" href="/?com=' + c.id + '">Página pública</a>' + (c.admin ? '<button class="btn pri" id="new" type="button">+ Crear evento</button>' : '') + '</div>' +
       (S.coms.length > 1 ? '<div class="coms">' + S.coms.map(function (x) { return '<button type="button" data-c="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '</div>' : '<p class="muted" style="margin-top:-8px">' + esc(c.name) + '</p>') +
       (c.admin ? '' : '<p class="msg">En esta comunidad no eres administrador: puedes ver los eventos y apuntarte, pero no crearlos.</p>') +
       '<div id="msg" class="msg" hidden></div><div class="list" id="list"><p class="muted">Cargando…</p></div>';
-    [].forEach.call(document.querySelectorAll('.coms button'), function (b) { b.onclick = function () { S.cid = b.dataset.c; panel(); }; });
+    $$('.coms button').forEach(function (b) { b.onclick = function () { S.cid = b.dataset.c; panel(); }; });
     if ($('#new')) $('#new').onclick = function () { editor(null); };
-    sb.from('events').select('id,title,starts_at,meet_name,cover_url,capacity,event_attendees(status,companion)').eq('community_id', c.id).order('starts_at', { ascending: false }).limit(60).then(function (r) {
-      if (r.error && /cover_url/.test(r.error.message || '')) { $('#list').innerHTML = '<p class="msg bad">Falta ejecutar supabase/11_push_y_web.sql en Supabase para usar esta web.</p>'; return; }
+    sb.from('events').select('id,title,starts_at,meet_name,cover_url,capacity,listed,open_reg').eq('community_id', c.id).order('starts_at', { ascending: false }).limit(60).then(function (r) {
       if (r.error) { $('#list').innerHTML = '<p class="msg bad">' + esc(err(r.error)) + '</p>'; return; }
       var evs = r.data || [], now = Date.now();
       evs.sort(function (a, b) { var A = new Date(a.starts_at).getTime(), B = new Date(b.starts_at).getTime(), fa = A >= now, fb = B >= now; return fa !== fb ? (fa ? -1 : 1) : (fa ? A - B : B - A); });
       $('#list').innerHTML = evs.length ? evs.map(function (e) {
-        var d = new Date(e.starts_at), cv = safeUrl(e.cover_url), n = (e.event_attendees || []).filter(function (a) { return a.status === 'going' || a.status === 'offered'; }).reduce(function (s, a) { return s + 1 + (a.companion ? 1 : 0); }, 0), w = (e.event_attendees || []).filter(function (a) { return a.status === 'waiting'; }).length;
-        return '<div class="card item" data-id="' + e.id + '"><div class="cover wide"' + (cv ? ' style="background-image:url(&quot;' + esc(cv) + '&quot;)"' : '') + '>' + (cv ? '' : '<img class="sym" src="/simbolo.svg" alt="">') + '</div><div>' +
+        var d = new Date(e.starts_at);
+        return '<div class="card item" data-id="' + e.id + '">' + coverHtml(e.cover_url, ' wide') + '<div>' +
           '<span class="muted small">' + D[d.getDay()] + ' ' + d.getDate() + ' ' + M[d.getMonth()] + ' ' + d.getFullYear() + ' · ' + hhmm(d) + (d.getTime() < now ? ' · pasado' : '') + '</span><h3>' + esc(e.title) + '</h3>' +
-          '<span class="muted small">' + (e.capacity ? n + ' de ' + e.capacity + ' plazas' : n + (n === 1 ? ' apuntado' : ' apuntados')) + (c.admin && w ? ' · ' + w + ' en espera' : '') + (e.meet_name ? ' · ' + esc(e.meet_name) : '') + '</span>' +
-          '<div class="acts"><a class="btn" href="/e/' + e.id + '">Ver página</a><button class="btn" data-a="copy" type="button">Copiar enlace</button>' + (c.admin ? '<button class="btn" data-a="edit" type="button">Editar</button>' : '') + '</div></div></div>';
+          '<span class="muted small">' + [e.capacity ? e.capacity + ' plazas' : 'Sin límite de plazas', e.meet_name ? esc(e.meet_name) : '', e.listed === false ? 'oculto en la página pública' : '', e.open_reg === false ? 'inscripciones cerradas' : ''].filter(Boolean).join(' · ') + '</span>' +
+          '<div class="acts"><a class="btn" href="/?e=' + e.id + '">Ver página</a><button class="btn" data-a="copy" type="button">Copiar enlace</button>' + (c.admin ? '<a class="btn" href="/?m=' + e.id + '">Inscritos</a><button class="btn" data-a="edit" type="button">Editar</button>' : '') + '</div></div></div>';
       }).join('') : '<div class="card"><b class="t">Todavía no hay eventos</b><p class="muted" style="margin:6px 0 0">' + (c.admin ? 'Crea el primero con «Crear evento». Aparecerá también en la app, y a los miembros les llegará el aviso.' : 'Cuando un administrador cree uno, aparecerá aquí y en la app.') + '</p></div>';
-      [].forEach.call(document.querySelectorAll('.item'), function (it) {
+      $$('.item').forEach(function (it) {
         var id = it.dataset.id, cp = $('[data-a=copy]', it), ed = $('[data-a=edit]', it);
-        cp.onclick = function () { var u = location.origin + '/e/' + id; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(function () { cp.textContent = 'Copiado'; setTimeout(function () { cp.textContent = 'Copiar enlace'; }, 1600); }, function () { window.prompt('Enlace del evento', u); }); };
+        cp.onclick = function () { copy(cp, location.origin + '/?e=' + id, 'Enlace del evento'); };
         if (ed) ed.onclick = function () { editor(id); };
       });
-      var we = /[?&]edit=([0-9a-f-]{36})/i.exec(location.search);
-      if (we && c.admin) { history.replaceState(null, '', '/'); editor(we[1]); }
+      var we = param('edit');
+      if (we && c.admin) { history.replaceState(null, '', '/'); editor(we); }
     });
   }
 
@@ -235,45 +420,83 @@ h2{font:600 15px Manrope;color:var(--texto2);margin:26px 0 10px;padding-bottom:1
   function editor(id) {
     var c = com();
     var draw = function (e) {
-      var d = e ? new Date(e.starts_at) : (function () { var x = new Date(Date.now() + 7 * 864e5); x.setHours(10, 0, 0, 0); return x; })(), cv = e && safeUrl(e.cover_url), blob = null;
+      var d = e ? new Date(e.starts_at) : (function () { var x = new Date(Date.now() + 7 * 864e5); x.setHours(10, 0, 0, 0); return x; })(), cv = e && safeUrl(e.cover_url), blob = null, ll = null, N = !e;
+      var on = function (k, def) { return (e ? e[k] !== false && (e[k] || def) : def) ? ' checked' : ''; }, qs = (e && e.questions || []).map(function (q) { return { id: q.id, label: q.label, type: q.type || 'text', options: q.options || [], required: !!q.required }; });
       app.innerHTML = '<p><button class="btn txt" id="back" type="button">← Eventos de ' + esc(c.name) + '</button></p><form class="edit" id="ef">' +
-        '<div><label class="pick"><div class="cover wide" id="cv"' + (cv ? ' style="background-image:url(&quot;' + esc(cv) + '&quot;)"' : '') + '>' + (cv ? '' : '<img class="sym" src="/simbolo.svg" alt="">') + '</div><span>' + (cv ? 'Cambiar portada' : 'Subir portada') + '</span><input id="file" type="file" accept="image/*" hidden></label><p class="muted small">Foto apaisada (16:9). Si no pones ninguna, en la app se ve el mapa del punto de salida.</p></div>' +
+        '<div><label class="pick"><div class="cover wide" id="cv"' + (cv ? ' style="background-image:url(&quot;' + esc(cv) + '&quot;)"' : '') + '>' + (cv ? '' : '<img class="sym" src="' + SYM + '" alt="">') + '</div><span>' + (cv ? 'Cambiar portada' : 'Subir portada') + '</span><input id="file" type="file" accept="image/*" hidden></label><p class="muted small">Foto apaisada (16:9). Si no pones ninguna, en la app se ve el mapa del punto de salida.</p></div>' +
         '<div class="form"><input class="title-in" id="title" required maxlength="120" placeholder="Nombre del evento" value="' + esc(e ? e.title : '') + '">' +
-        '<div class="two"><label>Empieza<input id="when" type="datetime-local" required value="' + localInput(d) + '"></label><label>Plazas (vacío = sin límite)<input id="cap" type="number" min="1" max="1000" inputmode="numeric" value="' + (e && e.capacity ? e.capacity : '') + '"></label></div>' +
+        '<div class="two"><label>Empieza<input id="when" type="datetime-local" required value="' + localInput(d) + '"></label><label>Termina (opcional)<input id="end" type="datetime-local" value="' + (e && e.ends_at ? localInput(new Date(e.ends_at)) : '') + '"></label></div>' +
         '<label>Punto de salida<input id="meet" maxlength="120" placeholder="Gasolinera Repsol de Teulada" value="' + esc(e ? e.meet_name : '') + '"></label>' +
+        '<label>Indicaciones para encontrarse (opcional)<input id="note" maxlength="300" placeholder="Entrando por la entrada principal, a mano izquierda" value="' + esc(e && e.meet_note || '') + '"></label>' +
         '<label>Enlace de Google Maps del punto de salida (opcional)<input id="murl" inputmode="url" maxlength="600" placeholder="https://maps.app.goo.gl/…" value="' + esc(e && e.meet_url ? e.meet_url : '') + '"></label>' +
-        '<label>Descripción<textarea id="desc" maxlength="4000" placeholder="Recorrido, paradas, ritmo, qué hay que llevar…">' + esc(e ? e.description : '') + '</textarea></label>' +
+        '<div class="acts2"><button class="btn" id="geo" type="button">Buscar el punto de salida en el mapa</button><span class="muted small" id="geot" style="align-self:center">' + (e && e.meet_lat != null ? 'Mapa: punto guardado' : 'Sirve para enseñar el mapa en la página') + '</span></div>' +
+        '<label>Descripción<textarea id="desc" maxlength="4000" placeholder="Recorrido, paradas, ritmo, qué hay que llevar…">' + esc(e ? e.description : '') + '</textarea><span class="small">Formato: **negrita**, *cursiva*, listas con «- » o «1. », títulos con «# » y enlaces pegados tal cual.</span></label>' +
+        '<p class="sec">Inscripción</p>' +
+        '<label>Plazas, en motos (vacío = sin límite)<input id="cap" type="number" min="1" max="1000" inputmode="numeric" value="' + (e && e.capacity ? e.capacity : '') + '"></label>' +
+        '<label class="chk"><input type="checkbox" id="o_open"' + on('open_reg', true) + '><span>Inscripciones abiertas</span></label>' +
+        '<label class="chk"><input type="checkbox" id="o_guests"' + on('allow_guests', true) + '><span>Cualquiera con el enlace puede apuntarse desde la web, sin cuenta ni app (nombre, correo y teléfono)</span></label>' +
+        '<label class="chk"><input type="checkbox" id="o_appr"' + on('require_approval', false) + '><span>Aprobar a mano cada inscripción hecha desde la web</span></label>' +
+        '<label class="chk"><input type="checkbox" id="o_show"' + on('show_guests', true) + '><span>Enseñar cuántos van y sus nombres a los demás asistentes</span></label>' +
+        '<label class="chk"><input type="checkbox" id="o_list"' + on('listed', true) + '><span>Aparece en la página pública de la comunidad</span></label>' +
+        '<p class="sec">Preguntas al apuntarse desde la web</p><div class="form" id="qs"></div><div><button class="btn" id="qadd" type="button">+ Añadir pregunta</button></div>' +
         '<p class="muted small" style="margin:0">La ruta para seguir en el mapa se añade desde la app (editar el evento → «Ruta»).</p>' +
         '<div id="msg" class="msg" hidden></div><button class="btn pri big" type="submit">' + (e ? 'Guardar cambios' : 'Crear evento') + '</button>' +
         (e ? '<button class="btn del" id="del" type="button">Borrar el evento</button>' : '') + '</div></form>';
+      var drawQs = function () {
+        $('#qs').innerHTML = qs.map(function (q, i) {
+          return '<div data-i="' + i + '"><div class="qrow"><input data-k="label" maxlength="120" placeholder="Pregunta (p. ej. ¿Qué bocadillo quieres?)" value="' + esc(q.label) + '"><select data-k="type"><option value="text"' + (q.type === 'text' ? ' selected' : '') + '>Texto</option><option value="select"' + (q.type === 'select' ? ' selected' : '') + '>Opciones</option><option value="check"' + (q.type === 'check' ? ' selected' : '') + '>Casilla</option></select><button class="btn del" data-k="del" type="button">Quitar</button></div>' +
+            (q.type === 'select' ? '<input data-k="options" style="margin-top:8px" placeholder="Opciones separadas por comas" value="' + esc(q.options.join(', ')) + '">' : '') +
+            '<label class="chk" style="margin-top:8px"><input type="checkbox" data-k="required"' + (q.required ? ' checked' : '') + '><span>Obligatoria</span></label></div>';
+        }).join('');
+        $$('#qs [data-k]').forEach(function (el) {
+          var q = qs[+el.closest('[data-i]').dataset.i], k = el.dataset.k;
+          if (k === 'del') el.onclick = function () { qs.splice(qs.indexOf(q), 1); drawQs(); };
+          else if (k === 'type') el.onchange = function () { q.type = el.value; drawQs(); };
+          else if (k === 'required') el.onchange = function () { q.required = el.checked; };
+          else if (k === 'options') el.oninput = function () { q.options = el.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean); };
+          else el.oninput = function () { q.label = el.value; };
+        });
+      };
+      drawQs();
+      $('#qadd').onclick = function () { if (qs.length >= 12) return; qs.push({ id: 'q' + Date.now().toString(36) + qs.length, label: '', type: 'text', options: [], required: false }); drawQs(); };
       $('#back').onclick = panel;
+      $('#geo').onclick = function () {
+        var q = $('#meet').value.trim(); if (!q) { msg('Escribe primero el punto de salida.', true); return; }
+        busy(this, function () { return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=es&q=' + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (a) { if (!a.length) throw new Error('No se ha encontrado ese sitio. Prueba con la dirección o pega el enlace de Google Maps.'); ll = [+a[0].lat, +a[0].lon]; msg(''); $('#geot').textContent = 'Encontrado: ' + a[0].display_name.slice(0, 90); }); });
+      };
       $('#file').onchange = function () { var f = this.files[0]; if (!f) return; coverBlob(f).then(function (b) { blob = b; var el = $('#cv'); el.style.backgroundImage = 'url("' + URL.createObjectURL(b) + '")'; el.innerHTML = ''; }, function (x) { msg(err(x), true); }); };
       $('#ef').onsubmit = function (ev) {
         ev.preventDefault();
         busy($('#ef button[type=submit]'), function () {
           var t = new Date($('#when').value); if (isNaN(t)) throw new Error('Pon la fecha y la hora.');
+          var f = $('#end').value ? new Date($('#end').value) : null; if (f && !(f > t)) throw new Error('La hora de fin tiene que ser posterior a la de inicio.');
           var murl = $('#murl').value.trim(); if (murl && !/^https?:\/\//i.test(murl)) throw new Error('El enlace del punto de salida tiene que empezar por https://');
-          var cap = parseInt($('#cap').value, 10), ll = murl ? coords(murl) : null;
-          var row = { community_id: c.id, title: $('#title').value.trim(), starts_at: t.toISOString(), meet_name: $('#meet').value.trim(), meet_url: murl || null, description: $('#desc').value.trim(), capacity: cap > 0 ? cap : null };
-          if (!e || murl !== (e.meet_url || '')) { row.meet_lat = ll ? ll[0] : null; row.meet_lon = ll ? ll[1] : null; }
+          var good = qs.filter(function (q) { return q.label.trim(); }); if (good.some(function (q) { return q.type === 'select' && q.options.length < 2; })) throw new Error('Las preguntas de opciones necesitan al menos dos opciones.');
+          var cap = parseInt($('#cap').value, 10), pin = ll || (murl ? coords(murl) : null);
+          var row = { community_id: c.id, title: $('#title').value.trim(), starts_at: t.toISOString(), ends_at: f ? f.toISOString() : null, meet_name: $('#meet').value.trim(), meet_note: $('#note').value.trim(), meet_url: murl || null, description: $('#desc').value.trim(), capacity: cap > 0 ? cap : null,
+            open_reg: $('#o_open').checked, allow_guests: $('#o_guests').checked, require_approval: $('#o_appr').checked, show_guests: $('#o_show').checked, listed: $('#o_list').checked,
+            questions: good.map(function (q) { return { id: q.id, label: q.label.trim(), type: q.type, options: q.type === 'select' ? q.options : [], required: q.required }; }) };
+          if (pin) { row.meet_lat = pin[0]; row.meet_lon = pin[1]; } else if (N || murl !== (e.meet_url || '')) { row.meet_lat = null; row.meet_lon = null; }
           var up = blob ? (function () { var path = user.id + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + '.jpg'; return sb.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg' }).then(function (r) { if (r.error) throw new Error('No se ha podido subir la portada: ' + err(r.error)); row.cover_url = sb.storage.from('covers').getPublicUrl(path).data.publicUrl; }); })() : Promise.resolve();
           return up.then(function () { return e ? sb.from('events').update(row).eq('id', e.id).select('id') : sb.from('events').insert(row).select('id'); }).then(function (r) {
             if (r.error) throw r.error; if (!r.data || !r.data.length) throw new Error('No se ha guardado: no tienes permiso para editar este evento.');
-            ring(c.id, { kind: e ? 'edit' : 'event' }); location.href = '/e/' + r.data[0].id;
+            ring(c.id, { kind: e ? 'edit' : 'event' }); location.href = '/?e=' + r.data[0].id;
           });
         });
       };
       if ($('#del')) $('#del').onclick = function () { var b = this; if (b.dataset.sure) busy(b, function () { return sb.from('events').delete().eq('id', e.id).then(function (r) { if (r.error) throw r.error; ring(c.id, { kind: 'edit' }); panel(); }); }); else { b.dataset.sure = 1; b.textContent = 'Pulsa otra vez para borrarlo (no se puede deshacer)'; } };
     };
     if (!id) { draw(null); return; }
-    sb.from('events').select('id,title,description,starts_at,meet_name,meet_url,capacity,cover_url').eq('id', id).maybeSingle().then(function (r) { if (r.error || !r.data) { panel(); return; } draw(r.data); });
+    sb.from('events').select('id,title,description,starts_at,ends_at,meet_name,meet_note,meet_url,meet_lat,capacity,cover_url,open_reg,allow_guests,require_approval,show_guests,listed,questions').eq('id', id).maybeSingle().then(function (r) { if (r.error || !r.data) { panel(); return; } draw(r.data); });
   }
 
   /* ---------- arranque ---------- */
   function start() {
-    var id = eventId();
+    var id = eventId(), cm = comId(), mg = param('m');
     if (id) { eventView(id); return; }
-    if (!user) { authView(start, 'Entra para crear y gestionar los eventos de tu comunidad. Es la misma cuenta de la app.'); return; }
+    if (cm) { communityView(cm); return; }
+    if (!user) { authView(start, mg ? 'Entra con tu cuenta de administrador para ver los inscritos.' : 'Entra para crear y gestionar los eventos de tu comunidad. Es la misma cuenta de la app.'); return; }
+    if (mg) { manageView(mg); return; }
     loadComs().then(panel, function (e) { app.innerHTML = '<p class="msg bad">' + esc(err(e)) + '</p>'; });
   }
   sb.auth.getSession().then(function (r) { user = r.data && r.data.session ? r.data.session.user : null; head(); start(); }, function () { start(); });
