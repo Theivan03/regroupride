@@ -300,7 +300,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
       else if (past || started) reg = '<div class="state"><span class="dot w"></span>' + (past ? 'Este evento ya ha pasado' : 'El evento ya ha empezado') + '</div>';
       else if (!e.open_reg) reg = '<div class="state"><span class="dot w"></span>Inscripciones cerradas</div>';
       else if (user && e.member) reg = '<button class="btn pri big" id="go" type="button">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button>';
-      else if (e.allow_guests) reg = '<form class="form" id="gf"><label>Nombre y apellidos<input id="gn" required minlength="2" maxlength="60" autocomplete="name"></label><div class="two"><label>Correo<input id="ge" type="email" required maxlength="120" autocomplete="email" value="' + esc(user ? user.email : '') + '"></label><label>Teléfono<input id="gp" type="tel" required minlength="9" maxlength="20" autocomplete="tel"></label></div>' +
+      else if (e.allow_guests) reg = '<form class="form" id="gf"><label>Nombre y apellidos<input id="gn" required minlength="2" maxlength="60" autocomplete="name"></label><div class="two"><label>Correo<input id="ge" type="email" required maxlength="120" autocomplete="email" value="' + esc(user ? user.email : '') + '"></label><label>Teléfono<input id="gp" type="tel" required minlength="9" maxlength="20" autocomplete="tel"></label></div><label>¿Con qué moto vienes?<input id="gb" required minlength="2" maxlength="80" placeholder="Marca y modelo"></label>' +
         qs.map(function (q, i) {
           var rq = q.required ? ' required' : '', lb = esc(q.label) + (q.required ? '' : ' (opcional)');
           if (q.type === 'check') return '<label class="chk"><input type="checkbox" data-q="' + i + '"' + rq + '><span>' + esc(q.label) + '</span></label>';
@@ -332,20 +332,32 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
       if ($('#qr')) drawQr($('#qr'), G ? G.code : e.ticket);
       $('#share').onclick = function () { var b = this; if (navigator.share) navigator.share({ title: e.title, url: link }).catch(function () {}); else copy(b, link, 'Enlace del evento'); };
       $('#ics').onclick = function () { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([icsText(e)], { type: 'text/calendar' })); a.download = 'evento.ics'; a.click(); };
-      var set = function (status) {
-        var q = e.mine ? sb.from('event_attendees').update({ status: status }).eq('event_id', id).eq('user_id', user.id).select('status') : sb.from('event_attendees').insert({ event_id: id, user_id: user.id, status: status }).select('status');
+      var set = function (status, bike) {
+        var row = { status: status }; if (bike) row.bike = bike;
+        var q = e.mine ? sb.from('event_attendees').update(row).eq('event_id', id).eq('user_id', user.id).select('status') : sb.from('event_attendees').insert(Object.assign({ event_id: id, user_id: user.id }, row)).select('status');
         return q.then(function (r2) { if (r2.error) throw r2.error; ring(e.community_id, { kind: 'att', eid: id }); again(); });
       };
       if ($('#login')) $('#login').onclick = function () { authView(again, 'Para apuntarte a «' + e.title + '».', again); };
-      if ($('#go')) $('#go').onclick = function () { busy(this, function () { return set('going').then(function () { if (!full) party(); }); }); };
-      if ($('#yes')) $('#yes').onclick = function () { busy(this, function () { return set('going'); }); };
+      // miembro de la comunidad: antes de apuntarse dice con qué moto viene y, si falta, su teléfono
+      var memberForm = function (after) {
+        Promise.all([sb.from('profiles').select('bike_brand,bike_model').eq('id', user.id).maybeSingle(), sb.from('profile_private').select('ride_phone').eq('id', user.id).maybeSingle()]).then(function (r) {
+          var p = (r[0] && r[0].data) || {}, ph = ((r[1] && r[1].data) || {}).ride_phone || '', bk = [p.bike_brand, p.bike_model].filter(Boolean).join(' ');
+          $('.reg .bd').innerHTML = '<form class="form" id="mf"><label>¿Con qué moto vienes?<input id="mb" required minlength="2" maxlength="80" placeholder="Marca y modelo" value="' + esc(bk) + '"></label><label>Teléfono<input id="mp" type="tel" required minlength="9" maxlength="20" autocomplete="tel" value="' + esc(ph) + '"><span class="small">Solo lo ven los administradores de la ruta, para llamarte si no apareces a la salida.</span></label><button class="btn pri big" type="submit">Apuntarme</button></form><div id="msg" class="msg" hidden></div>';
+          $('#mf').onsubmit = function (ev) {
+            ev.preventDefault();
+            busy($('#mf button'), function () { var np = $('#mp').value.trim(); return (np !== ph ? sb.from('profile_private').update({ ride_phone: np }).eq('id', user.id).then(function (x) { if (x.error) throw x.error; }) : Promise.resolve()).then(function () { return after($('#mb').value.trim()); }); });
+          };
+        });
+      };
+      if ($('#go')) $('#go').onclick = function () { memberForm(function (bike) { return set('going', bike).then(function () { if (!full) party(); }); }); };
+      if ($('#yes')) $('#yes').onclick = function () { memberForm(function (bike) { return set('going', bike); }); };
       if ($('#leave')) $('#leave').onclick = function () { busy(this, function () { return set('no'); }); };
-      if ($('#jf')) $('#jf').onsubmit = function (ev) { ev.preventDefault(); busy($('#jf button'), function () { return rpc('join_community', { p_code: $('#code').value.trim().toUpperCase() }).then(function (cid) { if (cid !== e.community_id) throw new Error('Ese código es de otra comunidad.'); return set('going'); }); }); };
+      if ($('#jf')) $('#jf').onsubmit = function (ev) { ev.preventDefault(); busy($('#jf button'), function () { return rpc('join_community', { p_code: $('#code').value.trim().toUpperCase() }).then(function (cid) { if (cid !== e.community_id) throw new Error('Ese código es de otra comunidad.'); memberForm(function (bike) { return set('going', bike); }); }); }); };
       if ($('#gf')) $('#gf').onsubmit = function (ev) {
         ev.preventDefault();
         busy($('#gf button[type=submit]'), function () {
           var ans = {}; $$('[data-q]', $('#gf')).forEach(function (el) { var q = qs[+el.dataset.q]; ans[q.id] = el.type === 'checkbox' ? el.checked : el.value.trim(); });
-          return rpc('event_register', { p_event: id, p_name: $('#gn').value.trim(), p_email: $('#ge').value.trim(), p_phone: $('#gp').value.trim(), p_companion: $('#gc').checked, p_answers: ans }).then(function (r) {
+          return rpc('event_register', { p_event: id, p_name: $('#gn').value.trim(), p_email: $('#ge').value.trim(), p_phone: $('#gp').value.trim(), p_companion: $('#gc').checked, p_answers: ans, p_bike: $('#gb').value.trim() }).then(function (r) {
             store('rg-t-' + id, r.code); history.replaceState(null, '', '/?e=' + id + '&t=' + r.code); if (!r.again && r.status === 'going') party(); ring(e.community_id, { kind: 'att', eid: id }); again();
           });
         });
@@ -387,14 +399,14 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
         '<input id="find" placeholder="Buscar por nombre, teléfono o correo" style="margin:0 0 14px"><div id="msg" class="msg" hidden></div><div class="card" style="padding:4px 6px" id="gl"></div>';
       var again = function () { manageView(id); };
       var list = function () {
-        var f = find.toLowerCase(), vis = rows.filter(function (x) { return !f || (x.name + ' ' + (x.phone || '') + ' ' + (x.email || '')).toLowerCase().indexOf(f) >= 0; });
+        var f = find.toLowerCase(), vis = rows.filter(function (x) { return !f || (x.name + ' ' + (x.phone || '') + ' ' + (x.email || '') + ' ' + (x.bike || '')).toLowerCase().indexOf(f) >= 0; });
         $('#gl').innerHTML = vis.length ? vis.map(function (x) {
           var i = rows.indexOf(x), ans = x.kind === 'g' ? qs.map(function (q) { var v = (x.answers || {})[q.id]; return v === '' || v == null || v === false ? '' : esc(q.label) + ': ' + (v === true ? 'sí' : esc(v)); }).filter(Boolean).join(' · ') : '', b = '';
           if (x.status === 'pending') b = '<button class="btn pri" data-a="approve">Aprobar</button><button class="btn" data-a="decline">Rechazar</button>';
           else if (x.status === 'going') b = '<button class="btn' + (x.checked_in ? '' : ' pri') + '" data-a="' + (x.checked_in ? 'uncheck' : 'checkin') + '">' + (x.checked_in ? 'Quitar llegada' : 'Ha llegado') + '</button>' + (x.kind === 'g' ? '<button class="btn del" data-a="remove">Quitar</button>' : '');
           else if (x.kind === 'g') b = (x.status === 'declined' ? '<button class="btn" data-a="approve">Aprobar</button>' : '<button class="btn" data-a="approve">Dar plaza</button><button class="btn del" data-a="remove">Quitar</button>');
           return '<div class="g" data-i="' + i + '"><div><b>' + esc(x.name) + '</b>' + (x.companion ? '<span class="tag">+1</span>' : '') + '<span class="tag' + (x.status === 'going' ? '' : ' w') + '">' + STN[x.status] + '</span>' + (x.checked_in ? '<span class="tag ok">Ha llegado</span>' : '') + '<span class="tag">' + (x.kind === 'm' ? 'App' : 'Web') + '</span>' +
-            '<br><span class="muted small">' + [x.phone ? '<a href="tel:' + esc(x.phone) + '">' + esc(x.phone) + '</a>' : '', esc(x.email || '')].filter(Boolean).join(' · ') + (ans ? '<br>' + ans : '') + '</span></div><div class="acts2">' + b + '</div></div>';
+            '<br><span class="muted small">' + [x.bike ? '<b>' + esc(x.bike) + '</b>' : 'Moto sin indicar', x.phone ? '<a href="tel:' + esc(x.phone) + '">Llamar · ' + esc(x.phone) + '</a>' : 'Sin teléfono', esc(x.email || '')].filter(Boolean).join(' · ') + (ans ? '<br>' + ans : '') + '</span></div><div class="acts2">' + b + '</div></div>';
         }).join('') : '<p class="muted" style="padding:12px">' + (rows.length ? 'Nadie coincide con la búsqueda.' : 'Todavía no se ha apuntado nadie.') + '</p>';
         $$('#gl [data-a]').forEach(function (bt) {
           bt.onclick = function () {
@@ -409,7 +421,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
       $('#cp').onclick = function () { copy(this, location.origin + '/?e=' + id, 'Enlace del evento'); };
       $('#csv').onclick = function () {
         var c = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
-        var t = [['Nombre', 'Origen', 'Estado', 'Teléfono', 'Correo', 'Acompañante', 'Ha llegado'].concat(qs.map(function (q) { return q.label; })).map(c).join(';')].concat(rows.map(function (x) { return [x.name, x.kind === 'm' ? 'App' : 'Web', STN[x.status], x.phone, x.email, x.companion ? 'Sí' : 'No', x.checked_in ? 'Sí' : 'No'].concat(qs.map(function (q) { var v = (x.answers || {})[q.id]; return v === true ? 'Sí' : v === false ? 'No' : v; })).map(c).join(';'); })).join('\r\n');
+        var t = [['Nombre', 'Origen', 'Estado', 'Moto', 'Teléfono', 'Correo', 'Acompañante', 'Ha llegado'].concat(qs.map(function (q) { return q.label; })).map(c).join(';')].concat(rows.map(function (x) { return [x.name, x.kind === 'm' ? 'App' : 'Web', STN[x.status], x.bike, x.phone, x.email, x.companion ? 'Sí' : 'No', x.checked_in ? 'Sí' : 'No'].concat(qs.map(function (q) { var v = (x.answers || {})[q.id]; return v === true ? 'Sí' : v === false ? 'No' : v; })).map(c).join(';'); })).join('\r\n');
         var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + t], { type: 'text/csv' })); a.download = 'inscritos.csv'; a.click();
       };
       $('#scan').onclick = function () { scanner(id, again); };

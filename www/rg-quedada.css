@@ -879,3 +879,7 @@ body:has(#view-map:not([hidden])) .rg-bg,body.rg-rec .rg-bg{display:none}
   .ev-go .btn,.ev .btn.small{flex:0 1 auto}
   .btn{cursor:pointer}
 }
+
+/* 0.26 — moto y llamada en la lista de inscritos */
+.rg-mbike{display:flex;align-items:center;gap:6px;text-align:left}.rg-mbike svg{width:16px;height:16px;color:var(--marca);flex:none}
+.rg-call{text-decoration:none;background:var(--marca-suave);color:var(--texto)}.rg-call svg{width:18px;height:18px}

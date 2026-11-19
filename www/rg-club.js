@@ -223,9 +223,10 @@
       im.src = u;
     });
   }
-  function setStatus(e, mine, status, companion) {
-    var q = mine ? sb.from('event_attendees').update({ status: status, companion: !!companion }).eq('event_id', e.id).eq('user_id', S.user.id).select('status')
-      : sb.from('event_attendees').insert({ event_id: e.id, user_id: S.user.id, status: status, companion: !!companion }).select('status');
+  function setStatus(e, mine, status, companion, bike) {
+    var row = { status: status, companion: !!companion }; if (bike) row.bike = String(bike).slice(0, 80);
+    var q = mine ? sb.from('event_attendees').update(row).eq('event_id', e.id).eq('user_id', S.user.id).select('status')
+      : sb.from('event_attendees').insert(Object.assign({ event_id: e.id, user_id: S.user.id }, row)).select('status');
     return q.then(function (r) { var d = ok(r); return d && d[0] ? d[0].status : status; });
   }
   // Una sola petición para la pestaña: los eventos con sus apuntados y sus administradores. La ruta completa de cada
@@ -298,8 +299,8 @@
     if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
     $$('.ev', pane).forEach(function (card) {
       var e = evs.filter(function (x) { return x.id === card.dataset.ev; })[0], mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
-      var set = function (status, companion, said) {
-        return setStatus(e, mine, status, companion).then(function (got) {
+      var set = function (status, companion, said, bike) {
+        return setStatus(e, mine, status, companion, bike).then(function (got) {
           ring(c.id, { kind: 'att', eid: e.id });
           if (got === 'waiting' && (!mine || mine.status !== 'waiting')) { A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn'); setTimeout(closedHelp, 1800); }
           else if (said) A.toast(said, 'ok');
@@ -308,8 +309,8 @@
       };
       $$('[data-act]', card).forEach(function (b) { b.addEventListener('click', function () {
         var act = b.dataset.act, st = mine ? mine.status : 'no';
-        if (act === 'go') set('going', mine && mine.companion, st === 'going' ? '' : 'Apuntado. Te lo recordaré el día antes y una hora antes.');
-        else if (act === 'confirm') set('going', mine && mine.companion, 'Confirmado: la plaza es tuya.');
+        if (act === 'go') askRideInfo(e, function (bike) { set('going', mine && mine.companion, st === 'going' ? '' : 'Apuntado. Te lo recordaré el día antes y una hora antes.', bike); });
+        else if (act === 'confirm') askRideInfo(e, function (bike) { set('going', mine && mine.companion, 'Confirmado: la plaza es tuya.', bike); }, mine && mine.bike);
         else if (act === 'no') set('no', false, st === 'offered' ? 'Vale. La plaza pasa al siguiente de la lista.' : (st === 'waiting' ? 'Has salido de la lista de espera.' : 'Desapuntado.'));
         else if (act === 'comp') set(st, !(mine && mine.companion));
         else if (act === 'luma') openUrl(e.luma_url); else if (act === 'rurl') openUrl(e.route_url); else if (act === 'route') loadRoute(e);
@@ -392,6 +393,29 @@
   // Mi entrada: el mismo código QR que sale en la web, para enseñarlo al llegar. El código lo da el servidor.
   var WEB = 'https://regroupride-eventos.netlify.app';
   function qrSvg(text) { try { var q = window.qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }); } catch (x) { return ''; } }
+  // Al apuntarse: con qué moto viene y un teléfono para que el administrador pueda llamarle.
+  // Con una sola moto en el garaje y el teléfono ya puesto no se pregunta nada.
+  function askRideInfo(e, then, already) {
+    var motos = A.vehicles().filter(function (v) { return (v.type || 'moto') !== 'coche'; }), name = function (v) { return (v.name || [v.make, v.model].filter(Boolean).join(' ') || 'Mi moto').trim(); };
+    var phone = Cl.ridePhone ? Cl.ridePhone() : null, needPhone = phone === '';
+    if (already && !needPhone) { then(already); return; }
+    if (motos.length === 1 && !needPhone) { then(name(motos[0])); return; }
+    var main = motos.filter(function (v) { return v.principal; })[0] || motos[0];
+    Cl.sheet('<div class="head"><h1>Apuntarme</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p class="muted" style="text-align:left;margin:0">' + esc(e.title) + '</p><form class="rg-form" id="riForm">' +
+      (already ? '' : motos.length > 1 ? '<label>¿Con qué moto vienes?<select id="riBike">' + motos.map(function (v) { return '<option' + (v === main ? ' selected' : '') + '>' + esc(name(v)) + '</option>'; }).join('') + '</select></label>'
+        : motos.length === 1 ? '<p style="text-align:left;margin:0">Moto: <b>' + esc(name(motos[0])) + '</b></p>'
+        : '<label>¿Con qué moto vienes?<input id="riBikeTxt" required minlength="2" maxlength="80" placeholder="Marca y modelo, p. ej. Zontes 703 RR"></label><p class="muted rg-small" style="text-align:left">Si la añades en Garaje, la próxima vez no te lo pregunto.</p>') +
+      (needPhone ? '<label>Tu teléfono<input id="riPhone" type="tel" inputmode="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" placeholder="600 000 000"></label><p class="muted rg-small" style="text-align:left">Solo lo ven los administradores de la ruta, para llamarte si no apareces a la salida.</p>' : '') +
+      '<button class="btn big primary" type="submit">Apuntarme</button></form>');
+    $('#clX').addEventListener('click', Cl.closeSheet);
+    $('#riForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var bike = already || ($('#riBike') ? $('#riBike').value : $('#riBikeTxt') ? $('#riBikeTxt').value.trim() : name(motos[0]));
+      Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
+        return (needPhone ? Cl.savePhone($('#riPhone').value.trim()) : Promise.resolve()).then(function () { Cl.closeSheet(); then(bike); });
+      });
+    });
+  }
   function icn(n) { return '<svg><use href="#i-' + n + '"/></svg>'; }
   function rpcOk(fn, args) { return sb.rpc(fn, args).then(function (r) { if (r.error) throw r.error; return r.data; }); }
   // Inscritos y llegada (administradores): apuntados de la app y de la web, aprobar, marcar la llegada y leer las entradas.
@@ -409,17 +433,19 @@
       var n = function (f) { return rows.filter(f).length; }, again = function () { manageSheet(e, find); };
       shell('<div class="rg-mstats"><div><b>' + n(function (x) { return x.status === 'going' || x.status === 'offered'; }) + (e.capacity ? '<small> / ' + e.capacity + '</small>' : '') + '</b><span>Con plaza</span></div><div><b>' + n(function (x) { return x.status === 'waiting'; }) + '</b><span>En espera</span></div><div><b>' + n(function (x) { return x.status === 'pending'; }) + '</b><span>Por aprobar</span></div><div><b>' + n(function (x) { return x.checked_in; }) + '</b><span>Han llegado</span></div></div>' +
         '<button class="btn big primary" id="mgScan" type="button">' + icn('qr') + 'Leer entradas (QR)</button>' +
-        '<div class="rg-form"><input id="mgFind" placeholder="Buscar por nombre o teléfono" value="' + esc(find) + '" autocomplete="off"></div>' +
+        '<div class="rg-form"><input id="mgFind" placeholder="Buscar por nombre, moto o teléfono" value="' + esc(find) + '" autocomplete="off"></div>' +
         '<div class="rg-list" id="mgList"></div><button class="btn small" id="mgWeb" type="button">' + icn('share') + 'Abrir en la web (respuestas y descarga)</button>');
       var list = function () {
-        var f = find.toLowerCase(), vis = rows.filter(function (x) { return !f || (x.name + ' ' + (x.phone || '') + ' ' + (x.email || '')).toLowerCase().indexOf(f) >= 0; });
+        var f = find.toLowerCase(), vis = rows.filter(function (x) { return !f || (x.name + ' ' + (x.phone || '') + ' ' + (x.email || '') + ' ' + (x.bike || '')).toLowerCase().indexOf(f) >= 0; });
         $('#mgList').innerHTML = vis.length ? vis.map(function (x) {
           var b = '';
           if (x.status === 'pending') b = '<button class="btn small primary" data-a="approve" type="button">Aprobar</button><button class="btn small" data-a="decline" type="button">Rechazar</button>';
           else if (x.status === 'going') b = '<button class="btn small' + (x.checked_in ? '' : ' primary') + '" data-a="' + (x.checked_in ? 'uncheck' : 'checkin') + '" type="button">' + (x.checked_in ? 'Quitar llegada' : 'Ha llegado') + '</button>';
           else if (x.kind === 'g') b = '<button class="btn small" data-a="approve" type="button">' + (x.status === 'declined' ? 'Aprobar' : 'Dar plaza') + '</button>';
           return '<div class="club-person rg-mrow" data-i="' + rows.indexOf(x) + '"><span class="rg-ava ' + (x.checked_in ? 'rol-admin' : 'rol-comp') + '">' + esc((x.name || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + (x.companion ? ' <span class="mstatus">+1</span>' : '') + '</b>' +
-            '<span class="muted rg-small">' + MST[x.status] + ' · ' + (x.kind === 'm' ? 'App' : 'Web') + (x.checked_in ? ' · <b>ha llegado</b>' : '') + (x.phone ? ' · ' + esc(x.phone) : '') + '</span><div class="rg-row">' + b + '</div></div></div>';
+            '<span class="muted rg-small">' + MST[x.status] + ' · ' + (x.kind === 'm' ? 'App' : 'Web') + (x.checked_in ? ' · <b>ha llegado</b>' : '') + '</span>' +
+            '<span class="rg-small rg-mbike">' + icn('bike') + (x.bike ? esc(x.bike) : '<span class="muted">Moto sin indicar</span>') + '</span>' +
+            '<div class="rg-row">' + (x.phone ? '<a class="btn small rg-call" href="tel:' + esc(String(x.phone).replace(/[^0-9+]/g, '')) + '">' + icn('phone') + 'Llamar · ' + esc(x.phone) + '</a>' : '<span class="muted rg-small">Sin teléfono</span>') + b + '</div></div></div>';
         }).join('') : '<div class="empty">' + (rows.length ? 'Nadie coincide con la búsqueda.' : 'Todavía no se ha apuntado nadie.') + '</div>';
         $$('#mgList [data-a]').forEach(function (bt) {
           bt.addEventListener('click', function () {

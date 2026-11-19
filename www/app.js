@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.25.0';
+  var APP_VERSION = '0.26.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -1295,7 +1295,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, activePlan: function () { return planMode ? null : activePlan; },
     isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { askAndStart(); }, reloadProfile: reloadProfile, setProfileName: setProfileName, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
-    plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); },
+    plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); }, vehicles: function () { return vehicles.slice(); },
     routeBetween: function (wps) { return routeBetween(wps); },   // [[lat, lon], …] → { coords, dist (km), dur (s), steps, routed }
     previewPlan: function (p) { p.preview = true; showView('map'); followPlan(p, true); },
     // Lo que llevo medido en la ruta en marcha: km, segundos en movimiento e inclinación máxima de cada curva.
