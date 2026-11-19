@@ -502,7 +502,13 @@
   }
   document.addEventListener('click', function (ev) { var s = $('#rgSheet'); if (ev.target === s && !s.classList.contains('rg-page') && !s.classList.contains('rg-win')) sheetBack(); });
   // Fondo vivo (líneas que se mueven despacio) detrás de las pantallas que no son el mapa.
-  (function () { var b = document.createElement('div'); b.className = 'rg-bg'; b.setAttribute('aria-hidden', 'true'); document.body.insertBefore(b, document.body.firstChild); })();
+  (function () { var b = document.createElement('div'); b.className = 'rg-bg'; b.setAttribute('aria-hidden', 'true'); b.innerHTML = '<i></i><i></i><b></b>'; document.body.insertBefore(b, document.body.firstChild); })();
+  // Onda al tocar un botón (solo en los que no van colocados a mano sobre el mapa).
+  document.addEventListener('pointerdown', function (ev) {
+    var b = ev.target.closest && ev.target.closest('.btn'); if (!b || b.disabled) return;
+    var pos = getComputedStyle(b).position; if (pos !== 'static' && pos !== 'relative') return;
+    b.classList.add('rg-rip-host'); var r = b.getBoundingClientRect(), sp = document.createElement('span'); sp.className = 'rg-rip'; sp.style.left = (ev.clientX - r.left) + 'px'; sp.style.top = (ev.clientY - r.top) + 'px'; b.appendChild(sp); setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 650);
+  }, { passive: true });
   function busy(btn, f) { var old = btn.innerHTML; btn.disabled = true; btn.textContent = 'Un momento…'; return Promise.resolve().then(f).catch(function (e) { A.toast(msg(e), 'bad'); }).then(function () { btn.disabled = false; btn.innerHTML = old; }); }
   var LOGO = '<div class="rg-logo"><img class="rg-sym" src="simbolo.svg" alt=""><b>ReGroup<i>Ride</i></b></div>';
 

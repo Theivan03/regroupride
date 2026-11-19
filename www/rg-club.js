@@ -278,7 +278,7 @@
       var startBtn = canRun && e.route, mineHtml;
       if (st === 'offered') mineHtml = '<div class="ev-offer"><b>Ha quedado una plaza libre para ti</b><span>Confirma si vienes' + (dl ? ' antes del ' + fmtWhen(dl).toLowerCase() : '') + '. Si no puedes, pasa al siguiente de la lista.</span><div class="ev-go"><button class="btn small primary" data-act="confirm" type="button">Sí, voy</button><button class="btn small" data-act="no" type="button">No puedo</button></div></div>';
       else if (st === 'waiting') mineHtml = '<div class="ev-go"><button class="btn small" data-act="no" type="button">' + ic('exit') + 'Salir de la lista</button>';
-      else if (iGo) mineHtml = '<div class="ev-go"><button class="btn small" data-act="comp" type="button" aria-pressed="' + !!mine.companion + '">Con acompañante</button><button class="btn small" data-act="no" type="button">No voy</button>';
+      else if (iGo) mineHtml = '<button class="btn small ev-ticket" data-act="ticket" type="button">' + ic('qr') + 'Mi entrada (QR)</button><div class="ev-go"><button class="btn small" data-act="comp" type="button" aria-pressed="' + !!mine.companion + '">Con acompañante</button><button class="btn small" data-act="no" type="button">No voy</button>';
       else mineHtml = '<div class="ev-go"><button class="btn' + (startBtn ? ' small' : ' big primary') + '" data-act="go" type="button">' + ic('check') + (full ? 'Apuntarme a la lista de espera' : 'Voy') + '</button>';
       if (st !== 'offered') mineHtml += (e.luma_url ? '<button class="btn small" data-act="luma" type="button">Apuntarse en Luma</button>' : '') + '</div>';
       var countHtml = '<button class="link ev-count" data-act="who" type="button">' + count + '</button>';
@@ -292,6 +292,7 @@
         (st === 'offered' ? mineHtml + countHtml : countHtml + mineHtml) +
         (startBtn ? '<button class="btn big primary ev-start" data-act="start" type="button">' + ic('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
         ((iGo || st === 'offered') && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
+        (canRun ? '<button class="btn small" data-act="manage" type="button">' + ic('list') + 'Inscritos y llegada (web)</button>' : '') +
         (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
     if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
@@ -314,7 +315,7 @@
         else if (act === 'luma') openUrl(e.luma_url); else if (act === 'rurl') openUrl(e.route_url); else if (act === 'route') loadRoute(e);
         else if (act === 'meet') openUrl(meetOf(e).url); else if (act === 'gomeet') goMeet(e, b);
         else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
-        else if (act === 'who') whoGoes(e, att);
+        else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') openUrl(WEB + '/?m=' + e.id);
         else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
       }); });
     });
@@ -387,6 +388,21 @@
     if (!r || !r.coords || r.coords.length < 2) { A.toast('Este evento no tiene ruta.', 'warn'); return; }
     var p = { id: parseInt(e.id.replace(/-/g, '').slice(0, 12), 16), name: r.name || e.title, wps: r.wps || [], pois: r.pois || [], coords: r.coords, dist: r.dist || 0, dur: r.dur || 0, routed: true, steps: r.steps || [], created: Date.now(), eventId: e.id };
     A.usePlan(p).then(function () { A.toast('Ruta cargada. Pulsa «Iniciar ruta» cuando salgáis.', 'ok'); });
+  }
+  // Mi entrada: el mismo código QR que sale en la web, para enseñarlo al llegar. El código lo da el servidor.
+  var WEB = 'https://regroupride-eventos.netlify.app';
+  function qrSvg(text) { try { var q = window.qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }); } catch (x) { return ''; } }
+  function ticketSheet(e) {
+    Cl.sheet('<div class="head"><h1>Mi entrada</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      '<div class="rg-ticket"><div class="rg-ticket-qr" id="tkQr"><span class="muted">Cargando…</span></div><b>' + esc(e.title) + '</b><span class="muted">' + fmtWhen(e.starts_at) + '</span><span class="muted rg-small">Enseña este código al llegar: el organizador lo lee y marca tu llegada.</span></div>' +
+      '<button class="btn" id="tkWeb" type="button">' + ic('share') + 'Compartir el evento</button>');
+    $('#clX').addEventListener('click', Cl.closeSheet);
+    $('#tkWeb').addEventListener('click', function () { var u = WEB + '/?e=' + e.id; if (navigator.share) navigator.share({ title: e.title, url: u }).catch(function () {}); else openUrl(u); });
+    sb.rpc('event_public', { p_id: e.id }).then(function (r) {
+      var box = $('#tkQr'); if (!box) return;
+      var code = r.data && r.data.ticket, svg = code ? qrSvg(code) : '';
+      if (svg) box.innerHTML = svg; else box.innerHTML = '<span class="muted">' + (r.error ? 'No se ha podido cargar la entrada. Revisa la conexión.' : 'La entrada aparece cuando tienes la plaza confirmada.') + '</span>';
+    });
   }
   function whoGoes(e, att) {
     var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), off = att.filter(function (x) { return x.event_id === e.id && x.status === 'offered'; }), queue = queueOf(att, e);
