@@ -24,7 +24,7 @@
 
   /* ---------- música ---------- */
   var host = $('.map-bottom'); if (!host) return;
-  var bar = document.createElement('div'), M = native && P.RgMedia ? P.RgMedia : null, key = '', art = '', last = null, timer = 0;
+  var bar = document.createElement('div'), M = native && P.RgMedia ? P.RgMedia : null, key = '', art = '', last = null, timer = 0, seen = 0;
   bar.id = 'musicBar'; bar.hidden = true; host.insertBefore(bar, host.firstChild);
   var NOTE = '<svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="16" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
   var X = '<button class="mb-x" data-m="hide" type="button" aria-label="Quitar"><svg><use href="#i-close"/></svg></button>';
@@ -36,6 +36,15 @@
     if (off()) { bar.hidden = true; return; }
     if (!M) {      // versión web (iPhone, ordenador): el navegador no puede ver qué suena; solo un acceso rápido
       draw('<span class="mb-art">' + NOTE + '</span><div class="mb-txt"><b>Música</b><span>Abre tu app de música</span></div><button class="btn small" data-m="spotify" type="button">Spotify</button>' + X, 'mb-web');
+      return;
+    }
+    if (s && s.basic) {      // Android: se sabe si suena y se le mandan las teclas multimedia; el título no (haría falta un permiso que bloquea la instalación)
+      if (s.playing) seen = Date.now();
+      if (!s.playing && Date.now() - seen > 20 * 60000) { bar.hidden = true; return; }
+      if (bar.hidden || bar.className.indexOf('mb-on') < 0) draw('<span class="mb-art">' + NOTE + '</span><div class="mb-txt"><b>Música</b><span class="mb-st"></span></div>' +
+        '<button class="mb-b" data-m="prev" type="button" aria-label="Anterior">' + ic('prev') + '</button><button class="mb-b mb-play" data-m="toggle" type="button" aria-label="Pausa o seguir"></button><button class="mb-b" data-m="next" type="button" aria-label="Siguiente">' + ic('next') + '</button>', 'mb-on');
+      bar.querySelector('.mb-st').textContent = s.playing ? 'Sonando' : 'En pausa';
+      bar.querySelector('.mb-play').innerHTML = ic(s.playing ? 'pause' : 'play'); bar.classList.toggle('mb-playing', !!s.playing);
       return;
     }
     if (!s || !s.granted) {
@@ -73,11 +82,15 @@
   var set = $('#view-settings');
   if (set) {
     var row = document.createElement('div'); row.className = 'card rg-music-set';
-    row.innerHTML = '<div><b>Música en el mapa</b><span class="muted">' + (native ? 'Enseña la canción que suena y botones de pausa y siguiente.' : 'Un acceso rápido a tu app de música.') + '</span></div><button class="btn small" id="musicToggle" type="button"></button>';
+    row.innerHTML = '<div><b>Música en el mapa</b><span class="muted">' + (native ? 'Cuando suena música, botones de anterior, pausa y siguiente.' : 'Un acceso rápido a tu app de música.') + '</span></div><button class="btn small" id="musicToggle" type="button"></button>';
     set.appendChild(row);
     var tg = row.querySelector('#musicToggle'), lab = function () { tg.textContent = off() ? 'Activar' : 'Quitar'; };
     lab(); tg.addEventListener('click', function () { store('rg.music.off', off() ? '0' : '1'); lab(); poll(); if (off()) bar.hidden = true; });
   }
+  // En el móvil, al cerrarse el teclado la página puede quedarse desplazada y todo el mapa aparece subido: se recoloca.
+  function settle() { setTimeout(function () { var a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return; if (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) window.scrollTo(0, 0); }, 140); }
+  document.addEventListener('focusout', settle);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', settle);
   poll();
   if (M) { timer = setInterval(poll, 2500); document.addEventListener('visibilitychange', poll); }
 })();
