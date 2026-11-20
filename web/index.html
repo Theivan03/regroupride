@@ -233,7 +233,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
 .rg-swap.rg-in>*:nth-child(2){animation-delay:.06s}.rg-swap.rg-in>*:nth-child(3){animation-delay:.12s}.rg-swap.rg-in>*:nth-child(4){animation-delay:.18s}.rg-swap.rg-in>*:nth-child(5){animation-delay:.24s}.rg-swap.rg-in>*:nth-child(n+6){animation-delay:.3s}
 @keyframes rgUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.rg-split::before,.rg-split.sw-signup,.rg-split.sw-login,.rg-swap.rg-in>*{animation:none!important}}
-.auth .rg-split{margin:0 0 18px;height:260px}.maker .ban{display:block;width:100%;border-radius:16px;aspect-ratio:3/2;object-fit:cover;margin:0 0 14px}
+.auth .rg-split{margin:0 0 18px;height:260px}.rg-only{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .5s cubic-bezier(.3,1,.35,1),opacity .35s ease}.rg-only>div{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:14px}.rg-only>div>:last-child{margin-bottom:14px}#f[data-mode=signup] .rg-only{grid-template-rows:1fr;opacity:1}.maker .ban{display:block;width:100%;border-radius:16px;aspect-ratio:3/2;object-fit:cover;margin:0 0 14px}
 </style>
 </head>
 <body>
@@ -318,19 +318,21 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
   function authView(then, intro, backTo) {
     var mode = 'login'; setBack(backTo || null);
     (function draw() {
-      app.innerHTML = '<div class="auth card">' + (window.RGArt ? RGArt.split(mode) : '') + '<h1>' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</h1><p class="muted">' + esc(intro || 'Con la misma cuenta que usas en la app de ReGroupRide.') + '</p><form class="form" id="f">' +
-        (mode === 'signup' ? '<label>Nombre<input id="n" required maxlength="24" autocomplete="name"></label><label>Teléfono<input id="t" type="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel"></label>' : '') +
-        '<label>Correo<input id="e" type="email" required autocomplete="email"></label><label>Contraseña<input id="p" type="password" required minlength="6" autocomplete="' + (mode === 'login' ? 'current-password' : 'new-password') + '"></label>' +
-        '<div id="msg" class="msg" hidden></div><button class="btn pri big" type="submit">' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</button></form>' +
-        '<p class="small" style="text-align:center;margin:16px 0 0"><button class="btn txt" id="sw" type="button">' + (mode === 'login' ? 'No tengo cuenta: crear una' : 'Ya tengo cuenta: entrar') + '</button></p></div>';
-      $('#sw').onclick = function () { mode = mode === 'login' ? 'signup' : 'login'; draw(); };
-      var box = $('.auth'), kids = [].slice.call(box.children).filter(function (x) { return x.id !== 'rgMode'; }); kids.forEach(function (x, i) { x.style.animation = 'rgUp .5s cubic-bezier(.2,1.2,.3,1) ' + (i * .07) + 's both'; });
-      $$('#rgMode button').forEach(function (b) { b.onclick = function () {
-        if (b.dataset.m === mode) return; mode = b.dataset.m;
-        var sp = $('#rgMode'); sp.dataset.on = mode; $$('button', sp).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); sp.classList.add('sw-' + mode);
-        kids.forEach(function (x) { x.style.animation = 'none'; x.style.transition = 'opacity .28s,transform .28s'; x.style.opacity = 0; x.style.transform = 'translateY(18px)'; });
-        setTimeout(draw, 440);
-      }; });
+      app.innerHTML = '<div class="auth card" id="rgAuthBox">' + (window.RGArt ? RGArt.split(mode) : '') + '<h1 id="ah"></h1><p class="muted">' + esc(intro || 'Con la misma cuenta que usas en la app de ReGroupRide.') + '</p><form class="form" id="f" style="gap:0">' +
+        '<div class="rg-only"><div><label>Nombre<input id="n" maxlength="24" autocomplete="name"></label><label>Teléfono<input id="t" type="tel" minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel"></label></div></div>' +
+        '<label style="margin-bottom:14px">Correo<input id="e" type="email" required autocomplete="email"></label><label style="margin-bottom:14px">Contraseña<input id="p" type="password" required minlength="6"></label>' +
+        '<div id="msg" class="msg" hidden style="margin-bottom:14px"></div><button class="btn pri big" type="submit" id="ago"></button></form>' +
+        '<p class="small" style="text-align:center;margin:16px 0 0"><button class="btn txt" id="sw" type="button"></button></p></div>';
+      var setMode = function (m, fx) {
+        mode = m; var up = m === 'signup', sp = $('#rgMode');
+        $('#f').dataset.mode = m; $('#n').required = $('#t').required = up; $('#n').tabIndex = $('#t').tabIndex = up ? 0 : -1;
+        $('#p').autocomplete = up ? 'new-password' : 'current-password';
+        $('#ah').textContent = $('#ago').textContent = up ? 'Crear cuenta' : 'Entrar'; $('#sw').textContent = up ? 'Ya tengo cuenta: entrar' : 'No tengo cuenta: crear una';
+        if (sp) { sp.dataset.on = m; $$('button', sp).forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.m === m)); }); if (fx) { sp.classList.remove('sw-login', 'sw-signup'); void sp.offsetWidth; sp.classList.add('sw-' + m); } }
+      };
+      setMode(mode, false);
+      $('#sw').onclick = function () { setMode(mode === 'login' ? 'signup' : 'login', true); };
+      $$('#rgMode button').forEach(function (b) { b.onclick = function () { if (b.dataset.m !== mode) setMode(b.dataset.m, true); }; });
       $('#f').onsubmit = function (ev) {
         ev.preventDefault();
         busy($('#f button[type=submit]'), function () {
@@ -672,7 +674,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
     app.innerHTML = '<div class="maker card"><img class="ban" src="/creador-moto.jpg" alt="Ivan con su moto"><h1>Hola, soy Ivan</h1><p class="muted" style="margin:4px 0 14px">23 años, motero, y uno más del grupo</p>' +
       '<p>No soy nadie especial: soy uno más de los que quedan el domingo para rodar. ReGroupRide nació porque en cada salida pasaba lo mismo: alguien se quedaba atrás, otro se perdía en un cruce y al final estábamos todos parados mirando el WhatsApp.</p>' +
       '<p>Pensé que hacía falta algo sencillo para rodar juntos sin perder a nadie, y como no lo encontré, me puse a hacerlo. La hago yo solo, en mis ratos libres, con la ayuda de la gente de <b>Ratone Bikes</b>, que la prueba en cada ruta y me dice sin filtros qué falla y qué falta.</p>' +
-      '<p>Esta app es tan vuestra como mía. Si echas algo en falta o algo no va, cuéntamelo en Ajustes → «Sugerencias y fallos»: lo leo yo y te contesto yo. Nos vemos en la carretera. V\'s ✌️</p>' +
+      '<p>Esta app es tan vuestra como mía. Si echas algo en falta o algo no va, cuéntamelo en Ajustes → «Sugerencias y fallos»: lo leo yo y te contesto yo. Nos vemos en la carretera ✌️</p>' +
       '<a class="btn mar" href="https://regroupride-app.netlify.app" target="_blank" rel="noopener">Abrir la app</a></div>';
   }
 

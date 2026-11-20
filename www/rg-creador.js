@@ -52,17 +52,18 @@
       '<h3>Hola, soy Ivan</h3><span class="muted" style="margin-top:-6px">23 años, motero, y uno más del grupo</span>' +
       '<p>No soy nadie especial: soy uno más de los que quedan el domingo para rodar. ReGroupRide nació porque en cada salida pasaba lo mismo: alguien se quedaba atrás, otro se perdía en un cruce y al final estábamos todos parados mirando el WhatsApp.</p>' +
       '<p>Pensé que hacía falta algo sencillo para rodar juntos sin perder a nadie y, como no lo encontré, me puse a hacerlo. La hago yo solo, en mis ratos libres, con la ayuda de la gente de <b>Ratone Bikes</b>, que la prueba en cada ruta y me dice sin filtros qué falla y qué falta.</p>' +
-      '<p>Esta app es tan vuestra como mía. Si echas algo en falta o algo no va, escríbeme: lo leo yo y te contesto yo. Nos vemos en la carretera. V\'s ✌️</p>' +
-      '<div class="rg-row"><button class="btn small primary" id="makerWrite" type="button">Escribirme</button></div>';
-    about.parentNode.insertBefore(box, about);
+      '<p>Esta app es tan vuestra como mía. Si echas algo en falta o algo no va, escríbeme: lo leo yo y te contesto yo. Nos vemos en la carretera ✌️</p>' +
+      '<div class="rg-row"><button class="btn small primary" id="makerWrite" type="button">Escribirme</button><button class="btn small" id="makerTour" type="button">Ver el tutorial</button></div>';
+    var syncBox = document.getElementById('rgSyncBox'); if (syncBox) syncBox.parentNode.insertBefore(box, syncBox); else about.parentNode.insertBefore(box, about);
     box.querySelector('#makerWrite').addEventListener('click', function () { Cl.openFeedback(); });
+    box.querySelector('#makerTour').addEventListener('click', function () { if (window.RGTour) RGTour.start(); });
 
     /* ---------- códigos de ventaja ---------- */
     var NAMES = { sin_anuncios: 'Sin publicidad', premium: 'Premium', todo_gratis: 'Todo gratis' };
     var cb = document.createElement('div'); cb.className = 'rg-maker';
     cb.innerHTML = '<span class="label">¿Tienes un código?</span><div class="rg-ben" id="benList" hidden></div>' +
       '<form class="rg-code" id="codeForm"><input id="codeIn" maxlength="24" autocomplete="off" autocapitalize="characters" placeholder="Escríbelo aquí" aria-label="Código"><button class="btn small primary" type="submit">Usar</button></form>';
-    about.parentNode.insertBefore(cb, box);
+    about.parentNode.insertBefore(cb, about);
     var paint = function (list) { Cl.benefits = list || []; var el = cb.querySelector('#benList'); el.hidden = !Cl.benefits.length; el.innerHTML = Cl.benefits.map(function (x) { return '<span>' + (NAMES[x.benefit] || x.benefit) + '</span>'; }).join(''); };
     var benU = null, loadBen = function () { var u = Cl.user && Cl.user(), id = u ? u.id : ''; if (id === benU) return; benU = id; if (!id) { paint([]); return; } Cl.sb.rpc('my_benefits').then(function (r) { if (!r.error && benU === id) paint(r.data); }, function () {}); };
     setTimeout(loadBen, 3500); setInterval(loadBen, 6000);

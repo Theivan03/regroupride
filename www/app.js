@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.31.0';
+  var APP_VERSION = '0.32.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -1209,8 +1209,9 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   $('#btnProfileBack').addEventListener('click', function () { showView('map'); });
   var nameTimer = null;
   $('#profileName').addEventListener('input', function (e) { profile.name = e.target.value; renderAvatar(); if (nameTimer) clearTimeout(nameTimer); nameTimer = setTimeout(function () { DB.set('profile', profile); if (window.RGCloud && RGCloud.saveName) RGCloud.saveName(profile.name); }, 900); });
+  function setAvatar(d) { if (!d) return; profile.avatar = d; renderAvatar(); DB.set('profile', profile); if (window.RGSync) RGSync.touch('avatar'); }
   $('#btnAvatar').addEventListener('click', function () { $('#avatarFile').value = ''; $('#avatarFile').click(); });
-  $('#avatarFile').addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; shrinkImage(f, 256).then(function (d) { if (!d) return; profile.avatar = d; renderAvatar(); DB.set('profile', profile); if (window.RGSync) RGSync.touch('avatar'); }); });
+  $('#avatarFile').addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; (window.RGCrop ? RGCrop.open(f) : shrinkImage(f, 256)).then(setAvatar); });
 
   /* ---------- ajustes ---------- */
   function renderSettings() {
@@ -1291,6 +1292,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   /* ---------- puente para los módulos de ReGroupRide (rg-app.js) ---------- */
   window.RGApp = {
     stopRide: function () { if (rec) stopRide(); },
+    setAvatar: function (d) { setAvatar(d); },
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, activePlan: function () { return planMode ? null : activePlan; },
     isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },

@@ -516,28 +516,36 @@
   var MUST = !navigator.webdriver; try { if (localStorage.getItem('rg.test.wall')) MUST = true; } catch (e) {}
   function openAuth(first, mode0) {
     var mode = mode0 || (first ? 'signup' : 'login');
+    var pic = null;
     function draw() {
-      var s = sheet(LOGO + '<p class="muted rg-lead">Rutas en grupo, sin perder a nadie.</p>' +
+      var s = sheet(LOGO + '<p class="muted rg-lead">Rutas en grupo, sin perder a nadie.</p><div id="rgAuthBox" data-mode="' + mode + '">' +
         (window.RGArt ? RGArt.split(mode) : '<div class="seg rg-wide" id="rgMode"><button type="button" data-m="login" aria-pressed="' + (mode === 'login') + '">Entrar</button><button type="button" data-m="signup" aria-pressed="' + (mode === 'signup') + '">Crear cuenta</button></div>') +
-        '<form id="rgAuth" class="rg-form" autocomplete="on">' +
-        (mode === 'signup' ? '<label>Tu nombre<input id="rgName" required maxlength="60" autocomplete="name" placeholder="Como te conoce la gente"></label>' +
-          '<label>Teléfono<input id="rgTel" type="tel" inputmode="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" placeholder="600 000 000" title="Tu número, con 9 cifras o más"></label>' +
-          '<label>¿Cómo vas en moto?<select id="rgLevel">' + levelOptions(3) + '</select></label>' : '') +
+        '<form id="rgAuth" class="rg-form" autocomplete="on" data-mode="' + mode + '" style="margin-top:16px">' +
+        '<div class="rg-only"><div>' +
+          '<button class="rg-pic" id="rgPic" type="button"><span class="rg-ava" id="rgPicAva"><svg width="26" height="26"><use href="#i-camera"/></svg></span><span><b>Tu foto</b><small>Opcional. Es la que verá el grupo.</small></span></button>' +
+          '<label>Tu nombre<input id="rgName" maxlength="60" autocomplete="name" placeholder="Como te conoce la gente"></label>' +
+          '<label>Teléfono<input id="rgTel" type="tel" inputmode="tel" minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" placeholder="600 000 000" title="Tu número, con 9 cifras o más"></label>' +
+          '<label>¿Cómo vas en moto?<select id="rgLevel">' + levelOptions(3) + '</select></label></div></div>' +
         '<label>Correo<input id="rgEmail" type="email" required autocomplete="email" inputmode="email"></label>' +
-        '<label>Contraseña<input id="rgPass" type="password" required minlength="6" autocomplete="' + (mode === 'login' ? 'current-password' : 'new-password') + '"></label>' +
-        '<button class="btn big primary" type="submit">' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</button></form>' +
-        (mode === 'login' ? '<button class="link rg-center" id="rgForgot" type="button">He olvidado la contraseña</button>' : '<p class="muted rg-small">El teléfono solo lo ven los administradores de tus rutas y quien pida ayuda. Necesitas tener al menos 16 años.</p>') +
+        '<label>Contraseña<input id="rgPass" type="password" required minlength="6"></label>' +
+        '<button class="btn big primary" type="submit" id="rgGo"></button></form>' +
+        '<div class="rg-foot"><button class="link rg-center" id="rgForgot" data-for="login" type="button">He olvidado la contraseña</button><p class="muted rg-small" data-for="signup">El teléfono solo lo ven los administradores de tus rutas y quien pida ayuda. Necesitas tener al menos 16 años.</p></div>' +
         (MUST ? '<p class="muted rg-small rg-center">Para usar ReGroupRide necesitas una cuenta. Es gratis y se crea en un minuto.</p>' :
-          '<button class="btn rg-skip" id="rgSkip" type="button">' + (first ? 'Ahora no' : 'Cerrar') + '</button>'));
-      var fm = $('#rgAuth'); fm.classList.add('rg-swap', 'rg-in');
-      s.querySelectorAll('#rgMode button').forEach(function (b) { b.addEventListener('click', function () {
-        if (b.dataset.m === mode) return; mode = b.dataset.m;
-        var sp = $('#rgMode');
-        if (!sp.classList.contains('rg-split')) { draw(); return; }
-        sp.dataset.on = mode; sp.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); sp.classList.add('sw-' + mode);
-        fm.classList.remove('rg-in'); fm.classList.add('rg-out');
-        setTimeout(function () { if ($('#rgMode') === sp) draw(); }, 440);
-      }); });
+          '<button class="btn rg-skip" id="rgSkip" type="button">' + (first ? 'Ahora no' : 'Cerrar') + '</button>') + '</div>');
+      // Cambiar entre entrar y crear cuenta no redibuja nada: los campos de más se despliegan o se recogen.
+      function setMode(m, fx) {
+        mode = m; var up = m === 'signup', sp = $('#rgMode');
+        $('#rgAuthBox').dataset.mode = m; $('#rgAuth').dataset.mode = m;
+        ['#rgName', '#rgTel'].forEach(function (q) { $(q).required = up; });
+        ['#rgName', '#rgTel', '#rgLevel', '#rgPic'].forEach(function (q) { $(q).tabIndex = up ? 0 : -1; });
+        $('#rgPass').autocomplete = up ? 'new-password' : 'current-password';
+        $('#rgGo').textContent = up ? 'Crear cuenta' : 'Entrar';
+        sp.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.m === m)); });
+        if (sp.classList.contains('rg-split')) { sp.dataset.on = m; if (fx) { sp.classList.remove('sw-login', 'sw-signup'); void sp.offsetWidth; sp.classList.add('sw-' + m); } }
+      }
+      setMode(mode, false);
+      s.querySelectorAll('#rgMode button').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.m !== mode) setMode(b.dataset.m, true); }); });
+      $('#rgPic').addEventListener('click', function () { if (!window.RGCrop) return; RGCrop.pick().then(function (d) { if (!d) return; pic = d; var a = $('#rgPicAva'); if (a) { a.classList.add('has'); a.innerHTML = '<img src="' + d + '" alt="">'; } }); });
       if ($('#rgSkip')) $('#rgSkip').addEventListener('click', function () { try { localStorage.removeItem('rg.wall'); } catch (e) {} closeSheet(); });
       $('#rgAuth').addEventListener('submit', function (ev) {
         ev.preventDefault();
@@ -547,14 +555,15 @@
           var job = mode === 'login' ? sb.auth.signInWithPassword({ email: email, password: pass }) : sb.auth.signUp({ email: email, password: pass, options: { data: { name: name, phone: tel } } });
           return job.then(function (r) {
             if (r.error) throw r.error;
-            if (!r.data.session) { A.toast('Cuenta creada. Confirma el correo que te hemos enviado y luego entra.', 'ok'); mode = 'login'; draw(); return; }
+            if (mode === 'signup' && pic && A.setAvatar) A.setAvatar(pic);
+            if (!r.data.session) { A.toast('Cuenta creada. Confirma el correo que te hemos enviado y luego entra.', 'ok'); setMode('login', true); return; }
             var set = lvl ? sb.from('profiles').update({ level: lvl }).eq('id', r.data.session.user.id).then(function () {}, function () {}) : Promise.resolve();
             try { localStorage.removeItem('rg.wall'); } catch (e) {}
             return set.then(refresh).then(function () { closeSheet(); A.toast(mode === 'login' ? 'Sesión iniciada.' : '¡Bienvenido, ' + (name || 'motero') + '!', 'ok'); });
           });
-        });
+        }).then(function () { var g = $('#rgGo'); if (g) g.textContent = mode === 'signup' ? 'Crear cuenta' : 'Entrar'; });
       });
-      var f = $('#rgForgot'); if (f) f.addEventListener('click', function () {
+      $('#rgForgot').addEventListener('click', function () {
         var email = $('#rgEmail').value.trim(); if (!email) { A.toast('Escribe tu correo y vuelve a pulsar.', 'warn'); return; }
         sb.auth.resetPasswordForEmail(email).then(function (r) { A.toast(r.error ? msg(r.error) : 'Te hemos enviado un correo para cambiarla.', r.error ? 'bad' : 'ok'); });
       });
@@ -775,8 +784,9 @@
       });
     }).catch(function () { return true; }).then(function (ok) { permBusy = false; permAt = Date.now(); return ok; });
   }
+  var missT = 0;
   function showMissing(s, still) {
-    if (!$('#rgSheet').hidden) return;      // hay otra ventana abierta: se dirá la próxima vez
+    if (!$('#rgSheet').hidden) { clearTimeout(missT); missT = setTimeout(function () { permAt = 0; checkAll(false); }, 5000); return; }      // hay otra ventana abierta (la de entrada, por ejemplo): se vuelve a mirar enseguida
     var noFull = s.fullScreen === false, onlyFull = noFull && !still.length && s.locationOn;
     var rows = still.map(function (n) { return '<div class="perm"><div><b>' + n[1] + '</b><span class="muted">' + n[2] + '</span></div><span class="mstatus due">Falta</span></div>'; }).join('') +
       (s.locationOn ? '' : '<div class="perm"><div><b>Ubicación del teléfono</b><span class="muted">Está apagada: sin ella la app no sabe dónde estás.</span></div><span class="mstatus due">Apagada</span></div>') +

@@ -30,7 +30,7 @@
   var X = '<button class="mb-x" data-m="hide" type="button" aria-label="Quitar"><svg><use href="#i-close"/></svg></button>';
   function ic(n) { return '<svg><use href="#i-' + n + '"/></svg>'; }
   function draw(html, cls) { bar.className = cls || ''; bar.innerHTML = html; bar.hidden = false; }
-  function off() { return store('rg.music.off') === '1'; }
+  function off() { return true; }      // la barra de música queda desactivada por ahora (no funciona como debe); para recuperarla: store('rg.music.off') === '1'
   function paint(s) {
     last = s;
     if (off()) { bar.hidden = true; return; }
