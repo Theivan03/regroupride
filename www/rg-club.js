@@ -520,7 +520,9 @@
       '<div class="ch-mute"><span id="chMuteTx" data-ev="' + e.id + '"></span>' + bellHtml(e.id).replace(' data-act="bell"', '') + '</div>');
     $('#rgSheet [data-bell]').addEventListener('click', function () { toggleMute(e.id); }); paintBells(); if (MUTES === null) loadMutes();
     $('#clX').addEventListener('click', function () { clearInterval(chatT); Cl.closeSheet(); });
-    var last = -1;
+    var last = -1, BK = {};
+    sb.from('event_attendees').select('user_id,bike').eq('event_id', e.id).then(function (r) { (r.data || []).forEach(function (x) { if (x.bike) BK[x.user_id] = x.bike; }); last = -1; load(true); }, function () {});
+    function bikeOf(id) { var p = S.names[id]; return BK[id] || (p ? [p.bike_brand, p.bike_model].filter(Boolean).join(' ') : ''); }
     function load(force) {
       if (!$('#chList')) { clearInterval(chatT); return Promise.resolve(); }
       return sb.from('event_messages').select('id,user_id,body,created_at').eq('event_id', e.id).order('id', { ascending: false }).limit(200).then(function (r) {
@@ -532,7 +534,7 @@
           el.innerHTML = rows.length ? rows.map(function (x) {
             var d = new Date(x.created_at), k = d.toDateString(), me = x.user_id === S.user.id, sep = '';
             if (k !== day) { day = k; sep = '<span class="ev-chat-day">' + d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) + '</span>'; }
-            return sep + '<div class="ev-msg' + (me ? ' me' : '') + '">' + (me ? '' : ava(x.user_id)) + '<div><b>' + esc(who(x.user_id)) + '</b><p>' + esc(x.body) + '</p><time>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '</time></div></div>';
+            return sep + '<div class="ev-msg' + (me ? ' me' : '') + '">' + (me ? '' : ava(x.user_id)) + '<div><b>' + esc(who(x.user_id)) + (bikeOf(x.user_id) ? ' <small>· ' + esc(bikeOf(x.user_id)) + '</small>' : '') + '</b><p>' + esc(x.body) + '</p><time>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '</time></div></div>';
           }).join('') : '<p class="muted">Todavía no ha escrito nadie. Rompe el hielo: ¿de dónde sales?</p>';
           if (stick) el.scrollTop = el.scrollHeight;
         });

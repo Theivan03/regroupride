@@ -49,16 +49,33 @@
     box.className = 'rg-maker';
     box.innerHTML = '<span class="label">Quién hace ReGroupRide</span>' +
       '<img class="rg-maker-banner" src="creador-moto.jpg" alt="Ivan con su moto" loading="lazy">' +
-      '<div class="rg-maker-top"><span class="rg-maker-pic" id="makerPic">IC</span><div><b>Ivan Cabrera</b><span class="muted">23 años · motero · creador y único desarrollador</span></div></div>' +
-      '<p>ReGroupRide la hago yo solo: la idea, el diseño y todo el desarrollo. Salgo en moto con grupo y la app nace de lo que echaba en falta en esas rutas.</p>' +
-      '<p>Se hace en colaboración con la comunidad <b>Ratone Bikes</b>, que la prueba en sus salidas y propone muchas de las mejoras.</p>' +
-      '<p class="muted">Todo lo que envías en «Sugerencias y fallos» me llega a mí directamente y te contesto en la propia app.</p>' +
+      '<h3>Hola, soy Ivan</h3><span class="muted" style="margin-top:-6px">23 años, motero, y uno más del grupo</span>' +
+      '<p>No soy nadie especial: soy uno más de los que quedan el domingo para rodar. ReGroupRide nació porque en cada salida pasaba lo mismo: alguien se quedaba atrás, otro se perdía en un cruce y al final estábamos todos parados mirando el WhatsApp.</p>' +
+      '<p>Pensé que hacía falta algo sencillo para rodar juntos sin perder a nadie y, como no lo encontré, me puse a hacerlo. La hago yo solo, en mis ratos libres, con la ayuda de la gente de <b>Ratone Bikes</b>, que la prueba en cada ruta y me dice sin filtros qué falla y qué falta.</p>' +
+      '<p>Esta app es tan vuestra como mía. Si echas algo en falta o algo no va, escríbeme: lo leo yo y te contesto yo. Nos vemos en la carretera. V\'s ✌️</p>' +
       '<div class="rg-row"><button class="btn small primary" id="makerWrite" type="button">Escribirme</button></div>';
     about.parentNode.insertBefore(box, about);
-    // La foto se enseña sola cuando exista el archivo creador.jpg; mientras, las iniciales.
-    var img = new Image(); img.alt = 'Ivan Cabrera';
-    img.onload = function () { var p = document.getElementById('makerPic'); p.textContent = ''; p.appendChild(img); };
-    img.src = 'creador.jpg';
     box.querySelector('#makerWrite').addEventListener('click', function () { Cl.openFeedback(); });
+
+    /* ---------- códigos de ventaja ---------- */
+    var NAMES = { sin_anuncios: 'Sin publicidad', premium: 'Premium', todo_gratis: 'Todo gratis' };
+    var cb = document.createElement('div'); cb.className = 'rg-maker';
+    cb.innerHTML = '<span class="label">¿Tienes un código?</span><div class="rg-ben" id="benList" hidden></div>' +
+      '<form class="rg-code" id="codeForm"><input id="codeIn" maxlength="24" autocomplete="off" autocapitalize="characters" placeholder="Escríbelo aquí" aria-label="Código"><button class="btn small primary" type="submit">Usar</button></form>';
+    about.parentNode.insertBefore(cb, box);
+    var paint = function (list) { Cl.benefits = list || []; var el = cb.querySelector('#benList'); el.hidden = !Cl.benefits.length; el.innerHTML = Cl.benefits.map(function (x) { return '<span>' + (NAMES[x.benefit] || x.benefit) + '</span>'; }).join(''); };
+    var benU = null, loadBen = function () { var u = Cl.user && Cl.user(), id = u ? u.id : ''; if (id === benU) return; benU = id; if (!id) { paint([]); return; } Cl.sb.rpc('my_benefits').then(function (r) { if (!r.error && benU === id) paint(r.data); }, function () {}); };
+    setTimeout(loadBen, 3500); setInterval(loadBen, 6000);
+    cb.querySelector('#codeForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var inp = cb.querySelector('#codeIn'), code = inp.value.trim(); if (code.length < 3) return;
+      if (!(Cl.user && Cl.user())) { Cl.openAuth(false); return; }
+      var b = ev.target.querySelector('button'); b.disabled = true;
+      Cl.sb.rpc('promo_redeem', { p_code: code }).then(function (r) {
+        b.disabled = false;
+        if (r.error) { A.toast(r.error.message || 'No se ha podido usar el código.', 'bad'); return; }
+        inp.value = ''; A.toast(r.data.again ? 'Ese código ya lo tenías activado.' : '¡Código activado! ' + (NAMES[r.data.benefit] || ''), 'ok'); benU = null; loadBen();
+      }, function () { b.disabled = false; A.toast('Sin conexión. Prueba otra vez.', 'bad'); });
+    });
   }
 })();

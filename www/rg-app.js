@@ -529,7 +529,15 @@
         (mode === 'login' ? '<button class="link rg-center" id="rgForgot" type="button">He olvidado la contraseña</button>' : '<p class="muted rg-small">El teléfono solo lo ven los administradores de tus rutas y quien pida ayuda. Necesitas tener al menos 16 años.</p>') +
         (MUST ? '<p class="muted rg-small rg-center">Para usar ReGroupRide necesitas una cuenta. Es gratis y se crea en un minuto.</p>' :
           '<button class="btn rg-skip" id="rgSkip" type="button">' + (first ? 'Ahora no' : 'Cerrar') + '</button>'));
-      s.querySelectorAll('#rgMode button').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.m === mode) return; mode = b.dataset.m; draw(); }); });
+      var fm = $('#rgAuth'); fm.classList.add('rg-swap', 'rg-in');
+      s.querySelectorAll('#rgMode button').forEach(function (b) { b.addEventListener('click', function () {
+        if (b.dataset.m === mode) return; mode = b.dataset.m;
+        var sp = $('#rgMode');
+        if (!sp.classList.contains('rg-split')) { draw(); return; }
+        sp.dataset.on = mode; sp.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); sp.classList.add('sw-' + mode);
+        fm.classList.remove('rg-in'); fm.classList.add('rg-out');
+        setTimeout(function () { if ($('#rgMode') === sp) draw(); }, 440);
+      }); });
       if ($('#rgSkip')) $('#rgSkip').addEventListener('click', function () { try { localStorage.removeItem('rg.wall'); } catch (e) {} closeSheet(); });
       $('#rgAuth').addEventListener('submit', function (ev) {
         ev.preventDefault();
