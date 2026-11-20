@@ -976,7 +976,7 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .rg-split{height:min(46vh,340px);background:#fff}
 .rg-split .ph{position:absolute;inset:0;background-size:cover;background-position:50% 50%;transition:transform .6s cubic-bezier(.2,.9,.3,1)}
 .rg-split button[data-m=login] .ph{background-size:135% auto;background-position:92% 46%}
-.rg-split button[data-m=signup] .ph{background-size:150% auto;background-position:12% 62%}
+.rg-split button[data-m=signup] .ph{background-size:118% auto;background-position:0% 100%}
 .rg-split .ph::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,12,25,.72) 0,rgba(15,12,25,.12) 42%,rgba(15,12,25,.35) 100%)}
 .rg-split button[data-m=login] .ph::after{background:linear-gradient(180deg,rgba(59,26,133,.85) 0,rgba(59,26,133,.1) 45%,rgba(15,12,25,.4) 100%)}
 .rg-split button[aria-pressed=true] .ph{transform:scale(1.04)}
