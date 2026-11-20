@@ -147,7 +147,7 @@
     ({ events: paneEvents, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
   }
   function renderJoin() {
-    box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Buscar comunidades</b><p class="muted">Encuentra grupos por nombre o por zona y únete.</p><div class="plan-link"><input type="search" id="clFind" maxlength="40" placeholder="Nombre, pueblo, provincia…" autocomplete="off"></div><div id="clFound" class="club-found"><p class="muted">Cargando…</p></div></div>' +
+    box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Buscar comunidades</b><p class="muted">Encuentra grupos por nombre o por zona y únete.</p><div class="club-find-box">' + icn('search') + '<input type="text" inputmode="search" enterkeyhint="search" id="clFind" maxlength="40" placeholder="Nombre, pueblo, provincia…" autocomplete="off"></div><div id="clFound" class="club-found"><p class="muted">Cargando…</p></div></div>' +
       '<div class="club-card"><b>Viajes de varios días</b><p class="muted">Organiza una escapada con etapas, alojamiento y gastos, con tu comunidad o entre amigos.</p><button class="btn" id="clTrips2" type="button" style="width:100%">' + icn('route') + 'Mis viajes</button></div>' +
       '<div class="club-card"><b>Tengo un código</b><p class="muted">Escribe el código que te ha pasado el organizador.</p><div class="plan-link"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="clJoin" type="button">Unirme</button></div></div>' +
       '<div class="club-card"><b>Crear una comunidad</b><p class="muted">Serás su administrador: podrás crear eventos, publicar avisos e invitar a la gente.</p><input type="text" id="clName" maxlength="60" placeholder="Nombre de la comunidad"><button class="btn" id="clCreate" type="button" style="margin-top:10px;width:100%">Crear comunidad</button></div>';
@@ -166,7 +166,7 @@
     var q = inp.value.trim();
     sb.rpc('community_search', { p_q: q }).then(function (r) {
       if (!$('#clFound') || $('#clFind').value.trim() !== q) return;
-      var rows = ok(r);
+      var rows = ok(r) || [];
       out.innerHTML = rows.length ? rows.map(function (x) {
         var btn = x.mine ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>Ya estás</span>' : x.requested ? '<span class="mstatus soon">Solicitud enviada</span>' :
           x.join_mode === 'open' ? '<button class="btn small primary" data-j="' + x.id + '" type="button">Unirme</button>' : x.join_mode === 'request' ? '<button class="btn small primary" data-j="' + x.id + '" data-ask="1" type="button">Pedir unirme</button>' : '<span class="muted rg-small">Solo con código</span>';

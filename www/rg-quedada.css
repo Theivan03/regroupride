@@ -1141,3 +1141,8 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .tr-route span{display:flex;align-items:center;gap:6px;font-weight:700;min-width:0}.tr-route svg{width:16px;height:16px;flex:none}
 .tr-start{width:100%}
 .tr-gpx{display:flex}
+
+/* buscador de comunidades: mismo campo que el resto de la app, con su lupa */
+.club-find-box{position:relative;display:flex}
+.club-find-box svg{position:absolute;left:14px;top:50%;width:18px;height:18px;transform:translateY(-50%);opacity:.55;pointer-events:none}
+.club-find-box input{flex:1;min-width:0;padding-left:42px!important}
