@@ -1,0 +1,3 @@
+-- ReGroupRide · 24 — la ruta de cada día de un viaje. Aplicado en producción como migración «viajes_ruta_por_dia».
+--  · trip_routes(event_id, day_id, route): la ruta de cada día, con la misma forma que events.route.
+--  · event_start_day(p_event, p_day): inicia la ruta de ese día para los apuntados, igual que event_start().

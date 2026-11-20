@@ -1003,5 +1003,5 @@
     if (u) setTimeout(pushRegister, 2500);
     if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) { forgetReminders(); liveSync(); } else setTimeout(function () { nativePending(); inbox(true); if (!S.loaded) load().catch(function () {}); else liveSync(); }, 1500); if (!$('#view-club').hidden) show(); }
   });
-  window.RGClub = { show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, mine: function () { return IN.events.slice(); } };
+  window.RGClub = { show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, ring: function (cid, m) { ring(cid, m); }, mine: function () { return IN.events.slice(); } };
 })();

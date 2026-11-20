@@ -274,6 +274,16 @@
     $('#ofGo').addEventListener('click', function () { named(); closeSheet(); A.usePlan(plan).then(function () { A.showView('map'); A.startRide(); }); });
     $('#ofNo').addEventListener('click', function () { closeSheet(); A.toast('Ruta descartada.', 'warn'); });
   }
+  // Para los días de un viaje: del archivo GPX a una ruta lista para seguir (con giros si hay conexión), sin guardarla en «mis rutas».
+  function gpxRoute(text, fname) {
+    var g; try { g = L.gpxToPlan(text); } catch (e) { return Promise.reject(new Error('No se pudo leer el GPX: ' + e.message)); }
+    if (!g.name) g.name = String(fname || '').replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' ').trim() || 'Ruta GPX';
+    if (g.route) return Promise.reject(new Error('Ese archivo solo trae puntos sueltos, sin trazado. Impórtalo desde Rutas, guarda la ruta y elígela aquí.'));
+    var simp = Geo.simplify(g.coords.map(function (c) { return [0, c[1], c[0]]; }), 8).map(function (p) { return [p[2], p[1]]; });
+    var line = L.makeLine(simp), km = Math.round(line.total / 100) / 10;
+    var route = { name: g.name.slice(0, 60), wps: g.wps, pois: g.pois || [], coords: simp, steps: [], dist: km, dur: Math.round(line.total / 15) };
+    return gpxSteps(line).then(function (r) { route.steps = r.steps; if (r.ok) route.dur = Math.round(r.dur); return route; }, function () { return route; });
+  }
   function gpxPicked(text, fname) {
     var mode = gpxMode, g; gpxMode = null;
     try { g = L.gpxToPlan(text); } catch (e) { A.toast('No se pudo importar: ' + e.message, 'bad'); return; }
@@ -407,7 +417,7 @@
     return gpxAsPlan({ name: name || 'Ruta grabada', title: 'Ruta para seguir', coords: coords, wps: [[a[1], a[0], 'Salida'], [b[1], b[0], 'Llegada']], pois: [] });
   }
 
-  window.RGNav = { togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx, resolvePoint: function (t) { return resolvePoint(t); } };
+  window.RGNav = { gpxRoute: gpxRoute, togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx, resolvePoint: function (t) { return resolvePoint(t); } };
 
   /* ================= importar enlace de Google Maps ================= */
   function readClipboard() {

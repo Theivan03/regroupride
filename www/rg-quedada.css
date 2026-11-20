@@ -1136,3 +1136,8 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .tr-date{flex:none;width:48px;text-align:center;font-size:12px;text-transform:uppercase;border-radius:12px;padding:6px 0;background:var(--marca,#5A2DB0);color:var(--sobre-marca,#fff)}
 .tr-date b{display:block;font-size:20px;line-height:1}
 .tr-info{flex:1;min-width:0}.tr-info b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tr-info small{opacity:.7}
+
+.tr-route{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;border:1.5px solid var(--marca,#7B5CF0)}
+.tr-route span{display:flex;align-items:center;gap:6px;font-weight:700;min-width:0}.tr-route svg{width:16px;height:16px;flex:none}
+.tr-start{width:100%}
+.tr-gpx{display:flex}

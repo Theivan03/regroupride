@@ -78,7 +78,9 @@
       return '<div class="tr-day"><div class="tr-day-h"><span class="tr-n">Día ' + (i + 1) + '</span><span class="muted">' + dstr(dayDate(ev, i)) + '</span></div>' +
         '<b class="tr-t">' + esc(d.title || 'Etapa ' + (i + 1)) + '</b>' +
         '<div class="tr-meta">' + (d.start ? '<span><svg><use href="#i-clock"/></svg>Salida ' + esc(d.start) + '</span>' : '') + (num(d.km) ? '<span><svg><use href="#i-route"/></svg>' + Math.round(num(d.km)) + ' km</span>' : '') + (d.from ? '<span><svg><use href="#i-locate"/></svg>' + esc(d.from) + '</span>' : '') + '</div>' +
-        (r ? '<a class="btn small" href="' + esc(r) + '" target="_blank" rel="noopener"><svg><use href="#i-route"/></svg>Ver la ruta</a>' : '') +
+        (d.route_name ? '<div class="tr-route"><span><svg><use href="#i-route"/></svg>' + esc(d.route_name) + (num(d.route_km) ? ' · ' + String(d.route_km).replace('.', ',') + ' km' : '') + '</span><button class="btn small" data-load="' + esc(d.id) + '" type="button">Cargar ruta</button></div>' +
+          (T && T.admin ? '<button class="btn big primary tr-start" data-start="' + esc(d.id) + '" data-n="' + (i + 1) + '" type="button"><svg><use href="#i-play"/></svg>Iniciar la ruta del día ' + (i + 1) + '</button><span class="muted rg-small">A los apuntados les saltará el aviso para unirse, como en cualquier ruta.</span>' : '') : '') +
+        (r ? '<a class="btn small" href="' + esc(r) + '" target="_blank" rel="noopener"><svg><use href="#i-gmaps"/></svg>Ver en Maps</a>' : '') +
         ((d.stops || []).length ? '<ul class="tr-stops">' + d.stops.map(function (p) { var pu = url(p.url); return '<li>' + (p.time ? '<time>' + esc(p.time) + '</time>' : '<time></time>') + '<span><b>' + esc(p.name) + '</b>' + (p.note ? '<small>' + esc(p.note) + '</small>' : '') + '</span>' + (pu ? '<a href="' + esc(pu) + '" target="_blank" rel="noopener">Mapa</a>' : '') + '</li>'; }).join('') + '</ul>' : '') +
         (st.name ? '<div class="tr-stay"><span class="label">Dónde dormimos · ' + (STAY[st.kind] || 'Alojamiento') + '</span><b>' + esc(st.name) + '</b>' + (st.address ? '<span class="muted">' + esc(st.address) + '</span>' : '') +
           '<div class="tr-meta">' + (num(st.price) ? '<span>' + eur(st.price) + ' por persona</span>' : '') + (st.checkin ? '<span>Entrada ' + esc(st.checkin) + '</span>' : '') + (st.parking ? '<span>Parking para motos</span>' : '') + '</div>' + (st.note ? '<p>' + esc(st.note) + '</p>' : '') +
@@ -87,9 +89,35 @@
   }
   function panePlan() {
     var ev = T.ev, t = T.trip, list = String(t.checklist || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
-    $('#trPane').innerHTML = (ev.meet_name ? '<div class="tr-day"><span class="label">Punto de salida</span><b class="tr-t">' + esc(ev.meet_name) + '</b><div class="tr-meta"><span><svg><use href="#i-clock"/></svg>' + new Date(ev.starts_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '</span></div>' + (url(ev.meet_url) ? '<a class="btn small" href="' + esc(url(ev.meet_url)) + '" target="_blank" rel="noopener">Abrir en Maps</a>' : '') + '</div>' : '') +
+    var live = T.att.some(function (x) { return x.user_id === me() && (x.status === 'going' || x.status === 'offered'); }) || T.admin;
+    $('#trPane').innerHTML = (live && window.RGGroup ? '<button class="btn" id="trEnter" type="button" hidden><svg><use href="#i-play"/></svg>Hay una ruta en marcha: unirme</button>' : '') + (ev.meet_name ? '<div class="tr-day"><span class="label">Punto de salida</span><b class="tr-t">' + esc(ev.meet_name) + '</b><div class="tr-meta"><span><svg><use href="#i-clock"/></svg>' + new Date(ev.starts_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '</span></div>' + (url(ev.meet_url) ? '<a class="btn small" href="' + esc(url(ev.meet_url)) + '" target="_blank" rel="noopener">Abrir en Maps</a>' : '') + '</div>' : '') +
       (ev.description ? '<p class="tr-desc">' + esc(ev.description) + '</p>' : '') + planHtml(ev, t) +
       (list.length ? '<div class="tr-day"><span class="label">Qué llevar</span><ul class="tr-check">' + list.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>' : '');
+    wirePlan();
+  }
+
+  function dayRoute(dayId) { return sb.from('trip_routes').select('route').eq('event_id', T.ev.id).eq('day_id', dayId).maybeSingle().then(function (r) { var x = ok(r); if (!x || !x.route || !x.route.coords || x.route.coords.length < 2) throw new Error('Ese día no tiene ruta cargada.'); return x.route; }); }
+  function wirePlan() {
+    var host = $('#trPane'), ev = T.ev;
+    $$('[data-load]', host).forEach(function (b) { b.addEventListener('click', function () {
+      Cl.busy(b, function () { return dayRoute(b.dataset.load).then(function (r) {
+        var p = { id: parseInt(ev.id.replace(/-/g, '').slice(0, 10), 16) + (parseInt(b.dataset.load, 36) % 9973), name: r.name || ev.title, wps: r.wps || [], pois: r.pois || [], coords: r.coords, dist: r.dist || 0, dur: r.dur || 0, routed: true, steps: r.steps || [], created: Date.now(), eventId: ev.id };
+        Cl.closeSheet(); return A.usePlan(p).then(function () { A.toast('Ruta del día cargada. Pulsa «Iniciar ruta» cuando salgáis.', 'ok'); });
+      }); });
+    }); });
+    $$('[data-start]', host).forEach(function (b) { b.addEventListener('click', function () {
+      if (!window.RGGroup) return;
+      if (!b.dataset.sure) { b.dataset.sure = 1; var t = b.innerHTML; b.textContent = '¿Empezamos el día ' + b.dataset.n + '? Toca otra vez'; setTimeout(function () { if (b.dataset.sure) { delete b.dataset.sure; b.innerHTML = t; } }, 4000); return; }
+      delete b.dataset.sure;
+      Cl.busy(b, function () { return sb.rpc('event_start_day', { p_event: ev.id, p_day: b.dataset.start }).then(function (r) {
+        var d = ok(r); if (window.RGClub && RGClub.ring) RGClub.ring(ev.community_id, { kind: 'call', id: d && d.id, eid: ev.id });
+        Cl.closeSheet(); return RGGroup.enter(d, { start: true }).then(function () { A.toast('Ruta iniciada. A los apuntados les sale el aviso para unirse.', 'ok'); });
+      }); });
+    }); });
+    var en = $('#trEnter'); if (en) {
+      sb.rpc('ride_calls').then(function (r) { var c = (r.data || []).filter(function (x) { return x.event_id === ev.id; })[0]; if (!c || !$('#trEnter')) return; en.hidden = false; en.textContent = '«' + c.name + '» está en marcha: unirme';
+        en.addEventListener('click', function () { Cl.busy(en, function () { return sb.rpc('ride_join_event', { p_id: c.id }).then(function (q) { var d = ok(q); Cl.closeSheet(); return RGGroup.enter(d, { start: true }); }); }); }); }, function () {});
+    }
   }
 
   /* ---------- gente ---------- */
@@ -157,6 +185,9 @@
     var ev = T.ev, D = JSON.parse(JSON.stringify(T.trip)), s0 = new Date(ev.starts_at), e0 = ev.ends_at ? new Date(ev.ends_at) : s0;
     var base = { title: ev.title, date: ymd(s0), time: ('0' + s0.getHours()).slice(-2) + ':' + ('0' + s0.getMinutes()).slice(-2), end: ymd(e0), cap: ev.capacity || '', meet: ev.meet_name || '', meet_url: ev.meet_url || '', desc: ev.description || '' };
     D.days = D.days || []; D.budget = D.budget || [];
+    var NEW = {}, plans = A.plans ? A.plans() : [];      // rutas elegidas o importadas en esta edición, por día
+    function did() { return Math.random().toString(36).slice(2, 10).replace(/[^a-z0-9]/g, 'x').padEnd(8, 'x'); }
+    D.days.forEach(function (d) { if (!d.id) d.id = did(); });
     function get(o, path) { return path.reduce(function (x, k) { return x == null ? x : x[k]; }, o); }
     function set(o, path, v) { for (var i = 0; i < path.length - 1; i++) { if (o[path[i]] == null) o[path[i]] = {}; o = o[path[i]]; } o[path[path.length - 1]] = v; }
     function f(label, path, attrs, val) { var v = val !== undefined ? val : get(D, path); return '<label>' + label + '<input data-p="' + path.join('.') + '" value="' + esc(v == null ? '' : v) + '" ' + (attrs || '') + '></label>'; }
@@ -174,7 +205,10 @@
           return '<fieldset class="tr-ed"><legend>Día ' + (i + 1) + '<button class="link danger" data-rm="days.' + i + '" type="button">Quitar día</button></legend>' +
             f('Título de la etapa', ['days', i, 'title'], 'maxlength="100" placeholder="Teulada → Cuenca"') +
             '<div class="tr-two">' + f('Hora de salida', ['days', i, 'start'], 'type="time"') + f('Kilómetros', ['days', i, 'km'], 'type="number" min="0" max="2000" inputmode="numeric"') + '</div>' +
-            f('Sale de', ['days', i, 'from'], 'maxlength="100" placeholder="Hotel, gasolinera…"') + f('Enlace de la ruta (Maps, Calimoto…)', ['days', i, 'route_url'], 'type="url" maxlength="600" placeholder="https://…"') +
+            f('Sale de', ['days', i, 'from'], 'maxlength="100" placeholder="Hotel, gasolinera…"') +
+            '<label>Ruta de este día (la que seguirá el grupo)<select data-rt="' + d.id + '"><option value="">Sin ruta</option>' + (d.route_name ? '<option value="keep" selected>' + esc((NEW[d.id] && NEW[d.id].name ? 'Nueva: ' : 'Mantener: ') + d.route_name) + '</option>' : '') + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
+            '<div class="tr-gpx"><button class="btn small" data-gpx="' + d.id + '" type="button"><svg><use href="#i-download"/></svg>Importar GPX para este día</button><input type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden></div>' +
+            f('Enlace de la ruta en Maps (opcional, para la web)', ['days', i, 'route_url'], 'type="url" maxlength="600" placeholder="https://…"') +
             '<span class="label">Paradas</span>' + d.stops.map(function (p, k) { return '<div class="tr-stop-ed"><div class="tr-two"><input data-p="days.' + i + '.stops.' + k + '.name" maxlength="80" placeholder="Parada (almuerzo, mirador…)" value="' + esc(p.name || '') + '"><input data-p="days.' + i + '.stops.' + k + '.time" type="time" value="' + esc(p.time || '') + '" aria-label="Hora"></div><div class="tr-two"><input data-p="days.' + i + '.stops.' + k + '.url" type="url" maxlength="400" placeholder="Enlace de Maps (opcional)" value="' + esc(p.url || '') + '"><button class="link danger" data-rm="days.' + i + '.stops.' + k + '" type="button">Quitar</button></div></div>'; }).join('') +
             '<button class="btn small" data-add="days.' + i + '.stops" type="button">+ Añadir parada</button>' +
             '<span class="label">Dónde se duerme esa noche</span>' + f('Nombre del alojamiento', ['days', i, 'stay', 'name'], 'maxlength="100" placeholder="Vacío si se vuelve a casa"') +
@@ -189,7 +223,25 @@
         '<label>Qué llevar (una cosa por línea)<textarea data-p="checklist" class="note" maxlength="1500" placeholder="DNI y carné&#10;Seguro y ficha de la moto&#10;Ropa de agua">' + esc(D.checklist || '') + '</textarea></label>' +
         '<button class="btn big primary" type="submit">Guardar viaje</button></form>');
       $('#trX').addEventListener('click', function () { reload(); });
-      $$('[data-add]').forEach(function (b) { b.addEventListener('click', function () { sync(); var p = b.dataset.add.split('.'), arr = get(D, p); if (!arr) { arr = []; set(D, p, arr); } arr.push(p.length === 1 && p[0] === 'days' ? { stops: [], stay: {} } : p[0] === 'budget' ? { per: 'p' } : {}); var y = $('#rgSheet .rg-sheet-in') ? $('#rgSheet .rg-sheet-in').scrollTop : 0; paint(); var box = $('#rgSheet .rg-sheet-in'); if (box) box.scrollTop = y; }); });
+      var setRoute = function (d, r) { NEW[d.id] = r; d.route_name = r ? r.name : ''; d.route_km = r ? r.dist : ''; if (r && !num(d.km)) d.km = Math.round(r.dist); };
+      var repaint = function () { var box = $('#rgSheet .rg-sheet-in'), y = box ? box.scrollTop : 0; paint(); box = $('#rgSheet .rg-sheet-in'); if (box) box.scrollTop = y; };
+      $$('[data-rt]').forEach(function (sel) { sel.addEventListener('change', function () {
+        sync(); var d = D.days.filter(function (x) { return x.id === sel.dataset.rt; })[0], v = sel.value; if (!d || v === 'keep') return;
+        if (!v) setRoute(d, null); else { var p = plans.filter(function (x) { return String(x.id) === v; })[0]; if (p) setRoute(d, { name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur }); }
+        repaint();
+      }); });
+      $$('[data-gpx]').forEach(function (b) { var inp = b.parentNode.querySelector('input[type=file]');
+        b.addEventListener('click', function () { inp.value = ''; inp.click(); });
+        inp.addEventListener('change', function () {
+          var file = inp.files && inp.files[0]; if (!file) return; if (!window.RGNav || !RGNav.gpxRoute) { A.toast('No se puede importar aquí.', 'bad'); return; }
+          sync(); var d = D.days.filter(function (x) { return x.id === b.dataset.gpx; })[0], rd = new FileReader();
+          b.disabled = true; b.textContent = 'Leyendo el GPX…';
+          rd.onload = function () { RGNav.gpxRoute(String(rd.result || ''), file.name).then(function (r) { setRoute(d, r); A.toast('Ruta del día cargada: ' + String(r.dist).replace('.', ',') + ' km.', 'ok'); repaint(); }).catch(function (e) { A.toast(e.message || 'No se pudo importar.', 'bad'); repaint(); }); };
+          rd.onerror = function () { A.toast('No se pudo leer el archivo.', 'bad'); repaint(); };
+          rd.readAsText(file);
+        });
+      });
+      $$('[data-add]').forEach(function (b) { b.addEventListener('click', function () { sync(); var p = b.dataset.add.split('.'), arr = get(D, p); if (!arr) { arr = []; set(D, p, arr); } arr.push(p.length === 1 && p[0] === 'days' ? { id: did(), stops: [], stay: {} } : p[0] === 'budget' ? { per: 'p' } : {}); var y = $('#rgSheet .rg-sheet-in') ? $('#rgSheet .rg-sheet-in').scrollTop : 0; paint(); var box = $('#rgSheet .rg-sheet-in'); if (box) box.scrollTop = y; }); });
       $$('[data-rm]').forEach(function (b) { b.addEventListener('click', function () { sync(); var p = b.dataset.rm.split('.'), k = +p.pop(); get(D, p).splice(k, 1); var y = $('#rgSheet .rg-sheet-in') ? $('#rgSheet .rg-sheet-in').scrollTop : 0; paint(); var box = $('#rgSheet .rg-sheet-in'); if (box) box.scrollTop = y; }); });
       $('#trForm').addEventListener('submit', function (evn) {
         evn.preventDefault(); sync();
@@ -201,7 +253,11 @@
         Cl.busy(evn.target.querySelector('button[type=submit]'), function () {
           return sb.from('events').update({ title: base.title.trim(), description: base.desc.trim(), starts_at: st.toISOString(), ends_at: en.toISOString(), capacity: parseInt(base.cap, 10) > 0 ? parseInt(base.cap, 10) : null, meet_name: base.meet.trim(), meet_url: url(base.meet_url) || null, trip: D }).eq('id', ev.id).select('id').then(function (r) {
             if (!ok(r).length) throw new Error('No se ha guardado: no eres organizador de este viaje.');
-            A.toast('Viaje guardado.', 'ok'); reload('plan');
+            // las rutas de cada día: se suben las nuevas y se quitan las de días borrados o dejados sin ruta
+            var jobs = [], keepIds = D.days.filter(function (d) { return d.route_name; }).map(function (d) { return d.id; });
+            Object.keys(NEW).forEach(function (k) { if (NEW[k] && keepIds.indexOf(k) >= 0) jobs.push(sb.from('trip_routes').upsert({ event_id: ev.id, day_id: k, route: NEW[k], updated_at: new Date().toISOString() }).then(ok)); });
+            jobs.push(sb.from('trip_routes').select('day_id').eq('event_id', ev.id).then(function (q) { var gone = (q.data || []).map(function (x) { return x.day_id; }).filter(function (k) { return keepIds.indexOf(k) < 0; }); return gone.length ? sb.from('trip_routes').delete().eq('event_id', ev.id).in('day_id', gone).then(ok) : null; }));
+            return Promise.all(jobs).then(function () { A.toast('Viaje guardado.', 'ok'); reload('plan'); });
           });
         });
       });
@@ -239,7 +295,7 @@
       ev.preventDefault();
       var st = new Date($('#nA').value + 'T09:00'), en = new Date($('#nB').value + 'T23:00'), title = $('#nT').value.trim();
       if (isNaN(st) || isNaN(en) || en < st) { A.toast('La vuelta no puede ser antes de la salida.', 'warn'); return; }
-      var days = []; for (var i = 0, n = Math.min(30, Math.round((en - st) / 864e5) + 1); i < n; i++) days.push({ stops: [], stay: {} });
+      var days = []; for (var i = 0, n = Math.min(30, Math.round((en - st) / 864e5) + 1); i < n; i++) days.push({ id: Math.random().toString(36).slice(2, 10).replace(/[^a-z0-9]/g, 'x').padEnd(8, 'x'), stops: [], stay: {} });
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
         var job = cid ? sb.from('events').insert({ community_id: cid, title: title, description: '', starts_at: st.toISOString(), ends_at: en.toISOString(), created_by: me(), trip: { days: days, budget: [] } }).select('id').single().then(function (r) { return ok(r).id; })
           : sb.rpc('trip_create_private', { p_title: title, p_starts: st.toISOString(), p_ends: en.toISOString() }).then(function (r) { var o = ok(r); return sb.from('events').update({ trip: { days: days, budget: [] } }).eq('id', o.event).then(function () { return o.event; }); });
