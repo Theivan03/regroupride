@@ -926,3 +926,48 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .rg-reply{margin-top:8px;padding:10px 12px;border-radius:12px;border-left:4px solid #7B5CF0;background:color-mix(in srgb,#7B5CF0 14%,transparent)}
 .rg-reply b{display:block;font-size:13px;margin-bottom:2px}
 .rg-reply p{margin:0;white-space:pre-wrap}
+
+/* ===== entrada partida en diagonal ===== */
+.rg-split{position:relative;height:210px;border-radius:22px;overflow:hidden;background:#14101F;flex:none}
+.rg-split button{position:absolute;inset:0;border:0;padding:0;margin:0;cursor:pointer;font:inherit;transition:clip-path .45s cubic-bezier(.3,1.3,.4,1),filter .3s,opacity .3s;-webkit-tap-highlight-color:transparent}
+.rg-split button[data-m=login]{background:linear-gradient(150deg,#7B5CF0,#3B1A85);color:#fff;clip-path:polygon(0 0,58% 0,38% 100%,0 100%)}
+.rg-split button[data-m=signup]{background:linear-gradient(150deg,#E4F74A,#B9D40F);color:#14150F;clip-path:polygon(58% 0,100% 0,100% 100%,38% 100%)}
+.rg-split[data-on=login] button[data-m=login]{clip-path:polygon(0 0,72% 0,52% 100%,0 100%)}
+.rg-split[data-on=login] button[data-m=signup]{clip-path:polygon(72% 0,100% 0,100% 100%,52% 100%)}
+.rg-split[data-on=signup] button[data-m=login]{clip-path:polygon(0 0,46% 0,26% 100%,0 100%)}
+.rg-split[data-on=signup] button[data-m=signup]{clip-path:polygon(46% 0,100% 0,100% 100%,26% 100%)}
+.rg-split button[aria-pressed=false]{filter:saturate(.55) brightness(.72)}
+.rg-split .art{position:absolute;bottom:6px;width:58%;display:block;transition:transform .45s cubic-bezier(.3,1.3,.4,1),left .45s,right .45s}
+.rg-split .art svg{display:block;width:100%;height:auto;overflow:visible}
+.rg-split button[data-m=login] .art{left:3%}.rg-split button[data-m=signup] .art{right:2%}
+.rg-split button[aria-pressed=false] .art{transform:scale(.62);transform-origin:bottom center}
+.rg-split button[data-m=login][aria-pressed=false] .art{left:-12%}.rg-split button[data-m=signup][aria-pressed=false] .art{right:-12%}
+.rg-split .tx{position:absolute;top:14px;display:block;line-height:1.15}
+.rg-split button[data-m=login] .tx{left:16px;text-align:left}.rg-split button[data-m=signup] .tx{right:16px;text-align:right}
+.rg-split .tx b{display:block;font-size:21px;font-weight:800}.rg-split .tx small{display:block;font-size:13px;opacity:.8;margin-top:2px}
+.rg-split button[aria-pressed=false] .tx b{font-size:15px}.rg-split button[aria-pressed=false] .tx{max-width:76px}.rg-split button[aria-pressed=false] .tx small{display:none}
+.rg-split button[data-m=login] .a2{fill:#D9F21C}.rg-split button[data-m=login] .a2s{stroke:#D9F21C}
+.rg-split button[data-m=signup] .a2{fill:#5A2DB0}.rg-split button[data-m=signup] .a2s{stroke:#5A2DB0}
+.rg-split button[aria-pressed=true] .art svg{animation:rgArtIn .6s cubic-bezier(.2,1.4,.3,1) both}
+@keyframes rgArtIn{from{transform:translateX(-26px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.rg-split button,.rg-split .art,.rg-split .art svg{transition:none;animation:none}}
+
+/* ===== 0.29 · fotos de perfil, chat del evento, foto del creador ===== */
+.rg-ava{overflow:hidden;flex:none}
+.rg-ava img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%}
+.rg-maker-banner{display:block;width:100%;border-radius:14px;aspect-ratio:3/2;object-fit:cover}
+.ev-chat-btn{width:100%;justify-content:center}
+.ev-chat{display:flex;flex-direction:column;gap:10px;min-height:38vh;max-height:52vh;overflow-y:auto;padding:4px 2px;overscroll-behavior:contain}
+.ev-msg{display:flex;gap:8px;align-items:flex-end;max-width:88%}
+.ev-msg .rg-ava{width:32px;height:32px;font-size:14px}
+.ev-msg>div{background:var(--superficie-2,var(--color-surface));border-radius:16px 16px 16px 4px;padding:8px 12px;min-width:0}
+.ev-msg b{display:block;font-size:12px;color:var(--marca,#7B5CF0)}
+.ev-msg p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.ev-msg time{display:block;font-size:11px;opacity:.6;text-align:right;margin-top:2px}
+.ev-msg.me{align-self:flex-end;flex-direction:row-reverse}
+.ev-msg.me>div{background:var(--marca,#5A2DB0);color:var(--sobre-marca,#fff);border-radius:16px 16px 4px 16px}
+.ev-msg.me b{display:none}
+.ev-chat-day{align-self:center;font-size:12px;opacity:.65}
+.ev-chat-form{display:flex;gap:8px;align-items:center;margin-top:10px}
+.ev-chat-form input{flex:1;min-width:0}
+.ev-chat-form .btn{flex:none}

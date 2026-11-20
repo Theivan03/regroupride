@@ -29,7 +29,7 @@
   try { var nm0 = JSON.parse(localStorage.getItem('rg.club.names') || '{}'); S.names = nm0.n || {}; NAMES_AT = nm0.t || {}; } catch (e) {}
   function saveNames() { try { var ids = Object.keys(S.names).slice(-400), n = {}, t = {}; ids.forEach(function (id) { n[id] = S.names[id]; t[id] = NAMES_AT[id] || 0; }); localStorage.setItem('rg.club.names', JSON.stringify({ n: n, t: t })); } catch (e) {} }
   function fetchNames(ids) {
-    return sb.from('profiles').select('id,name,bike_brand,bike_model').in('id', ids).then(function (r) { (r.data || []).forEach(function (p) { S.names[p.id] = p; NAMES_AT[p.id] = Date.now(); }); saveNames(); });
+    return sb.from('profiles').select('id,name,bike_brand,bike_model,avatar_url').in('id', ids).then(function (r) { (r.data || []).forEach(function (p) { S.names[p.id] = p; NAMES_AT[p.id] = Date.now(); }); saveNames(); });
   }
   function names(ids) {
     var uniq = ids.filter(function (id, i) { return id && ids.indexOf(id) === i; }), need = uniq.filter(function (id) { return !S.names[id]; });
@@ -51,6 +51,7 @@
     return Promise.resolve(MEM[k] || (window.DB ? DB.get(k, null) : null)).then(function (d) { if (d) paint(d); }, noop).then(function () { return fresh; }).then(paint);
   }
   function who(id) { var p = S.names[id]; return (p && p.name) || 'Motero'; }
+  function ava(id, cls) { var p = S.names[id], u = p && p.avatar_url; return '<span class="rg-ava' + (cls ? ' ' + cls : '') + '">' + (/^https:\/\//.test(u || '') ? '<img src="' + esc(u) + '" alt="" loading="lazy">' : esc(who(id).charAt(0).toUpperCase())) + '</span>'; }
   function bike(id) { var p = S.names[id]; return p ? [p.bike_brand, p.bike_model].filter(Boolean).join(' ') : ''; }
 
   /* ---------- carga ---------- */
@@ -293,6 +294,7 @@
         (st === 'offered' ? mineHtml + countHtml : countHtml + mineHtml) +
         (startBtn ? '<button class="btn big primary ev-start" data-act="start" type="button">' + ic('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
         ((iGo || st === 'offered') && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
+        (iGo || st === 'waiting' || st === 'offered' || canRun ? '<button class="btn small ev-chat-btn" data-act="chat" type="button">' + ic('people') + 'Chat de los que van</button>' : '') +
         (canRun ? '<button class="btn small" data-act="manage" type="button">' + ic('people') + 'Inscritos y llegada</button>' : '') +
         (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
@@ -316,7 +318,7 @@
         else if (act === 'luma') openUrl(e.luma_url); else if (act === 'rurl') openUrl(e.route_url); else if (act === 'route') loadRoute(e);
         else if (act === 'meet') openUrl(meetOf(e).url); else if (act === 'gomeet') goMeet(e, b);
         else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
-        else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') manageSheet(e);
+        else if (act === 'chat') chatSheet(e); else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') manageSheet(e);
         else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
       }); });
     });
@@ -368,7 +370,7 @@
       var ms = ok(r); return names(ms.map(function (m) { return m.user_id; })).then(function () {
         var cur = S.evAdmins[e.id] || [];
         Cl.sheet('<div class="head"><h1>Administradores de esta ruta</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">' + esc(e.title) + '. Quien marques podrá iniciar esta ruta, recibirá los avisos de SOS, avería y gasolina y podrá repartir los grupos. No será administrador de la comunidad ni de otras rutas.</p><div class="rg-list">' +
-          ms.map(function (m) { var on = cur.indexOf(m.user_id) >= 0; return '<div class="club-person" data-u="' + m.user_id + '"><span class="rg-ava">' + esc(who(m.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(m.user_id)) + '</b><span class="muted">' + (m.role === 'admin' ? 'Administrador de la comunidad' : esc(bike(m.user_id))) + '</span></div>' +
+          ms.map(function (m) { var on = cur.indexOf(m.user_id) >= 0; return '<div class="club-person" data-u="' + m.user_id + '">' + ava(m.user_id) + '<div><b>' + esc(who(m.user_id)) + '</b><span class="muted">' + (m.role === 'admin' ? 'Administrador de la comunidad' : esc(bike(m.user_id))) + '</span></div>' +
             (m.role === 'admin' ? '<span class="mstatus ok">Ya puede</span>' : '<button class="btn small' + (on ? ' primary' : '') + '" type="button">' + (on ? 'Admin de la ruta ✓' : 'Hacer admin') + '</button>') + '</div>'; }).join('') + '</div>');
         $('#clX').addEventListener('click', function () { Cl.closeSheet(); paneEvents(c); });
         $$('#rgSheet [data-u] .btn').forEach(function (b) { b.addEventListener('click', function () {
@@ -493,6 +495,43 @@
       }, function (x) { say(x.message, 'bad'); });
     }, function () { if (!last) say('No hay permiso para usar la cámara. Dáselo a la app en los ajustes del móvil, o escribe el código.', 'bad'); });
   }
+  /* ---------- chat del evento: solo quienes van (apuntados, lista de espera) y los administradores ---------- */
+  var chatT = 0;
+  function chatSheet(e) {
+    clearInterval(chatT);
+    Cl.sheet('<div class="head"><h1>Chat del evento</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      '<p class="muted" style="text-align:left;margin:0">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + '. Solo lo ven quienes van y los administradores.</p>' +
+      '<div class="ev-chat" id="chList"><p class="muted">Cargando…</p></div>' +
+      '<form class="ev-chat-form" id="chForm"><input id="chIn" maxlength="1000" autocomplete="off" enterkeyhint="send" placeholder="Escribe un mensaje" aria-label="Mensaje"><button class="btn primary" type="submit">Enviar</button></form>');
+    $('#clX').addEventListener('click', function () { clearInterval(chatT); Cl.closeSheet(); });
+    var last = -1;
+    function load(force) {
+      if (!$('#chList')) { clearInterval(chatT); return Promise.resolve(); }
+      return sb.from('event_messages').select('id,user_id,body,created_at').eq('event_id', e.id).order('id', { ascending: false }).limit(200).then(function (r) {
+        var rows = ok(r).reverse(), top = rows.length ? rows[rows.length - 1].id : 0; if (top === last && !force) return;
+        return names(rows.map(function (x) { return x.user_id; })).catch(function () {}).then(function () {
+          var el = $('#chList'); if (!el || el.dataset.ev !== e.id) return;
+          var stick = last < 0 || el.scrollHeight - el.scrollTop - el.clientHeight < 80, day = '';
+          last = top;
+          el.innerHTML = rows.length ? rows.map(function (x) {
+            var d = new Date(x.created_at), k = d.toDateString(), me = x.user_id === S.user.id, sep = '';
+            if (k !== day) { day = k; sep = '<span class="ev-chat-day">' + d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) + '</span>'; }
+            return sep + '<div class="ev-msg' + (me ? ' me' : '') + '">' + (me ? '' : ava(x.user_id)) + '<div><b>' + esc(who(x.user_id)) + '</b><p>' + esc(x.body) + '</p><time>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '</time></div></div>';
+          }).join('') : '<p class="muted">Todavía no ha escrito nadie. Rompe el hielo: ¿de dónde sales?</p>';
+          if (stick) el.scrollTop = el.scrollHeight;
+        });
+      }).catch(function (er) { var el = $('#chList'); if (el && last < 0) el.innerHTML = '<p class="muted">' + esc(Cl.msg(er)) + '</p>'; });
+    }
+    $('#chList').dataset.ev = e.id;
+    $('#chForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var inp = $('#chIn'), text = inp.value.trim(); if (!text) return;
+      var b = ev.target.querySelector('button'); b.disabled = true;
+      sb.from('event_messages').insert({ event_id: e.id, body: text }).then(function (r) { ok(r); inp.value = ''; return load(true); }).catch(fail).then(function () { b.disabled = false; inp.focus(); });
+    });
+    load(true);
+    chatT = setInterval(function () { if (!$('#chList')) { clearInterval(chatT); return; } if (document.visibilityState !== 'hidden') load(false); }, 5000);
+  }
   function ticketSheet(e) {
     Cl.sheet('<div class="head"><h1>Mi entrada</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
       '<div class="rg-ticket"><div class="rg-ticket-qr" id="tkQr"><span class="muted">Cargando…</span></div><b>' + esc(e.title) + '</b><span class="muted">' + fmtWhen(e.starts_at) + '</span><span class="muted rg-small">Enseña este código al llegar: el organizador lo lee y marca tu llegada.</span></div>' +
@@ -508,7 +547,7 @@
   function whoGoes(e, att) {
     var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), off = att.filter(function (x) { return x.event_id === e.id && x.status === 'offered'; }), queue = queueOf(att, e);
     var evAd = S.evAdmins[e.id] || [];
-    var person = function (g, tag) { var ad = evAd.indexOf(g.user_id) >= 0; return '<div class="club-person"><span class="rg-ava ' + (ad ? 'rol-admin' : 'rol-comp') + '">' + esc(who(g.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(g.user_id)) + (ad ? ' <span class="mstatus ok">admin</span>' : '') + (g.companion ? ' <span class="mstatus">+1</span>' : '') + (tag ? ' <span class="mstatus">' + tag + '</span>' : '') + '</b><span class="muted">' + esc(bike(g.user_id)) + '</span></div></div>'; };
+    var person = function (g, tag) { var ad = evAd.indexOf(g.user_id) >= 0; return '<div class="club-person">' + ava(g.user_id, ad ? 'rol-admin' : 'rol-comp') + '<div><b>' + esc(who(g.user_id)) + (ad ? ' <span class="mstatus ok">admin</span>' : '') + (g.companion ? ' <span class="mstatus">+1</span>' : '') + (tag ? ' <span class="mstatus">' + tag + '</span>' : '') + '</b><span class="muted">' + esc(bike(g.user_id)) + '</span></div></div>'; };
     Cl.sheet('<div class="head"><h1>Quién viene</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + (e.capacity ? ' · ' + e.capacity + (e.capacity === 1 ? ' plaza' : ' plazas') : '') + '</p><div class="rg-list">' +
       (going.length || off.length ? going.map(function (g) { return person(g); }).join('') + off.map(function (g) { return person(g, 'por confirmar'); }).join('') : '<p class="muted">Nadie apuntado todavía.</p>') + '</div>' +
       (queue.length && (isAdmin() || (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0) ? '<h2 class="rg-h2">Lista de espera</h2><p class="muted rg-small" style="text-align:left">Solo la ven los administradores.</p><div class="rg-list">' + queue.map(function (g, i) { return person(g, 'puesto ' + (i + 1)); }).join('') + '</div>' : ''));
@@ -640,7 +679,7 @@
         var pane = $('#clPane'); if (!pane || S.tab !== 'members' || !cur() || cur().id !== c.id) return;
         pane.innerHTML = '<span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span><div class="club-card club-people">' + ms.map(function (m) {
           var me = m.user_id === S.user.id;
-          return '<div class="club-person" data-u="' + m.user_id + '"><span class="rg-ava ' + (m.role === 'admin' ? 'rol-admin' : 'rol-comp') + '">' + esc(who(m.user_id).charAt(0).toUpperCase()) + '</span><div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
+          return '<div class="club-person" data-u="' + m.user_id + '">' + ava(m.user_id, m.role === 'admin' ? 'rol-admin' : 'rol-comp') + '<div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
             (isAdmin() && !me ? '<span class="rg-macts"><button class="link" data-act="role" type="button">' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</button><button class="link danger" data-act="kick" type="button">Expulsar</button></span>' : '') + '</div>';
         }).join('') + '</div><button class="btn" id="clLeave" type="button"><svg><use href="#i-exit"/></svg>Salir de esta comunidad</button>';
         $$('[data-act]', pane).forEach(function (b) { b.addEventListener('click', function () {

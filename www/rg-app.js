@@ -516,7 +516,7 @@
     var mode = mode0 || (first ? 'signup' : 'login');
     function draw() {
       var s = sheet(LOGO + '<p class="muted rg-lead">Rutas en grupo, sin perder a nadie.</p>' +
-        '<div class="seg rg-wide" id="rgMode"><button type="button" data-m="login" aria-pressed="' + (mode === 'login') + '">Entrar</button><button type="button" data-m="signup" aria-pressed="' + (mode === 'signup') + '">Crear cuenta</button></div>' +
+        (window.RGArt ? RGArt.split(mode) : '<div class="seg rg-wide" id="rgMode"><button type="button" data-m="login" aria-pressed="' + (mode === 'login') + '">Entrar</button><button type="button" data-m="signup" aria-pressed="' + (mode === 'signup') + '">Crear cuenta</button></div>') +
         '<form id="rgAuth" class="rg-form" autocomplete="on">' +
         (mode === 'signup' ? '<label>Tu nombre<input id="rgName" required maxlength="60" autocomplete="name" placeholder="Como te conoce la gente"></label>' +
           '<label>Teléfono<input id="rgTel" type="tel" inputmode="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" placeholder="600 000 000" title="Tu número, con 9 cifras o más"></label>' +
@@ -527,7 +527,7 @@
         (mode === 'login' ? '<button class="link rg-center" id="rgForgot" type="button">He olvidado la contraseña</button>' : '<p class="muted rg-small">El teléfono solo lo ven los administradores de tus rutas y quien pida ayuda. Necesitas tener al menos 16 años.</p>') +
         '<button class="btn rg-skip" id="rgSkip" type="button">' + (first ? 'Ahora no' : 'Cerrar') + '</button>' +
         (first ? '<p class="muted rg-small">Sin cuenta puedes usar el mapa y grabar rutas, pero se quedan solo en este móvil. Con cuenta se guardan en ella y puedes rodar en grupo.</p>' : ''));
-      s.querySelectorAll('#rgMode button').forEach(function (b) { b.addEventListener('click', function () { mode = b.dataset.m; draw(); }); });
+      s.querySelectorAll('#rgMode button').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.m === mode) return; mode = b.dataset.m; draw(); }); });
       $('#rgSkip').addEventListener('click', function () { try { localStorage.removeItem('rg.wall'); } catch (e) {} closeSheet(); });
       $('#rgAuth').addEventListener('submit', function (ev) {
         ev.preventDefault();
@@ -653,7 +653,7 @@
     var box = $('#rgAccount'); if (!box) return;
     if (user) {
       var name = (profile && profile.name) || (user.user_metadata && user.user_metadata.name) || 'Tu cuenta';
-      box.innerHTML = '<div class="rg-acc"><span class="rg-ava">' + esc(name.charAt(0).toUpperCase()) + '</span><div><b>' + esc(name) + '</b><span class="muted">' + esc(user.email || '') + '</span></div></div>' +
+      box.innerHTML = '<div class="rg-acc"><span class="rg-ava">' + (profile && /^https:\/\//.test(profile.avatar_url || '') ? '<img src="' + esc(profile.avatar_url) + '" alt="">' : esc(name.charAt(0).toUpperCase())) + '</span><div><b>' + esc(name) + '</b><span class="muted">' + esc(user.email || '') + '</span></div></div>' +
         '<button class="rg-level" id="rgPhone" type="button"><span>' + (ridePhone ? esc(ridePhone) : 'Teléfono para las rutas') + '</span><small>' + (ridePhone ? 'Teléfono para las rutas · tocar para cambiarlo' : 'Falta tu teléfono · para que puedan llamarte en una ruta') + '</small></button>' +
         '<div class="rg-row"><button class="btn small" id="rgFeedback" type="button"><svg><use href="#i-info"/></svg>Sugerencias y fallos</button><button class="btn small" id="rgOut" type="button"><svg><use href="#i-exit"/></svg>Cerrar sesión</button></div>';
       $('#rgPhone').addEventListener('click', openPhone);

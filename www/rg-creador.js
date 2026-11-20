@@ -3,7 +3,6 @@
   'use strict';
   var A = window.RGApp, Cl = window.RGCloud; if (!Cl || !Cl.sb) return;
   var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  var PANEL = 'https://regroupride-eventos.netlify.app/?dev=1';
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
   function uuid() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -23,29 +22,43 @@
   document.addEventListener('visibilitychange', function () { setTimeout(ping, 1500); });
   setInterval(ping, 30 * 60000);
 
+  /* ---------- foto de perfil: la que pones en «Perfil» se sube a tu cuenta para que la vean los demás ---------- */
+  var avaBusy = false;
+  function syncAva() {
+    var u = Cl.user && Cl.user(), img = document.querySelector('#avatarBig img');
+    if (!u || avaBusy || !img || img.src.indexOf('data:image') !== 0) return;
+    var src = img.src, sig = u.id + '|' + src.length + '|' + src.slice(-24);
+    if (store('rg.ava.up') === sig) return;
+    avaBusy = true;
+    Promise.resolve().then(function () {
+      var m = /^data:(image\/\w+);base64,(.*)$/.exec(src); if (!m) throw new Error('formato');
+      var bin = atob(m[2]), arr = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      var path = u.id + '/' + Date.now().toString(36) + '.' + (m[1] === 'image/png' ? 'png' : 'jpg');
+      return Cl.sb.storage.from('avatars').upload(path, new Blob([arr], { type: m[1] }), { contentType: m[1] }).then(function (r) {
+        if (r.error) throw r.error;
+        return Cl.sb.from('profiles').update({ avatar_url: Cl.sb.storage.from('avatars').getPublicUrl(path).data.publicUrl }).eq('id', u.id);
+      });
+    }).then(function (r) { if (r && !r.error) store('rg.ava.up', sig); }).catch(function () {}).then(function () { avaBusy = false; });
+  }
+  setTimeout(syncAva, 6000); setInterval(syncAva, 8000);
+
   /* ---------- quién hace ReGroupRide ---------- */
   var about = document.getElementById('about');
   if (about) {
     var box = document.createElement('div');
     box.className = 'rg-maker';
     box.innerHTML = '<span class="label">Quién hace ReGroupRide</span>' +
+      '<img class="rg-maker-banner" src="creador-moto.jpg" alt="Ivan con su moto" loading="lazy">' +
       '<div class="rg-maker-top"><span class="rg-maker-pic" id="makerPic">IC</span><div><b>Ivan Cabrera</b><span class="muted">23 años · motero · creador y único desarrollador</span></div></div>' +
       '<p>ReGroupRide la hago yo solo: la idea, el diseño y todo el desarrollo. Salgo en moto con grupo y la app nace de lo que echaba en falta en esas rutas.</p>' +
       '<p>Se hace en colaboración con la comunidad <b>Ratone Bikes</b>, que la prueba en sus salidas y propone muchas de las mejoras.</p>' +
       '<p class="muted">Todo lo que envías en «Sugerencias y fallos» me llega a mí directamente y te contesto en la propia app.</p>' +
-      '<div class="rg-row"><button class="btn small primary" id="makerWrite" type="button">Escribirme</button><a class="btn small" id="makerPanel" href="' + PANEL + '" target="_blank" rel="noopener" hidden>Panel del creador</a></div>';
+      '<div class="rg-row"><button class="btn small primary" id="makerWrite" type="button">Escribirme</button></div>';
     about.parentNode.insertBefore(box, about);
     // La foto se enseña sola cuando exista el archivo creador.jpg; mientras, las iniciales.
     var img = new Image(); img.alt = 'Ivan Cabrera';
     img.onload = function () { var p = document.getElementById('makerPic'); p.textContent = ''; p.appendChild(img); };
     img.src = 'creador.jpg';
     box.querySelector('#makerWrite').addEventListener('click', function () { Cl.openFeedback(); });
-    var lastU = null;
-    var admin = function () {
-      var u = Cl.user && Cl.user(), id = u ? u.id : ''; if (id === lastU) return; lastU = id;
-      var b = document.getElementById('makerPanel'); b.hidden = true; if (!id) return;
-      Cl.sb.rpc('is_app_admin').then(function (r) { if (lastU === id) b.hidden = !(r && r.data === true); }, function () {});
-    };
-    setTimeout(admin, 3000); setInterval(admin, 5000);
   }
 })();

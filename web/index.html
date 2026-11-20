@@ -173,6 +173,32 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
 .fb{display:grid;gap:10px}.fb .meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:var(--texto2)}.fb .meta b{color:var(--texto);font:600 16px Outfit}.fb .txt2{white-space:pre-wrap;margin:0;font-size:16px}
 .fb textarea{min-height:84px}.fb .act{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.fb select{width:auto;min-height:48px}
 @media (max-width:760px){.kp{grid-template-columns:repeat(2,1fr)}.two2{grid-template-columns:1fr}}
+
+/* ===== entrada partida en diagonal ===== */
+.rg-split{position:relative;height:210px;border-radius:22px;overflow:hidden;background:#14101F;flex:none}
+.rg-split button{position:absolute;inset:0;border:0;padding:0;margin:0;cursor:pointer;font:inherit;transition:clip-path .45s cubic-bezier(.3,1.3,.4,1),filter .3s,opacity .3s;-webkit-tap-highlight-color:transparent}
+.rg-split button[data-m=login]{background:linear-gradient(150deg,#7B5CF0,#3B1A85);color:#fff;clip-path:polygon(0 0,58% 0,38% 100%,0 100%)}
+.rg-split button[data-m=signup]{background:linear-gradient(150deg,#E4F74A,#B9D40F);color:#14150F;clip-path:polygon(58% 0,100% 0,100% 100%,38% 100%)}
+.rg-split[data-on=login] button[data-m=login]{clip-path:polygon(0 0,72% 0,52% 100%,0 100%)}
+.rg-split[data-on=login] button[data-m=signup]{clip-path:polygon(72% 0,100% 0,100% 100%,52% 100%)}
+.rg-split[data-on=signup] button[data-m=login]{clip-path:polygon(0 0,46% 0,26% 100%,0 100%)}
+.rg-split[data-on=signup] button[data-m=signup]{clip-path:polygon(46% 0,100% 0,100% 100%,26% 100%)}
+.rg-split button[aria-pressed=false]{filter:saturate(.55) brightness(.72)}
+.rg-split .art{position:absolute;bottom:6px;width:58%;display:block;transition:transform .45s cubic-bezier(.3,1.3,.4,1),left .45s,right .45s}
+.rg-split .art svg{display:block;width:100%;height:auto;overflow:visible}
+.rg-split button[data-m=login] .art{left:3%}.rg-split button[data-m=signup] .art{right:2%}
+.rg-split button[aria-pressed=false] .art{transform:scale(.62);transform-origin:bottom center}
+.rg-split button[data-m=login][aria-pressed=false] .art{left:-12%}.rg-split button[data-m=signup][aria-pressed=false] .art{right:-12%}
+.rg-split .tx{position:absolute;top:14px;display:block;line-height:1.15}
+.rg-split button[data-m=login] .tx{left:16px;text-align:left}.rg-split button[data-m=signup] .tx{right:16px;text-align:right}
+.rg-split .tx b{display:block;font-size:21px;font-weight:800}.rg-split .tx small{display:block;font-size:13px;opacity:.8;margin-top:2px}
+.rg-split button[aria-pressed=false] .tx b{font-size:15px}.rg-split button[aria-pressed=false] .tx{max-width:76px}.rg-split button[aria-pressed=false] .tx small{display:none}
+.rg-split button[data-m=login] .a2{fill:#D9F21C}.rg-split button[data-m=login] .a2s{stroke:#D9F21C}
+.rg-split button[data-m=signup] .a2{fill:#5A2DB0}.rg-split button[data-m=signup] .a2s{stroke:#5A2DB0}
+.rg-split button[aria-pressed=true] .art svg{animation:rgArtIn .6s cubic-bezier(.2,1.4,.3,1) both}
+@keyframes rgArtIn{from{transform:translateX(-26px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.rg-split button,.rg-split .art,.rg-split .art svg{transition:none;animation:none}}
+.auth .rg-split{margin:0 0 18px}.maker .ban{display:block;width:100%;border-radius:16px;aspect-ratio:3/2;object-fit:cover;margin:0 0 14px}
 </style>
 </head>
 <body>
@@ -181,6 +207,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
 <main class="wrap" id="app"><p class="muted">Cargando…</p></main>
 <footer class="foot muted"><a href="/?about=1">Quién hace ReGroupRide</a></footer>
 <script src="/supabase.js"></script>
+<script src="/rg-art.js"></script>
 
 <script>
 (function () {
@@ -256,12 +283,13 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
   function authView(then, intro, backTo) {
     var mode = 'login'; setBack(backTo || null);
     (function draw() {
-      app.innerHTML = '<div class="auth card"><h1>' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</h1><p class="muted">' + esc(intro || 'Con la misma cuenta que usas en la app de ReGroupRide.') + '</p><form class="form" id="f">' +
+      app.innerHTML = '<div class="auth card">' + (window.RGArt ? RGArt.split(mode) : '') + '<h1>' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</h1><p class="muted">' + esc(intro || 'Con la misma cuenta que usas en la app de ReGroupRide.') + '</p><form class="form" id="f">' +
         (mode === 'signup' ? '<label>Nombre<input id="n" required maxlength="24" autocomplete="name"></label><label>Teléfono<input id="t" type="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel"></label>' : '') +
         '<label>Correo<input id="e" type="email" required autocomplete="email"></label><label>Contraseña<input id="p" type="password" required minlength="6" autocomplete="' + (mode === 'login' ? 'current-password' : 'new-password') + '"></label>' +
         '<div id="msg" class="msg" hidden></div><button class="btn pri big" type="submit">' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</button></form>' +
         '<p class="small" style="text-align:center;margin:16px 0 0"><button class="btn txt" id="sw" type="button">' + (mode === 'login' ? 'No tengo cuenta: crear una' : 'Ya tengo cuenta: entrar') + '</button></p></div>';
       $('#sw').onclick = function () { mode = mode === 'login' ? 'signup' : 'login'; draw(); };
+      $$('#rgMode button').forEach(function (b) { b.onclick = function () { if (b.dataset.m !== mode) { mode = b.dataset.m; draw(); } }; });
       $('#f').onsubmit = function (ev) {
         ev.preventDefault();
         busy($('#f button[type=submit]'), function () {
@@ -600,7 +628,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
   /* ---------- quién hace ReGroupRide ---------- */
   function aboutView() {
     setBack(back('/'));
-    app.innerHTML = '<div class="maker card"><div class="top"><span class="pic" id="pic">IC</span><div><h1>Ivan Cabrera</h1><p class="muted" style="margin:4px 0 0">23 años · motero · creador y único desarrollador de ReGroupRide</p></div></div>' +
+    app.innerHTML = '<div class="maker card"><img class="ban" src="/creador-moto.jpg" alt="Ivan con su moto"><div class="top"><span class="pic" id="pic">IC</span><div><h1>Ivan Cabrera</h1><p class="muted" style="margin:4px 0 0">23 años · motero · creador y único desarrollador de ReGroupRide</p></div></div>' +
       '<p>ReGroupRide la hago yo solo: la idea, el diseño y todo el desarrollo. Salgo en moto con grupo y la app nace de lo que echaba en falta en esas rutas.</p>' +
       '<p>Se hace en colaboración con la comunidad <b>Ratone Bikes</b>, que la prueba en sus salidas y propone muchas de las mejoras.</p>' +
       '<p class="muted">¿Una idea o un fallo? En la app, en Ajustes → «Sugerencias y fallos». Me llega al momento y te contesto allí mismo.</p>' +
