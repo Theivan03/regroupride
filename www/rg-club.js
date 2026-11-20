@@ -57,9 +57,9 @@
   /* ---------- carga ---------- */
   function load() {
     if (!S.user) { S.list = []; S.loaded = true; return Promise.resolve(); }
-    return sb.from('community_members').select('role, communities(id,name,description,join_code,zone,ride_style,listed,join_mode)').eq('user_id', S.user.id).then(function (r) {
+    return sb.from('community_members').select('role, communities(id,name,description,join_code,zone,ride_style,listed,join_mode,kind)').eq('user_id', S.user.id).then(function (r) {
       if (r.error) { S.missing = /relation|schema cache|does not exist|not find/i.test(r.error.message || ''); if (!S.missing) throw r.error; S.list = []; }
-      else { S.missing = false; S.list = (r.data || []).filter(function (m) { return m.communities; }).map(function (m) { var c = m.communities; return { id: c.id, name: c.name, description: c.description, code: c.join_code, zone: c.zone || '', style: c.ride_style || '', listed: !!c.listed, mode: c.join_mode || 'code', role: m.role }; }); }
+      else { S.missing = false; S.list = (r.data || []).filter(function (m) { return m.communities && m.communities.kind !== 'trip'; }).map(function (m) { var c = m.communities; return { id: c.id, name: c.name, description: c.description, code: c.join_code, zone: c.zone || '', style: c.ride_style || '', listed: !!c.listed, mode: c.join_mode || 'code', role: m.role }; }); }
       S.loaded = true; if (!cur()) S.cid = null; else S.cid = cur().id;
       if (!r.error) { try { localStorage.setItem('rg.club.list:' + S.user.id, JSON.stringify(S.list)); } catch (e) {} }
       liveSync();
@@ -136,20 +136,23 @@
     var c = cur();
     if (!c) { renderJoin(); return; }
     box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.zone || c.style ? '<span class="club-zone">' + icn('locate') + esc([c.zone, c.style].filter(Boolean).join(' · ')) + '</span>' : '') + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><div class="club-head-act">' + (isAdmin() ? '<button class="btn small" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '<button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button></div></div>' +
-      '<div class="pills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button></div>' +
+      '<div class="pills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button><button class="pill pill-trips" type="button" id="clTrips" aria-pressed="false">' + icn('route') + 'Mis viajes</button></div>' +
       '<div class="seg rg-wide" id="clTabs">' + [['events', 'Eventos'], ['board', 'Tablón'], ['pages', 'Info'], ['members', 'Miembros']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
     $('#clInvite').addEventListener('click', invite);
     if ($('#clEdit')) $('#clEdit').addEventListener('click', function () { editCommunity(c); });
     $('#clOther').addEventListener('click', renderJoin);
+    $('#clTrips').addEventListener('click', function () { if (window.RGTrips) RGTrips.list(); });
     $$('[data-cid]', box).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); render(); }); });
     $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.t; render(); }); });
     ({ events: paneEvents, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
   }
   function renderJoin() {
     box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Buscar comunidades</b><p class="muted">Encuentra grupos por nombre o por zona y únete.</p><div class="plan-link"><input type="search" id="clFind" maxlength="40" placeholder="Nombre, pueblo, provincia…" autocomplete="off"></div><div id="clFound" class="club-found"><p class="muted">Cargando…</p></div></div>' +
+      '<div class="club-card"><b>Viajes de varios días</b><p class="muted">Organiza una escapada con etapas, alojamiento y gastos, con tu comunidad o entre amigos.</p><button class="btn" id="clTrips2" type="button" style="width:100%">' + icn('route') + 'Mis viajes</button></div>' +
       '<div class="club-card"><b>Tengo un código</b><p class="muted">Escribe el código que te ha pasado el organizador.</p><div class="plan-link"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="clJoin" type="button">Unirme</button></div></div>' +
       '<div class="club-card"><b>Crear una comunidad</b><p class="muted">Serás su administrador: podrás crear eventos, publicar avisos e invitar a la gente.</p><input type="text" id="clName" maxlength="60" placeholder="Nombre de la comunidad"><button class="btn" id="clCreate" type="button" style="margin-top:10px;width:100%">Crear comunidad</button></div>';
     if ($('#clBack')) $('#clBack').addEventListener('click', render);
+    $('#clTrips2').addEventListener('click', function () { if (window.RGTrips) RGTrips.list(); });
     var findT = 0; $('#clFind').addEventListener('input', function () { clearTimeout(findT); findT = setTimeout(findCommunities, 350); }); findCommunities();
     $('#clJoin').addEventListener('click', function (ev) { var code = $('#clCode').value.trim(); if (code.length < 4) { A.toast('Escribe el código.', 'warn'); return; }
       Cl.busy(ev.currentTarget, function () { return sb.rpc('join_community', { p_code: code }).then(function (r) { if (r.error) throw new Error(/no válido/i.test(r.error.message) ? 'Ese código no existe. Revísalo con el organizador.' : r.error.message); setCid(r.data); A.toast('¡Dentro!', 'ok'); return load().then(render); }); }); });
@@ -277,7 +280,7 @@
   }
   // Una sola petición para la pestaña: los eventos con sus apuntados y sus administradores. La ruta completa de cada
   // evento (decenas de KB) no se baja aquí: solo su nombre, sus km y dónde empieza; el resto, al pulsar «Cargar ruta».
-  var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon,route_url',
+  var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon,route_url,trip',
     EV_ROUTE = ',route_name:route->>name,route_dist:route->dist,route_start:route->coords->0,route_wp0:route->wps->0', EV_EMBED = ',event_attendees(*),event_admins(user_id)';
   function fetchEvents(c) {
     var since = new Date(Date.now() - 12 * 3600e3).toISOString();
@@ -310,7 +313,7 @@
   }
   function drawEvents(c, evs, att) {
     var pane = $('#clPane'); if (!pane || S.tab !== 'events') return;
-    pane.innerHTML = (isAdmin() ? '<button class="btn big primary club-add" id="evNew" type="button"><svg><use href="#i-plus"/></svg>Nuevo evento o ruta</button>' : '') + (evs.length ? evs.map(function (e) {
+    pane.innerHTML = (isAdmin() ? '<button class="btn big primary club-add" id="evNew" type="button"><svg><use href="#i-plus"/></svg>Nuevo evento o ruta</button><button class="btn club-add" id="evTrip" type="button">' + icn('route') + 'Nuevo viaje de varios días</button>' : '') + (evs.length ? evs.map(function (e) {
       var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
       var taken = takenOf(att, e), queue = queueOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap;
       var st = mine ? mine.status : 'no', iGo = st === 'going', people = going.length + going.filter(function (x) { return x.companion; }).length;
@@ -340,10 +343,12 @@
         (startBtn ? '<button class="btn big primary ev-start" data-act="start" type="button">' + ic('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
         ((iGo || st === 'offered') && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
         (iGo || st === 'waiting' || st === 'offered' || canRun ? '<div class="ev-chat-row"><button class="btn small ev-chat-btn" data-act="chat" type="button">' + ic('people') + 'Chat de los que van</button>' + bellHtml(e.id) + '</div>' : '') +
+        (e.trip ? '<button class="btn small primary ev-chat-btn" data-act="trip" type="button">' + ic('route') + 'Ver el viaje: etapas, alojamiento y gastos</button>' : '') +
         (canRun ? '<button class="btn small" data-act="manage" type="button">' + ic('people') + 'Inscritos y llegada</button>' : '') +
         (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
     if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
+        if ($('#evTrip')) $('#evTrip').addEventListener('click', function () { if (window.RGTrips) RGTrips.create(c.id); });
     $$('.ev', pane).forEach(function (card) {
       var e = evs.filter(function (x) { return x.id === card.dataset.ev; })[0], mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
       var set = function (status, companion, said, bike) {
@@ -363,7 +368,7 @@
         else if (act === 'luma') openUrl(e.luma_url); else if (act === 'rurl') openUrl(e.route_url); else if (act === 'route') loadRoute(e);
         else if (act === 'meet') openUrl(meetOf(e).url); else if (act === 'gomeet') goMeet(e, b);
         else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
-        else if (act === 'bell') toggleMute(e.id); else if (act === 'chat') chatSheet(e); else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') manageSheet(e);
+        else if (act === 'trip') { if (window.RGTrips) RGTrips.open(e.id); } else if (act === 'bell') toggleMute(e.id); else if (act === 'chat') chatSheet(e); else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') manageSheet(e);
         else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
       }); });
     });
@@ -765,7 +770,7 @@
         }, function () {});
         $('#clLeave').addEventListener('click', function (ev) {
           if (isAdmin() && ms.filter(function (x) { return x.role === 'admin'; }).length === 1 && ms.length > 1) { A.toast('Eres el único administrador: nombra a otro antes de salir.', 'warn'); return; }
-          armed(ev.currentTarget, '¿Seguro? Toca otra vez para salir', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; listAt = 0; return load().then(render); }).catch(fail); });
+          armed(ev.currentTarget, ms.length === 1 ? 'Eres el último: la comunidad se borrará. Toca otra vez' : '¿Seguro? Te quitas también de sus eventos. Toca otra vez', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; listAt = 0; inbox(true); return load().then(render); }).catch(fail); });
         });
       })(); }, useCache);
   }
@@ -998,5 +1003,5 @@
     if (u) setTimeout(pushRegister, 2500);
     if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) { forgetReminders(); liveSync(); } else setTimeout(function () { nativePending(); inbox(true); if (!S.loaded) load().catch(function () {}); else liveSync(); }, 1500); if (!$('#view-club').hidden) show(); }
   });
-  window.RGClub = { show: show, inbox: inbox, state: S, mine: function () { return IN.events.slice(); } };
+  window.RGClub = { show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, mine: function () { return IN.events.slice(); } };
 })();
