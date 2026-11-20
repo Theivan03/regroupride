@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.32.0';
+  var APP_VERSION = '0.32.1';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -1210,6 +1210,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   var nameTimer = null;
   $('#profileName').addEventListener('input', function (e) { profile.name = e.target.value; renderAvatar(); if (nameTimer) clearTimeout(nameTimer); nameTimer = setTimeout(function () { DB.set('profile', profile); if (window.RGCloud && RGCloud.saveName) RGCloud.saveName(profile.name); }, 900); });
   function setAvatar(d) { if (!d) return; profile.avatar = d; renderAvatar(); DB.set('profile', profile); if (window.RGSync) RGSync.touch('avatar'); }
+  if ($('#btnAvatar2')) $('#btnAvatar2').addEventListener('click', function () { $('#btnAvatar').click(); });
   $('#btnAvatar').addEventListener('click', function () { $('#avatarFile').value = ''; $('#avatarFile').click(); });
   $('#avatarFile').addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; (window.RGCrop ? RGCrop.open(f) : shrinkImage(f, 256)).then(setAvatar); });
 

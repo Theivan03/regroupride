@@ -864,12 +864,18 @@
   var sw = $('#setNavVoice');
   if (sw) { sw.checked = A.settings.navVoice === true; sw.addEventListener('change', function () { A.settings.navVoice = sw.checked; A.saveSettings(); if (sw.checked && window.Platform) Platform.speak('Indicaciones activadas'); }); }
 
+  // Sin sesión guardada: la pantalla de entrada se pone ya, sin esperar al servidor ni enseñar antes el mapa.
+  var GATE = document.documentElement.classList;
+  if (GATE.contains('rg-gate')) {
+    if (MUST && sb) { var w0 = false, s0 = false; try { w0 = !!localStorage.getItem('rg.wall'); s0 = localStorage.getItem('rg.welcomed') === '1'; } catch (e) {} openAuth(true, (w0 || s0) ? 'login' : 'signup'); }
+    GATE.remove('rg-gate');
+  }
   renderAccount();
   refresh().then(function () {
     var seen = false; try { seen = localStorage.getItem('rg.welcomed') === '1'; localStorage.setItem('rg.welcomed', '1'); } catch (e) {}
     var wall = false; try { wall = !!localStorage.getItem('rg.wall'); } catch (e) {}
-    if (user) { try { localStorage.removeItem('rg.wall'); } catch (e) {} }
-    else if (sb && (MUST || !seen || wall)) openAuth(true, (wall || seen) ? 'login' : 'signup');      // primera vez, o se acaba de cerrar sesión
+    if (user) { try { localStorage.removeItem('rg.wall'); } catch (e) {} if ($('#rgAuthBox')) closeSheet(); }
+    else if (sb && (MUST || !seen || wall) && !$('#rgAuthBox')) openAuth(true, (wall || seen) ? 'login' : 'signup');      // primera vez, o se acaba de cerrar sesión
   });
   if (sb) sb.auth.onAuthStateChange(function (ev, session) { var had = !!user; user = (session && session.user) || null; if (had !== !!user) renderAccount(); if (MUST && had && !user && $('#rgSheet').hidden) openAuth(true, 'login'); });
   sync();

@@ -6,6 +6,7 @@
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
   var STEPS = [
     { t: '¡Bienvenido a ReGroupRide!', x: 'En medio minuto te enseño dónde está cada cosa. Puedes saltarlo cuando quieras y repetirlo desde Ajustes.' },
+    { s: '#btnProfile', v: 'map', t: 'Tu perfil', x: 'Empieza por aquí: pon tu nombre y tu foto con el botón «Cambiar foto de perfil». Es lo que verá el resto del grupo.' },
     { s: '#btnRide', v: 'map', t: 'Iniciar ruta', x: 'Empieza a grabar tu salida: recorrido, kilómetros, velocidad e inclinación en cada curva.' },
     { s: '#btnTrip', v: 'map', t: 'Trayecto', x: 'Para un desplazamiento corto: mide tiempo y kilómetros sin guardar el recorrido.' },
     { s: '#btnMore', v: 'map', t: 'Opciones del mapa', x: 'Centrar el mapa, planificar una ruta, aparcar la moto, capas… todo lo del mapa está aquí.' },
@@ -13,8 +14,7 @@
     { s: '.tab[data-view=club]', t: 'Comunidad', x: 'El corazón de la app: únete a tu grupo, apúntate a sus eventos, habla en el chat de cada salida y rodad juntos sin perder a nadie.' },
     { s: '.tab[data-view=stats]', t: 'Datos', x: 'Tus números: kilómetros, inclinaciones máximas, logros y evolución.' },
     { s: '.tab[data-view=garage]', t: 'Garaje', x: 'Tus motos y su mantenimiento. La moto que guardes aquí se usa al apuntarte a un evento.' },
-    { s: '.tab[data-view=settings]', t: 'Ajustes', x: 'Tu cuenta, los permisos, la voz y el apartado para escribirme sugerencias o fallos.' },
-    { s: '#btnProfile', v: 'map', t: 'Tu perfil', x: 'Pon tu nombre y tu foto: es lo que verá el resto del grupo.' },
+    { s: '.tab[data-view=settings]', t: 'Ajustes', x: 'Tu cuenta, los permisos y la voz. Aquí también verás quién ha creado ReGroupRide y podrás escribirle tus sugerencias o los fallos que encuentres.' },
     { t: '¡Listo para rodar!', x: 'Lo primero: entra en Comunidad y únete a tu grupo con el código que te pase el organizador. Buena ruta.', end: true }
   ];
   var el = null, i = 0, running = false;

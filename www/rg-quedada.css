@@ -1069,3 +1069,5 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .rg-tour-bub b{display:block;font-size:19px;margin:2px 0 4px}.rg-tour-bub p{margin:0 0 12px;line-height:1.45}
 .rg-tour-n{font-size:12px;font-weight:700;color:var(--marca,#7B5CF0)}
 .rg-tour-act{display:flex;align-items:center;gap:8px;justify-content:flex-end}.rg-tour-act .link{margin-right:auto}
+
+.rg-photo-btn{display:flex;margin:-2px auto 14px}
