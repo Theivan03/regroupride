@@ -1,10 +1,10 @@
 /* Inclina — service worker: deja la app disponible sin cobertura.
    Archivos propios: red primero y copia en caché (así las actualizaciones llegan al momento).
    Las fuentes van incluidas en fonts/. */
-var CACHE = 'regroupride-v0.27.1';
-var SHELL = ['./', './index.html', './app.js?v=0.27.1', './lean-core.js?v=0.27.1', './geo.js?v=0.27.1', './db.js?v=0.27.1', './achievements.js?v=0.27.1', './platform.js?v=0.27.1', './manifest.webmanifest?v=0.27.1',
+var CACHE = 'regroupride-v0.28.0';
+var SHELL = ['./', './index.html', './app.js?v=0.28.0', './lean-core.js?v=0.28.0', './geo.js?v=0.28.0', './db.js?v=0.28.0', './achievements.js?v=0.28.0', './platform.js?v=0.28.0', './manifest.webmanifest?v=0.28.0',
   './vendor/maplibre-gl.js', './vendor/maplibre-gl.css', './icon-192.png', './icon-512.png', './icon-512-maskable.png',
-  './fonts/outfit-latin-wght-normal.woff2', './fonts/manrope-latin-wght-normal.woff2', './rg-lib.js?v=0.27.1', './rg-mapstyle.js?v=0.27.1', './rg-app.js?v=0.27.1', './rg-extras.js?v=0.27.1', './rg-thumbs.js?v=0.27.1', './rg-live.js?v=0.27.1', './rg-club.js?v=0.27.1', './rg-group.js?v=0.27.1', './rg-sync.js?v=0.27.1', './vendor/qrcode.js', './rg-theme.css?v=0.27.1', './rg-quedada.css?v=0.27.1', './simbolo.svg', './vendor/supabase.js'];
+  './fonts/outfit-latin-wght-normal.woff2', './fonts/manrope-latin-wght-normal.woff2', './rg-lib.js?v=0.28.0', './rg-mapstyle.js?v=0.28.0', './rg-app.js?v=0.28.0', './rg-extras.js?v=0.28.0', './rg-creador.js?v=0.28.0', './rg-thumbs.js?v=0.28.0', './rg-live.js?v=0.28.0', './rg-club.js?v=0.28.0', './rg-group.js?v=0.28.0', './rg-sync.js?v=0.28.0', './vendor/qrcode.js', './rg-theme.css?v=0.28.0', './rg-quedada.css?v=0.28.0', './simbolo.svg', './vendor/supabase.js'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));

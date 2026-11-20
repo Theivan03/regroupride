@@ -675,7 +675,7 @@
     if (!user) { A.toast('Entra en tu cuenta para enviar sugerencias: así podemos contestarte.', 'warn'); openAuth(false); return; }
     var kind = 'fallo';
     var s = sheet('<div class="head"><h1>Sugerencias y fallos</h1><button class="btn small icon" id="rgClose" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
-      '<p class="muted">Cuéntanos qué falla o qué mejorarías. El modelo de móvil y la versión se añaden solos.</p>' +
+      '<p class="muted">Cuéntame qué falla o qué mejorarías. Me llega al momento y te contesto aquí mismo. El modelo de móvil y la versión se añaden solos.</p>' +
       '<div class="seg rg-wide" id="rgKind"><button type="button" data-k="fallo" aria-pressed="true">Algo falla</button><button type="button" data-k="mejora" aria-pressed="false">Una mejora</button></div>' +
       '<div class="rg-form"><label>¿Qué ha pasado o qué propones?<textarea id="rgMsg" class="note" maxlength="4000" placeholder="Cuanto más concreto, mejor: qué pantalla, qué tocaste, qué esperabas…"></textarea></label>' +
       '<button class="btn big primary" id="rgSend" type="button">Enviar</button></div>' +
@@ -687,7 +687,7 @@
         var box = $('#rgMine'); if (!box) return;
         if (r.error) { box.innerHTML = '<p class="muted">' + esc(msg(r.error)) + '</p>'; return; }
         box.innerHTML = r.data.length ? r.data.map(function (f) {
-          return '<div class="rg-item"><div class="rg-tags"><span class="mstatus">' + (f.kind === 'fallo' ? 'Fallo' : 'Mejora') + '</span><span class="mstatus ' + (STATUS_CLS[f.status] === 'warn' ? 'soon' : STATUS_CLS[f.status] === 'bad' ? 'due' : STATUS_CLS[f.status]) + '">' + esc(f.status) + '</span><span class="muted">' + new Date(f.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + '</span></div><p>' + esc(f.message) + '</p>' + (f.admin_note ? '<p class="muted"><b>Respuesta:</b> ' + esc(f.admin_note) + '</p>' : '') + '</div>';
+          return '<div class="rg-item"><div class="rg-tags"><span class="mstatus">' + (f.kind === 'fallo' ? 'Fallo' : 'Mejora') + '</span><span class="mstatus ' + (STATUS_CLS[f.status] === 'warn' ? 'soon' : STATUS_CLS[f.status] === 'bad' ? 'due' : STATUS_CLS[f.status]) + '">' + esc(f.status) + '</span><span class="muted">' + new Date(f.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + '</span></div><p>' + esc(f.message) + '</p>' + (f.admin_note ? '<div class="rg-reply"><b>Ivan, de ReGroupRide</b><p>' + esc(f.admin_note) + '</p></div>' : '') + '</div>';
         }).join('') : '<p class="muted">Todavía no has enviado nada.</p>';
       });
     }

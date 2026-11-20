@@ -914,3 +914,15 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .rg-music-set{display:flex;align-items:center;gap:12px;justify-content:space-between}.rg-music-set div{display:flex;flex-direction:column;text-align:left;min-width:0}.rg-music-set b{font:600 16px/20px var(--font-titulo,inherit)}
 @media (prefers-reduced-motion:reduce){.tabs,.map-bottom,#tabsHandle{transition:none}#tabsHandle svg,#tabsHandle i,#musicBar,#musicBar .mb-art{animation:none!important}}
 @media (min-width:900px){body.rg-tabs-min .tabs{transform:translateY(60%) scale(.18,.3)}}
+
+/* ===== 0.28 · quién hace la app y respuestas a las sugerencias ===== */
+.rg-maker{background:var(--color-surface,var(--sup));border-radius:18px;padding:16px;margin:0 0 var(--sp-3,16px);display:grid;gap:10px}
+.rg-maker p{margin:0}
+.rg-maker-top{display:flex;align-items:center;gap:14px}
+.rg-maker-top b{display:block;font-size:18px}
+.rg-maker-top .muted{display:block;font-size:14px}
+.rg-maker-pic{flex:none;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;overflow:hidden;font-weight:800;font-size:22px;color:#fff;background:linear-gradient(135deg,#5A2DB0,#7B5CF0)}
+.rg-maker-pic img{width:100%;height:100%;object-fit:cover}
+.rg-reply{margin-top:8px;padding:10px 12px;border-radius:12px;border-left:4px solid #7B5CF0;background:color-mix(in srgb,#7B5CF0 14%,transparent)}
+.rg-reply b{display:block;font-size:13px;margin-bottom:2px}
+.rg-reply p{margin:0;white-space:pre-wrap}

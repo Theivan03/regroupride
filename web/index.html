@@ -160,12 +160,26 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.ev h1,.hd1 h1,.auth h1{-webkit-text-fill-color:currentColor;color:var(--texto);background:none}}
 @media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}.g{grid-template-columns:1fr}.qrow{grid-template-columns:1fr 1fr}}
 @media (max-width:760px){#who{display:none}.ev,.edit{grid-template-columns:1fr;gap:22px}.cover{aspect-ratio:16/9}.item{grid-template-columns:104px minmax(0,1fr);gap:12px}.two{grid-template-columns:1fr}}
+
+/* quién hace la app y panel del creador */
+.foot{max-width:1040px;margin:0 auto;padding:0 20px 40px;text-align:center;font-size:14px}.foot a{color:var(--texto2)}
+.maker{max-width:620px;margin:4vh auto 0}.maker .top{display:flex;align-items:center;gap:16px;margin-bottom:14px}.maker h1{font:700 30px/1.15 Outfit;margin:0}
+.pic{flex:none;width:88px;height:88px;border-radius:50%;display:grid;place-items:center;overflow:hidden;font:800 28px Outfit;color:#fff;background:linear-gradient(135deg,#5A2DB0,#7B5CF0)}.pic img{width:100%;height:100%;object-fit:cover}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 14px}.kp .card{padding:16px}.kp b{display:block;font:700 30px/1.1 Outfit}.kp span{display:block;font-size:14px;color:var(--texto2);margin-top:4px}.kp small{display:block;font-size:12px;color:var(--texto2);margin-top:2px}
+.bars{display:flex;align-items:flex-end;gap:3px;height:140px;margin-top:10px}.bars div{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:100%}.bars i{display:block;background:var(--marca);border-radius:4px 4px 0 0;min-height:2px}.bars i.z{background:var(--linea)}
+.axis{display:flex;justify-content:space-between;font-size:12px;color:var(--texto2);margin-top:6px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 14px;font-size:15px}.kv b{font-family:Outfit;text-align:right}
+.two2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.fb{display:grid;gap:10px}.fb .meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:var(--texto2)}.fb .meta b{color:var(--texto);font:600 16px Outfit}.fb .txt2{white-space:pre-wrap;margin:0;font-size:16px}
+.fb textarea{min-height:84px}.fb .act{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.fb select{width:auto;min-height:48px}
+@media (max-width:760px){.kp{grid-template-columns:repeat(2,1fr)}.two2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="bg" aria-hidden="true"><i></i><i></i><i></i><i></i><u></u><b></b></div>
 <header class="top"><button class="btn" id="bk" type="button" aria-label="Atrás" title="Atrás" hidden>←</button><a class="logo" href="/"><img src="/simbolo.svg" alt=""><span>ReGroup<i>Ride</i></span></a><span class="sp"></span><span id="who" class="muted small"></span><button class="btn txt" id="out" hidden>Salir</button></header>
 <main class="wrap" id="app"><p class="muted">Cargando…</p></main>
+<footer class="foot muted"><a href="/?about=1">Quién hace ReGroupRide</a></footer>
 <script src="/supabase.js"></script>
 
 <script>
@@ -583,12 +597,69 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
     sb.from('events').select('id,title,description,starts_at,ends_at,meet_name,meet_note,meet_url,route_url,meet_lat,capacity,cover_url,open_reg,allow_guests,require_approval,show_guests,listed,questions').eq('id', id).maybeSingle().then(function (r) { if (r.error || !r.data) { nav('/?c=' + c.id, true); return; } draw(r.data); });
   }
 
+  /* ---------- quién hace ReGroupRide ---------- */
+  function aboutView() {
+    setBack(back('/'));
+    app.innerHTML = '<div class="maker card"><div class="top"><span class="pic" id="pic">IC</span><div><h1>Ivan Cabrera</h1><p class="muted" style="margin:4px 0 0">23 años · motero · creador y único desarrollador de ReGroupRide</p></div></div>' +
+      '<p>ReGroupRide la hago yo solo: la idea, el diseño y todo el desarrollo. Salgo en moto con grupo y la app nace de lo que echaba en falta en esas rutas.</p>' +
+      '<p>Se hace en colaboración con la comunidad <b>Ratone Bikes</b>, que la prueba en sus salidas y propone muchas de las mejoras.</p>' +
+      '<p class="muted">¿Una idea o un fallo? En la app, en Ajustes → «Sugerencias y fallos». Me llega al momento y te contesto allí mismo.</p>' +
+      '<a class="btn mar" href="https://regroupride-app.netlify.app" target="_blank" rel="noopener">Abrir la app</a></div>';
+    var img = new Image(); img.alt = 'Ivan Cabrera'; img.onload = function () { var p = $('#pic'); if (p) { p.textContent = ''; p.appendChild(img); } }; img.src = '/creador.jpg';
+  }
+
+  /* ---------- panel del creador: uso de la app y sugerencias ---------- */
+  function devView() {
+    setBack(back('/'));
+    app.innerHTML = '<p class="muted">Cargando…</p>';
+    Promise.all([rpc('dev_stats'), rpc('dev_feedback')]).then(function (r) { drawDev(r[0], r[1]); }, function (e) {
+      app.innerHTML = '<div class="auth card"><h1>Panel del creador</h1><p class="msg bad">' + esc(/Solo el creador/.test(e.message || '') ? 'Esta página es solo para el creador de ReGroupRide.' : err(e)) + '</p><a class="btn" href="/">Ir al inicio</a></div>';
+    });
+  }
+  function pct(a, b) { return b ? Math.round(a * 100 / b) + ' %' : '—'; }
+  function drawDev(s, fb) {
+    var max = Math.max.apply(null, s.series.map(function (d) { return d.active; }).concat([1]));
+    var k = function (v, l, sub) { return '<div class="card"><b>' + v + '</b><span>' + l + '</span>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>'; };
+    var kv = function (o) { var ks = Object.keys(o || {}); return ks.length ? ks.map(function (x) { return '<span>' + esc(x) + '</span><b>' + o[x] + '</b>'; }).join('') : '<span class="muted">Sin datos todavía</span><b></b>'; };
+    var rt = s.retention || {}, since = s.since ? new Date(s.since) : null;
+    var ST = ['recibido', 'en curso', 'hecho', 'descartado'];
+    app.innerHTML = '<div class="hd1"><h1>Panel del creador</h1><button class="btn" id="rl" type="button">Actualizar</button></div>' +
+      '<p class="muted" style="margin-top:-8px">' + (since ? 'El uso se cuenta desde el ' + since.getDate() + ' de ' + ML[since.getMonth()] + ' de ' + since.getFullYear() + ': cada aparato que abre la app (0.28 o posterior, o la web) manda una señal al día.' : 'Todavía no ha llegado ninguna señal de uso: empiezan a contar con la versión 0.28.') + '</p>' +
+      '<div class="kp">' + k(s.dau, 'Activos hoy', 'Ayer: ' + s.dau_prev) + k(s.wau, 'Activos en 7 días') + k(s.mau, 'Activos en 30 días') + k(s.devices, 'Aparatos con la app', s.devices_account + ' con cuenta · ' + (s.devices - s.devices_account) + ' sin cuenta') + '</div>' +
+      '<div class="kp">' + k(s.accounts, 'Cuentas creadas', '+' + s.accounts_7 + ' en 7 días · +' + s.accounts_30 + ' en 30') + k(s.returning_30, 'Reincidentes', '3 días o más en el último mes') + k(s.days_per_device_30, 'Días de uso al mes', 'media por aparato') + k(s.feedback_unanswered, 'Sugerencias sin contestar', s.feedback_open + ' abiertas') + '</div>' +
+      '<div class="card" style="margin-bottom:14px"><b class="t">Aparatos activos por día · últimos 30 días</b><div class="bars">' + s.series.map(function (d) { return '<div title="' + d.day + ': ' + d.active + ' activos, ' + d.new_devices + ' nuevos, ' + d.new_accounts + ' cuentas nuevas"><i class="' + (d.active ? '' : 'z') + '" style="height:' + Math.round(d.active * 100 / max) + '%"></i></div>'; }).join('') + '</div><div class="axis"><span>' + esc(s.series[0].day) + '</span><span>máximo: ' + max + '</span><span>hoy</span></div></div>' +
+      '<div class="two2"><div class="card"><b class="t">¿Vuelven?</b><div class="kv" style="margin-top:10px"><span>Vuelven al día siguiente</span><b>' + pct(rt.d1, rt.base1) + '</b><span>Vuelven en la primera semana</span><b>' + pct(rt.d7, rt.base7) + '</b><span>Siguen al cabo de un mes</span><b>' + pct(rt.d30, rt.base30) + '</b><span>Cuentas que han entrado en 30 días</span><b>' + s.accounts_active_30 + ' de ' + s.accounts + '</b></div></div>' +
+      '<div class="card"><b class="t">Dónde se usa (30 días)</b><div class="kv" style="margin-top:10px">' + kv(s.platforms) + '<span class="muted">Versiones</span><b></b>' + kv(s.versions) + '<span>Móviles con avisos activados</span><b>' + s.push_devices + '</b></div></div></div>' +
+      '<div class="card" style="margin-bottom:14px"><b class="t">Qué se hace con la app</b><div class="kv" style="margin-top:10px"><span>Comunidades</span><b>' + s.communities + '</b><span>Miembros de comunidades</span><b>' + s.members + '</b><span>Eventos (próximos / total)</span><b>' + s.events_next + ' / ' + s.events_total + '</b><span>Inscripciones a eventos</span><b>' + s.signups + '</b><span>De ellas, por la web sin app</span><b>' + s.web_guests + '</b><span>Rutas en grupo en 30 días</span><b>' + s.group_rides_30 + '</b><span>Rutas grabadas (con cuenta)</span><b>' + s.rides + '</b><span>Kilómetros</span><b>' + Number(s.km).toLocaleString('es-ES') + '</b></div></div>' +
+      '<h2>Sugerencias y fallos</h2><div id="msg" class="msg" hidden></div><div class="list">' + (fb.length ? fb.map(function (f) {
+        var d = new Date(f.created_at), dv = f.device || {};
+        return '<div class="card fb" data-id="' + f.id + '"><div class="meta"><b>' + esc(f.name) + '</b><span class="tag' + (f.kind === 'fallo' ? '' : ' ok') + '">' + (f.kind === 'fallo' ? 'Fallo' : 'Mejora') + '</span><span>' + d.getDate() + ' ' + M[d.getMonth()] + ', ' + hhmm(d) + '</span><span>v' + esc(f.app_version || '?') + (dv.model ? ' · ' + esc(dv.model) : '') + (dv.platform ? ' · ' + esc(dv.platform) : '') + '</span>' + (f.email ? '<a href="mailto:' + esc(f.email) + '">' + esc(f.email) + '</a>' : '') + '</div>' +
+          '<p class="txt2">' + esc(f.message) + '</p><textarea placeholder="Tu respuesta: la verá en la app y le llegará un aviso al móvil." maxlength="2000">' + esc(f.admin_note) + '</textarea>' +
+          '<div class="act"><select aria-label="Estado">' + ST.map(function (x) { return '<option' + (x === f.status ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select><button class="btn pri" type="button">' + (f.admin_note ? 'Guardar cambios' : 'Enviar respuesta') + '</button>' + (f.replied_at ? '<span class="muted small">Contestado el ' + new Date(f.replied_at).getDate() + ' ' + M[new Date(f.replied_at).getMonth()] + '</span>' : '') + '</div></div>';
+      }).join('') : '<p class="muted">Todavía no ha llegado ninguna.</p>') + '</div>';
+    $('#rl').onclick = devView;
+    $$('.fb').forEach(function (el) {
+      $('button', el).onclick = function () {
+        var b = this, note = $('textarea', el).value.trim(), st = $('select', el).value;
+        busy(b, function () {
+          return sb.from('feedback').update({ admin_note: note, status: st }).eq('id', el.dataset.id).select('id').then(function (r) {
+            if (r.error) throw r.error; if (!r.data || !r.data.length) throw new Error('No se ha guardado.');
+            msg(note ? 'Respuesta enviada: le llega un aviso al móvil y la ve en la app.' : 'Estado guardado.');
+          });
+        });
+      };
+    });
+  }
+
   /* ---------- arranque ---------- */
   function start() {
     var id = eventId(), cm = comId(), mg = param('m');
     if (id) { eventView(id); return; }
     if (cm) { communityView(cm); return; }
-    if (!user) { authView(start, mg ? 'Entra con tu cuenta de administrador para ver los inscritos.' : 'Entra para crear y gestionar los eventos de tu comunidad. Es la misma cuenta de la app.', mg ? back('/?e=' + mg) : null); return; }
+    var dev = /[?&]dev\b/.test(location.search);
+    if (/[?&]about\b/.test(location.search)) { aboutView(); return; }
+    if (!user) { authView(start, dev ? 'Entra con tu cuenta de creador.' : mg ? 'Entra con tu cuenta de administrador para ver los inscritos.' : 'Entra para crear y gestionar los eventos de tu comunidad. Es la misma cuenta de la app.', mg ? back('/?e=' + mg) : null); return; }
+    if (dev && user) { devView(); return; }
     if (mg) { manageView(mg); return; }
     loadComs().then(function () { var ed = param('edit'), nw = /[?&]new=1/.test(location.search), c = com(); if ((ed || nw) && c && c.admin) editor(ed); else panel(); }, function (e) { app.innerHTML = '<p class="msg bad">' + esc(err(e)) + '</p>'; });
   }

@@ -283,6 +283,9 @@ final class EventNotices {
             } else if ("post".equals(kind)) {
                 head = com + " · Tablón";
                 body = title;
+            } else if ("note".equals(kind)) {       // respuestas a sugerencias y avisos del creador
+                head = it.optString("head", com);
+                body = title;
             } else {
                 head = com + " · Info";
                 body = title;
