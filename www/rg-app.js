@@ -565,7 +565,7 @@
       });
       $('#rgForgot').addEventListener('click', function () {
         var email = $('#rgEmail').value.trim(); if (!email) { A.toast('Escribe tu correo y vuelve a pulsar.', 'warn'); return; }
-        sb.auth.resetPasswordForEmail(email).then(function (r) { A.toast(r.error ? msg(r.error) : 'Te hemos enviado un correo para cambiarla.', r.error ? 'bad' : 'ok'); });
+        sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://regroupride-eventos.netlify.app/?reset=1' }).then(function (r) { A.toast(r.error ? msg(r.error) : 'Te hemos enviado un correo con un enlace para poner una contraseña nueva. Mira también en spam.', r.error ? 'bad' : 'ok'); });
       });
     }
     draw();

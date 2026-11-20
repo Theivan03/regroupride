@@ -250,6 +250,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
   // Claves públicas del proyecto (las mismas que lleva la app; lo que cada uno puede ver lo decide el servidor).
   var SB_URL = 'https://lpkeaxtzfbuqjkkusjit.supabase.co', SB_KEY = 'sb_publishable_lUo3IlFV8X0pVL5HUfbgNA_VLeizTOw';
   var LIB = { qr: '/qrcode.js', scan: '/jsqr.js' }, SYM = '/simbolo.svg';
+  var RECOVER = /type=recovery/.test(location.hash), LINKERR = /error_description=([^&]+)/.exec(location.hash);
   var sb = supabase.createClient(SB_URL, SB_KEY), app = document.getElementById('app'), user = null, S = { coms: [], cid: null };
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return [].slice.call((r || document).querySelectorAll(s)); };
@@ -322,7 +323,8 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
         '<div class="rg-only"><div><label>Nombre<input id="n" maxlength="24" autocomplete="name"></label><label>Teléfono<input id="t" type="tel" minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel"></label></div></div>' +
         '<label style="margin-bottom:14px">Correo<input id="e" type="email" required autocomplete="email"></label><label style="margin-bottom:14px">Contraseña<input id="p" type="password" required minlength="6"></label>' +
         '<div id="msg" class="msg" hidden style="margin-bottom:14px"></div><button class="btn pri big" type="submit" id="ago"></button></form>' +
-        '<p class="small" style="text-align:center;margin:16px 0 0"><button class="btn txt" id="sw" type="button"></button></p></div>';
+        '<p class="small" style="text-align:center;margin:16px 0 0"><button class="btn txt" id="sw" type="button"></button><br><button class="btn txt" id="fg" type="button">He olvidado la contraseña</button></p></div>';
+      $('#fg').onclick = function () { var em = $('#e').value.trim(); if (!em) { msg('Escribe tu correo arriba y vuelve a pulsar.', true); return; } sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/?reset=1' }).then(function (r) { msg(r.error ? err(r.error) : 'Te hemos enviado un correo con un enlace para poner una contraseña nueva. Mira también en spam.', !!r.error); }); };
       var setMode = function (m, fx) {
         mode = m; var up = m === 'signup', sp = $('#rgMode');
         $('#f').dataset.mode = m; $('#n').required = $('#t').required = up; $('#n').tabIndex = $('#t').tabIndex = up ? 0 : -1;
@@ -668,6 +670,23 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
     sb.from('events').select('id,title,description,starts_at,ends_at,meet_name,meet_note,meet_url,route_url,meet_lat,capacity,cover_url,open_reg,allow_guests,require_approval,show_guests,listed,questions').eq('id', id).maybeSingle().then(function (r) { if (r.error || !r.data) { nav('/?c=' + c.id, true); return; } draw(r.data); });
   }
 
+  /* ---------- contraseña nueva (se llega aquí desde el enlace del correo) ---------- */
+  function resetView() {
+    setBack(null);
+    if (!user) { app.innerHTML = '<div class="auth card"><h1>El enlace ya no vale</h1><p class="muted">' + (LINKERR ? 'Ha caducado o ya se usó. ' : '') + 'Vuelve a la app, pulsa «He olvidado la contraseña» y abre el correo nuevo que te llegue.</p></div>'; return; }
+    app.innerHTML = '<div class="auth card"><h1>Contraseña nueva</h1><p class="muted">Para ' + esc(user.email) + '. Vale para la app y para esta web.</p><form class="form" id="rf"><label>Contraseña nueva<input id="r1" type="password" required minlength="6" autocomplete="new-password"></label><label>Repítela<input id="r2" type="password" required minlength="6" autocomplete="new-password"></label><div id="msg" class="msg" hidden></div><button class="btn pri big" type="submit">Guardar contraseña</button></form></div>';
+    $('#rf').onsubmit = function (ev) {
+      ev.preventDefault();
+      busy($('#rf button'), function () {
+        if ($('#r1').value !== $('#r2').value) throw new Error('Las dos contraseñas no coinciden.');
+        return sb.auth.updateUser({ password: $('#r1').value }).then(function (r) {
+          if (r.error) throw r.error; RECOVER = false; history.replaceState(null, '', '/');
+          app.innerHTML = '<div class="auth card"><h1>Contraseña cambiada</h1><p class="muted">Ya puedes entrar en la app con la contraseña nueva.</p><a class="btn mar" href="https://regroupride-app.netlify.app">Abrir la app</a></div>'; party();
+        });
+      });
+    };
+  }
+
   /* ---------- quién hace ReGroupRide ---------- */
   function aboutView() {
     setBack(back('/'));
@@ -780,6 +799,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
   /* ---------- arranque ---------- */
   function start() {
     var id = eventId(), cm = comId(), mg = param('m');
+    if (RECOVER || LINKERR || /[?&]reset\b/.test(location.search) && /access_token|error/.test(location.hash)) { resetView(); return; }
     if (id) { eventView(id); return; }
     if (cm) { communityView(cm); return; }
     var dev = /[?&]dev\b/.test(location.search);
@@ -789,6 +809,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
     if (mg) { manageView(mg); return; }
     loadComs().then(function () { var ed = param('edit'), nw = /[?&]new=1/.test(location.search), c = com(); if ((ed || nw) && c && c.admin) editor(ed); else panel(); }, function (e) { app.innerHTML = '<p class="msg bad">' + esc(err(e)) + '</p>'; });
   }
+  sb.auth.onAuthStateChange(function (ev, session) { if (ev === 'PASSWORD_RECOVERY') { RECOVER = true; user = session ? session.user : user; head(); resetView(); } });
   sb.auth.getSession().then(function (r) { user = r.data && r.data.session ? r.data.session.user : null; head(); start(); }, function () { start(); });
 })();
 </script>

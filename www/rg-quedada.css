@@ -1071,3 +1071,16 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .rg-tour-act{display:flex;align-items:center;gap:8px;justify-content:flex-end}.rg-tour-act .link{margin-right:auto}
 
 .rg-photo-btn{display:flex;margin:-2px auto 14px}
+
+/* ===== 0.33 · ficha y buscador de comunidades ===== */
+.club-zone{display:flex;align-items:center;gap:4px;font-size:13px;font-weight:600;color:var(--marca,#7B5CF0)}
+.club-zone svg{width:14px;height:14px;flex:none}
+.club-head-act{display:flex;gap:8px;flex:none}
+.club-found{display:flex;flex-direction:column;margin-top:10px}
+.club-find{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--linea,rgba(127,127,127,.2))}
+.club-find>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.club-find p{margin:4px 0 0;font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.club-find .btn{flex:none}
+.rg-check{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:12px}
+.rg-check input{width:22px;height:22px;min-height:0;flex:none;margin-top:2px;accent-color:#7B5CF0}
+.rg-check small{display:block;font-weight:400;opacity:.75;margin-top:2px}

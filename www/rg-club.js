@@ -57,9 +57,9 @@
   /* ---------- carga ---------- */
   function load() {
     if (!S.user) { S.list = []; S.loaded = true; return Promise.resolve(); }
-    return sb.from('community_members').select('role, communities(id,name,description,join_code)').eq('user_id', S.user.id).then(function (r) {
+    return sb.from('community_members').select('role, communities(id,name,description,join_code,zone,ride_style,listed,join_mode)').eq('user_id', S.user.id).then(function (r) {
       if (r.error) { S.missing = /relation|schema cache|does not exist|not find/i.test(r.error.message || ''); if (!S.missing) throw r.error; S.list = []; }
-      else { S.missing = false; S.list = (r.data || []).filter(function (m) { return m.communities; }).map(function (m) { var c = m.communities; return { id: c.id, name: c.name, description: c.description, code: c.join_code, role: m.role }; }); }
+      else { S.missing = false; S.list = (r.data || []).filter(function (m) { return m.communities; }).map(function (m) { var c = m.communities; return { id: c.id, name: c.name, description: c.description, code: c.join_code, zone: c.zone || '', style: c.ride_style || '', listed: !!c.listed, mode: c.join_mode || 'code', role: m.role }; }); }
       S.loaded = true; if (!cur()) S.cid = null; else S.cid = cur().id;
       if (!r.error) { try { localStorage.setItem('rg.club.list:' + S.user.id, JSON.stringify(S.list)); } catch (e) {} }
       liveSync();
@@ -135,23 +135,68 @@
     if (S.missing) { box.innerHTML = '<div class="notice">Las comunidades aún no están activadas en el servidor. Falta ejecutar el archivo 02_comunidades.sql en Supabase.</div>'; return; }
     var c = cur();
     if (!c) { renderJoin(); return; }
-    box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button></div>' +
+    box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.zone || c.style ? '<span class="club-zone">' + icn('locate') + esc([c.zone, c.style].filter(Boolean).join(' · ')) + '</span>' : '') + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><div class="club-head-act">' + (isAdmin() ? '<button class="btn small" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '<button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button></div></div>' +
       '<div class="pills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button></div>' +
       '<div class="seg rg-wide" id="clTabs">' + [['events', 'Eventos'], ['board', 'Tablón'], ['pages', 'Info'], ['members', 'Miembros']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
     $('#clInvite').addEventListener('click', invite);
+    if ($('#clEdit')) $('#clEdit').addEventListener('click', function () { editCommunity(c); });
     $('#clOther').addEventListener('click', renderJoin);
     $$('[data-cid]', box).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); render(); }); });
     $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.t; render(); }); });
     ({ events: paneEvents, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
   }
   function renderJoin() {
-    box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Unirme a ' + (S.list.length ? 'otra' : 'una') + ' comunidad</b><p class="muted">Escribe el código que te ha pasado el organizador.</p><div class="plan-link"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="clJoin" type="button">Unirme</button></div></div>' +
+    box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Buscar comunidades</b><p class="muted">Encuentra grupos por nombre o por zona y únete.</p><div class="plan-link"><input type="search" id="clFind" maxlength="40" placeholder="Nombre, pueblo, provincia…" autocomplete="off"></div><div id="clFound" class="club-found"><p class="muted">Cargando…</p></div></div>' +
+      '<div class="club-card"><b>Tengo un código</b><p class="muted">Escribe el código que te ha pasado el organizador.</p><div class="plan-link"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="clJoin" type="button">Unirme</button></div></div>' +
       '<div class="club-card"><b>Crear una comunidad</b><p class="muted">Serás su administrador: podrás crear eventos, publicar avisos e invitar a la gente.</p><input type="text" id="clName" maxlength="60" placeholder="Nombre de la comunidad"><button class="btn" id="clCreate" type="button" style="margin-top:10px;width:100%">Crear comunidad</button></div>';
     if ($('#clBack')) $('#clBack').addEventListener('click', render);
+    var findT = 0; $('#clFind').addEventListener('input', function () { clearTimeout(findT); findT = setTimeout(findCommunities, 350); }); findCommunities();
     $('#clJoin').addEventListener('click', function (ev) { var code = $('#clCode').value.trim(); if (code.length < 4) { A.toast('Escribe el código.', 'warn'); return; }
       Cl.busy(ev.currentTarget, function () { return sb.rpc('join_community', { p_code: code }).then(function (r) { if (r.error) throw new Error(/no válido/i.test(r.error.message) ? 'Ese código no existe. Revísalo con el organizador.' : r.error.message); setCid(r.data); A.toast('¡Dentro!', 'ok'); return load().then(render); }); }); });
     $('#clCreate').addEventListener('click', function (ev) { var name = $('#clName').value.trim(); if (name.length < 2) { A.toast('Ponle un nombre.', 'warn'); return; }
       Cl.busy(ev.currentTarget, function () { return sb.rpc('create_community', { p_name: name, p_description: '' }).then(function (r) { setCid(ok(r)); A.toast('Comunidad creada. Invita a la gente con el código.', 'ok'); return load().then(render); }); }); });
+  }
+  /* ---------- buscador de comunidades y ficha (zona, estilo, cómo se entra) ---------- */
+  var MODES = { open: 'Cualquiera puede unirse', request: 'Hay que pedirlo y un administrador acepta', code: 'Solo con el código de invitación' };
+  function findCommunities() {
+    var inp = $('#clFind'), out = $('#clFound'); if (!inp || !out) return;
+    var q = inp.value.trim();
+    sb.rpc('community_search', { p_q: q }).then(function (r) {
+      if (!$('#clFound') || $('#clFind').value.trim() !== q) return;
+      var rows = ok(r);
+      out.innerHTML = rows.length ? rows.map(function (x) {
+        var btn = x.mine ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>Ya estás</span>' : x.requested ? '<span class="mstatus soon">Solicitud enviada</span>' :
+          x.join_mode === 'open' ? '<button class="btn small primary" data-j="' + x.id + '" type="button">Unirme</button>' : x.join_mode === 'request' ? '<button class="btn small primary" data-j="' + x.id + '" data-ask="1" type="button">Pedir unirme</button>' : '<span class="muted rg-small">Solo con código</span>';
+        return '<div class="club-find"><div><b>' + esc(x.name) + '</b><span class="club-zone">' + icn('locate') + esc([x.zone || 'Sin zona', x.style].filter(Boolean).join(' · ')) + '</span><span class="muted rg-small">' + x.members + (x.members === 1 ? ' miembro' : ' miembros') + (x.events_next ? ' · ' + x.events_next + (x.events_next === 1 ? ' evento próximo' : ' eventos próximos') : '') + '</span>' + (x.description ? '<p>' + esc(x.description) + '</p>' : '') + '</div>' + btn + '</div>';
+      }).join('') : '<p class="muted">' + (q ? 'No hay ninguna comunidad con «' + esc(q) + '».' : 'Todavía no hay comunidades en el buscador.') + ' Si la tuya no sale, pídele el código a su organizador.</p>';
+      $$('[data-j]', out).forEach(function (b) { b.addEventListener('click', function () {
+        Cl.busy(b, function () { return sb.rpc('community_ask', { p_id: b.dataset.j, p_message: '' }).then(function (r2) {
+          var res = ok(r2);
+          if (res === 'joined') { setCid(b.dataset.j); A.toast('¡Dentro!', 'ok'); return load().then(render); }
+          A.toast('Solicitud enviada. Te aviso cuando un administrador la acepte.', 'ok'); findCommunities();
+        }); });
+      }); });
+    }).catch(function (e) { if ($('#clFound')) $('#clFound').innerHTML = '<p class="muted">' + esc(Cl.msg(e)) + '</p>'; });
+  }
+  function editCommunity(c) {
+    Cl.sheet('<div class="head"><h1>Editar comunidad</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      '<form class="rg-form" id="ceForm"><label>Nombre<input id="ceName" required minlength="2" maxlength="60" value="' + esc(c.name) + '"></label>' +
+      '<label>Descripción<textarea id="ceDesc" class="note" maxlength="600" placeholder="Quiénes sois, cuándo soléis salir, qué tipo de rutas hacéis…">' + esc(c.description || '') + '</textarea></label>' +
+      '<label>Zona<input id="ceZone" maxlength="60" placeholder="Marina Alta, Alicante" value="' + esc(c.zone) + '"></label>' +
+      '<label>Estilo o tipo de motos<input id="ceStyle" maxlength="60" placeholder="Curvas tranquilas, naked y sport, trail…" value="' + esc(c.style) + '"></label>' +
+      '<label class="rg-check"><input type="checkbox" id="ceListed"' + (c.listed ? ' checked' : '') + '><span><b>Aparecer en el buscador de comunidades</b><small>Cualquiera con la app podrá encontraros por nombre o zona. Solo se ve esta ficha: el tablón, los eventos y los miembros siguen siendo solo para quien esté dentro.</small></span></label>' +
+      '<label>Cómo se entra desde el buscador<select id="ceMode">' + Object.keys(MODES).map(function (k) { return '<option value="' + k + '"' + (c.mode === k ? ' selected' : '') + '>' + MODES[k] + '</option>'; }).join('') + '</select></label>' +
+      '<button class="btn big primary" type="submit">Guardar</button></form>');
+    $('#clX').addEventListener('click', Cl.closeSheet);
+    $('#ceForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
+        return sb.from('communities').update({ name: $('#ceName').value.trim(), description: $('#ceDesc').value.trim(), zone: $('#ceZone').value.trim(), ride_style: $('#ceStyle').value.trim(), listed: $('#ceListed').checked, join_mode: $('#ceMode').value }).eq('id', c.id).select('id').then(function (r) {
+          if (!ok(r).length) throw new Error('No se ha guardado: no eres administrador de esta comunidad.');
+          Cl.closeSheet(); A.toast('Comunidad guardada.', 'ok'); listAt = 0; return load().then(render);
+        });
+      });
+    });
   }
   function invite() {
     var c = cur(), text = 'Únete a «' + c.name + '» en ReGroupRide. En la app, entra en Comunidad y escribe el código ' + c.code + '.';
@@ -695,7 +740,7 @@
         var ms = ok(r); return names(ms.map(function (m) { return m.user_id; })).then(function () { return ms; }); });
     }, function (ms) { (function () {
         var pane = $('#clPane'); if (!pane || S.tab !== 'members' || !cur() || cur().id !== c.id) return;
-        pane.innerHTML = '<span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span><div class="club-card club-people">' + ms.map(function (m) {
+        pane.innerHTML = '<div id="clReqs"></div><span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span><div class="club-card club-people">' + ms.map(function (m) {
           var me = m.user_id === S.user.id;
           return '<div class="club-person" data-u="' + m.user_id + '">' + ava(m.user_id, m.role === 'admin' ? 'rol-admin' : 'rol-comp') + '<div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
             (isAdmin() && !me ? '<span class="rg-macts"><button class="link" data-act="role" type="button">' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</button><button class="link danger" data-act="kick" type="button">Expulsar</button></span>' : '') + '</div>';
@@ -705,6 +750,19 @@
           if (b.dataset.act === 'role') sb.from('community_members').update({ role: m.role === 'admin' ? 'member' : 'admin' }).eq('community_id', c.id).eq('user_id', uid).then(function (r) { ok(r); return paneMembers(c); }).catch(fail);
           else armed(b, '¿Seguro?', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', uid).then(function (r) { ok(r); return paneMembers(c); }).catch(fail); });
         }); });
+        if (isAdmin()) sb.from('community_join_requests').select('user_id,message,created_at').eq('community_id', c.id).eq('status', 'pending').order('created_at').then(function (r) {
+          var rq = r.data || [], host = $('#clReqs'); if (!host || !rq.length) return;
+          names(rq.map(function (x) { return x.user_id; })).catch(function () {}).then(function () {
+            if (!$('#clReqs')) return;
+            host.innerHTML = '<span class="label">Quieren unirse (' + rq.length + ')</span><div class="club-card club-people">' + rq.map(function (x) {
+              return '<div class="club-person" data-u="' + x.user_id + '">' + ava(x.user_id) + '<div><b>' + esc(who(x.user_id)) + '</b><span class="muted">' + esc(x.message || bike(x.user_id)) + '</span></div><span class="rg-macts"><button class="btn small primary" data-rq="1" type="button">Aceptar</button><button class="link danger" data-rq="0" type="button">Rechazar</button></span></div>';
+            }).join('') + '</div>';
+            $$('[data-rq]', host).forEach(function (b) { b.addEventListener('click', function () {
+              b.disabled = true;
+              sb.rpc('community_request_answer', { p_id: c.id, p_user: b.closest('.club-person').dataset.u, p_ok: b.dataset.rq === '1' }).then(function (r2) { ok(r2); A.toast(b.dataset.rq === '1' ? 'Aceptado: ya está dentro.' : 'Solicitud rechazada.', 'ok'); return paneMembers(c); }).catch(fail);
+            }); });
+          });
+        }, function () {});
         $('#clLeave').addEventListener('click', function (ev) {
           if (isAdmin() && ms.filter(function (x) { return x.role === 'admin'; }).length === 1 && ms.length > 1) { A.toast('Eres el único administrador: nombra a otro antes de salir.', 'warn'); return; }
           armed(ev.currentTarget, '¿Seguro? Toca otra vez para salir', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; listAt = 0; return load().then(render); }).catch(fail); });
