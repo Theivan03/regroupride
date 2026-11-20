@@ -206,7 +206,7 @@
             f('Título de la etapa', ['days', i, 'title'], 'maxlength="100" placeholder="Teulada → Cuenca"') +
             '<div class="tr-two">' + f('Hora de salida', ['days', i, 'start'], 'type="time"') + f('Kilómetros', ['days', i, 'km'], 'type="number" min="0" max="2000" inputmode="numeric"') + '</div>' +
             f('Sale de', ['days', i, 'from'], 'maxlength="100" placeholder="Hotel, gasolinera…"') +
-            '<label>Ruta de este día (la que seguirá el grupo)<select data-rt="' + d.id + '"><option value="">Sin ruta</option>' + (d.route_name ? '<option value="keep" selected>' + esc((NEW[d.id] && NEW[d.id].name ? 'Nueva: ' : 'Mantener: ') + d.route_name) + '</option>' : '') + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
+            '<label>Ruta de este día (la que seguirá el grupo)<select data-rt="' + d.id + '"><option value="">Sin ruta</option>' + (d.route_name ? '<option value="keep" selected>' + esc((NEW[d.id] && NEW[d.id].name ? 'Elegida: ' : 'Mantener: ') + d.route_name) + '</option>' : '') + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
             '<div class="tr-gpx"><button class="btn small" data-gpx="' + d.id + '" type="button"><svg><use href="#i-download"/></svg>Importar GPX para este día</button><input type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden></div>' +
             f('Enlace de la ruta en Maps (opcional, para la web)', ['days', i, 'route_url'], 'type="url" maxlength="600" placeholder="https://…"') +
             '<span class="label">Paradas</span>' + d.stops.map(function (p, k) { return '<div class="tr-stop-ed"><div class="tr-two"><input data-p="days.' + i + '.stops.' + k + '.name" maxlength="80" placeholder="Parada (almuerzo, mirador…)" value="' + esc(p.name || '') + '"><input data-p="days.' + i + '.stops.' + k + '.time" type="time" value="' + esc(p.time || '') + '" aria-label="Hora"></div><div class="tr-two"><input data-p="days.' + i + '.stops.' + k + '.url" type="url" maxlength="400" placeholder="Enlace de Maps (opcional)" value="' + esc(p.url || '') + '"><button class="link danger" data-rm="days.' + i + '.stops.' + k + '" type="button">Quitar</button></div></div>'; }).join('') +
@@ -236,7 +236,12 @@
           var file = inp.files && inp.files[0]; if (!file) return; if (!window.RGNav || !RGNav.gpxRoute) { A.toast('No se puede importar aquí.', 'bad'); return; }
           sync(); var d = D.days.filter(function (x) { return x.id === b.dataset.gpx; })[0], rd = new FileReader();
           b.disabled = true; b.textContent = 'Leyendo el GPX…';
-          rd.onload = function () { RGNav.gpxRoute(String(rd.result || ''), file.name).then(function (r) { setRoute(d, r); A.toast('Ruta del día cargada: ' + String(r.dist).replace('.', ',') + ' km.', 'ok'); repaint(); }).catch(function (e) { A.toast(e.message || 'No se pudo importar.', 'bad'); repaint(); }); };
+          rd.onload = function () { RGNav.gpxRoute(String(rd.result || ''), file.name).then(function (r) {
+              setRoute(d, r);
+              // también se guarda en «mis rutas», para poder elegirla en otro día o en otro viaje
+              var saved = A.savePlan ? A.savePlan({ id: Date.now(), name: r.name, wps: r.wps, pois: r.pois || [], coords: r.coords, dist: r.dist, dur: r.dur, routed: true, steps: r.steps || [], created: Date.now(), gpx: true }) : Promise.resolve();
+              return Promise.resolve(saved).catch(function () {}).then(function () { plans = A.plans ? A.plans() : plans; A.toast('Ruta importada (' + String(r.dist).replace('.', ',') + ' km), puesta en este día y guardada en tus rutas.', 'ok'); repaint(); });
+            }).catch(function (e) { A.toast(e.message || 'No se pudo importar.', 'bad'); repaint(); }); };
           rd.onerror = function () { A.toast('No se pudo leer el archivo.', 'bad'); repaint(); };
           rd.readAsText(file);
         });

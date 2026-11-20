@@ -278,7 +278,15 @@
   function gpxRoute(text, fname) {
     var g; try { g = L.gpxToPlan(text); } catch (e) { return Promise.reject(new Error('No se pudo leer el GPX: ' + e.message)); }
     if (!g.name) g.name = String(fname || '').replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' ').trim() || 'Ruta GPX';
-    if (g.route) return Promise.reject(new Error('Ese archivo solo trae puntos sueltos, sin trazado. Impórtalo desde Rutas, guarda la ruta y elígela aquí.'));
+    if (g.route) {     // solo puntos sueltos: se calcula la carretera entre ellos, como hace el planificador
+      var pts = g.wps.slice(); if (pts.length > 25) { var keep = []; for (var k = 0; k < 25; k++) keep.push(pts[Math.round(k * (pts.length - 1) / 24)]); pts = keep; }
+      if (pts.length < 2) return Promise.reject(new Error('El archivo no trae ninguna ruta.'));
+      return A.routeBetween(pts.map(function (w) { return [w[0], w[1]]; })).then(function (r) {
+        if (!r || !r.coords || r.coords.length < 2) throw new Error('No se ha podido calcular la ruta entre los puntos del archivo.');
+        if (!r.routed) throw new Error('El archivo solo trae puntos sueltos y hace falta conexión para calcular la carretera entre ellos. Prueba de nuevo con cobertura.');
+        return { name: g.name.slice(0, 60), wps: pts, pois: g.pois || [], coords: r.coords, steps: r.steps || [], dist: Math.round(r.dist * 10) / 10, dur: Math.round(r.dur) };
+      });
+    }
     var simp = Geo.simplify(g.coords.map(function (c) { return [0, c[1], c[0]]; }), 8).map(function (p) { return [p[2], p[1]]; });
     var line = L.makeLine(simp), km = Math.round(line.total / 100) / 10;
     var route = { name: g.name.slice(0, 60), wps: g.wps, pois: g.pois || [], coords: simp, steps: [], dist: km, dur: Math.round(line.total / 15) };
