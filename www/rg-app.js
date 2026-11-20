@@ -512,6 +512,8 @@
   function busy(btn, f) { var old = btn.innerHTML; btn.disabled = true; btn.textContent = 'Un momento…'; return Promise.resolve().then(f).catch(function (e) { A.toast(msg(e), 'bad'); }).then(function () { btn.disabled = false; btn.innerHTML = old; }); }
   var LOGO = '<div class="rg-logo"><img class="rg-sym" src="simbolo.svg" alt=""><b>ReGroup<i>Ride</i></b></div>';
 
+  // La cuenta es obligatoria: sin sesión, la pantalla de entrada no se puede cerrar. (Las pruebas automáticas siguen pudiendo entrar sin cuenta.)
+  var MUST = !navigator.webdriver; try { if (localStorage.getItem('rg.test.wall')) MUST = true; } catch (e) {}
   function openAuth(first, mode0) {
     var mode = mode0 || (first ? 'signup' : 'login');
     function draw() {
@@ -525,10 +527,10 @@
         '<label>Contraseña<input id="rgPass" type="password" required minlength="6" autocomplete="' + (mode === 'login' ? 'current-password' : 'new-password') + '"></label>' +
         '<button class="btn big primary" type="submit">' + (mode === 'login' ? 'Entrar' : 'Crear cuenta') + '</button></form>' +
         (mode === 'login' ? '<button class="link rg-center" id="rgForgot" type="button">He olvidado la contraseña</button>' : '<p class="muted rg-small">El teléfono solo lo ven los administradores de tus rutas y quien pida ayuda. Necesitas tener al menos 16 años.</p>') +
-        '<button class="btn rg-skip" id="rgSkip" type="button">' + (first ? 'Ahora no' : 'Cerrar') + '</button>' +
-        (first ? '<p class="muted rg-small">Sin cuenta puedes usar el mapa y grabar rutas, pero se quedan solo en este móvil. Con cuenta se guardan en ella y puedes rodar en grupo.</p>' : ''));
+        (MUST ? '<p class="muted rg-small rg-center">Para usar ReGroupRide necesitas una cuenta. Es gratis y se crea en un minuto.</p>' :
+          '<button class="btn rg-skip" id="rgSkip" type="button">' + (first ? 'Ahora no' : 'Cerrar') + '</button>'));
       s.querySelectorAll('#rgMode button').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.m === mode) return; mode = b.dataset.m; draw(); }); });
-      $('#rgSkip').addEventListener('click', function () { try { localStorage.removeItem('rg.wall'); } catch (e) {} closeSheet(); });
+      if ($('#rgSkip')) $('#rgSkip').addEventListener('click', function () { try { localStorage.removeItem('rg.wall'); } catch (e) {} closeSheet(); });
       $('#rgAuth').addEventListener('submit', function (ev) {
         ev.preventDefault();
         var email = $('#rgEmail').value.trim(), pass = $('#rgPass').value, name = mode === 'signup' ? $('#rgName').value.trim() : '', lvl = mode === 'signup' ? +$('#rgLevel').value : 0, tel = mode === 'signup' ? $('#rgTel').value.trim() : '';
@@ -849,9 +851,9 @@
     var seen = false; try { seen = localStorage.getItem('rg.welcomed') === '1'; localStorage.setItem('rg.welcomed', '1'); } catch (e) {}
     var wall = false; try { wall = !!localStorage.getItem('rg.wall'); } catch (e) {}
     if (user) { try { localStorage.removeItem('rg.wall'); } catch (e) {} }
-    else if (sb && (!seen || wall)) openAuth(true, wall ? 'login' : 'signup');      // primera vez, o se acaba de cerrar sesión
+    else if (sb && (MUST || !seen || wall)) openAuth(true, (wall || seen) ? 'login' : 'signup');      // primera vez, o se acaba de cerrar sesión
   });
-  if (sb) sb.auth.onAuthStateChange(function (ev, session) { var had = !!user; user = (session && session.user) || null; if (had !== !!user) renderAccount(); });
+  if (sb) sb.auth.onAuthStateChange(function (ev, session) { var had = !!user; user = (session && session.user) || null; if (had !== !!user) renderAccount(); if (MUST && had && !user && $('#rgSheet').hidden) openAuth(true, 'login'); });
   sync();
   window.RGCloud = { sb: sb, cfg: { url: SB_URL, key: SB_KEY }, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profile: function () { return profile; }, openRider: openRider, saveName: saveName, signOut: signOut, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
     onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, sheetBack: sheetBack, ridePhone: function () { return ridePhone; },

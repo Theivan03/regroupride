@@ -971,3 +971,40 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .ev-chat-form{display:flex;gap:8px;align-items:center;margin-top:10px}
 .ev-chat-form input{flex:1;min-width:0}
 .ev-chat-form .btn{flex:none}
+
+/* fotos reales en la entrada partida */
+.rg-split{height:min(46vh,340px);background:#fff}
+.rg-split .ph{position:absolute;inset:0;background-size:cover;background-position:50% 50%;transition:transform .6s cubic-bezier(.2,.9,.3,1)}
+.rg-split button[data-m=login] .ph{background-size:135% auto;background-position:92% 46%}
+.rg-split button[data-m=signup] .ph{background-size:150% auto;background-position:12% 62%}
+.rg-split .ph::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,12,25,.72) 0,rgba(15,12,25,.12) 42%,rgba(15,12,25,.35) 100%)}
+.rg-split button[data-m=login] .ph::after{background:linear-gradient(180deg,rgba(59,26,133,.85) 0,rgba(59,26,133,.1) 45%,rgba(15,12,25,.4) 100%)}
+.rg-split button[aria-pressed=true] .ph{transform:scale(1.04)}
+.rg-split:not(.nophoto) .art{display:none}
+.rg-split:not(.nophoto) button,.rg-split:not(.nophoto) button[data-m=signup]{color:#fff}
+.rg-split:not(.nophoto) .tx{text-shadow:0 1px 10px rgba(0,0,0,.55)}
+.rg-split:not(.nophoto) button[data-m=signup] .tx b{color:#D9F21C}
+.rg-split.nophoto .ph{display:none}
+.rg-split button[data-m=login]{clip-path:polygon(0 0,57.4% 0,37.4% 100%,0 100%)}
+.rg-split[data-on=login] button[data-m=login]{clip-path:polygon(0 0,71.4% 0,51.4% 100%,0 100%)}
+.rg-split[data-on=signup] button[data-m=login]{clip-path:polygon(0 0,45.4% 0,25.4% 100%,0 100%)}
+.rg-split button[aria-pressed=false]{filter:saturate(.6) brightness(.62)}
+
+/* ===== 0.30 · barra del chat y campana de avisos ===== */
+.ev-chat-form{display:flex;gap:6px;align-items:center;margin-top:12px;padding:5px 5px 5px 16px;border-radius:28px;background:var(--superficie-2,var(--color-surface));border:1.5px solid var(--linea,rgba(127,127,127,.25));transition:border-color .2s,box-shadow .2s}
+.ev-chat-form:focus-within{border-color:var(--marca,#7B5CF0);box-shadow:0 0 0 4px color-mix(in srgb,var(--marca,#7B5CF0) 18%,transparent)}
+.ev-chat-form input,.ev-chat-form input:focus{flex:1;min-width:0;min-height:44px;height:44px;border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;padding:0!important;margin:0;font:inherit;font-size:16px;color:inherit;border-radius:0}
+.ev-chat-form .ch-send{flex:none;width:44px;height:44px;min-height:44px;border-radius:50%;border:0;padding:0;display:grid;place-items:center;cursor:pointer;background:var(--accion,#D9F21C);color:var(--sobre-accion,#14150F);transition:transform .18s cubic-bezier(.2,1.4,.3,1),opacity .2s}
+.ev-chat-form .ch-send:active{transform:scale(.88)}
+.ev-chat-form .ch-send[disabled]{opacity:.45}
+.ev-chat-form .ch-send svg{width:20px;height:20px;display:block}
+.ev-chat-row{display:flex;gap:8px;align-items:stretch}
+.ev-chat-row .ev-chat-btn{flex:1;width:auto}
+.ev-bell{flex:none;width:48px;min-height:44px;border-radius:14px;border:1.5px solid var(--linea,rgba(127,127,127,.25));background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer;padding:0}
+.ev-bell svg{width:22px;height:22px}
+.ev-bell[aria-pressed=true]{background:color-mix(in srgb,var(--marca,#7B5CF0) 16%,transparent);border-color:var(--marca,#7B5CF0);color:var(--marca,#7B5CF0)}
+.ev-bell[aria-pressed=false]{opacity:.6}
+.ev-bell[aria-pressed=false]::after{content:"";position:absolute;width:26px;height:2px;background:currentColor;transform:rotate(-45deg);border-radius:2px}
+.ev-bell{position:relative}
+.ch-mute{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:14px;background:var(--superficie-2,var(--color-surface));font-size:14px}
+.ch-mute .ev-bell{width:44px}

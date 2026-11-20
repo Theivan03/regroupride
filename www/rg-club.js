@@ -294,7 +294,7 @@
         (st === 'offered' ? mineHtml + countHtml : countHtml + mineHtml) +
         (startBtn ? '<button class="btn big primary ev-start" data-act="start" type="button">' + ic('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
         ((iGo || st === 'offered') && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
-        (iGo || st === 'waiting' || st === 'offered' || canRun ? '<button class="btn small ev-chat-btn" data-act="chat" type="button">' + ic('people') + 'Chat de los que van</button>' : '') +
+        (iGo || st === 'waiting' || st === 'offered' || canRun ? '<div class="ev-chat-row"><button class="btn small ev-chat-btn" data-act="chat" type="button">' + ic('people') + 'Chat de los que van</button>' + bellHtml(e.id) + '</div>' : '') +
         (canRun ? '<button class="btn small" data-act="manage" type="button">' + ic('people') + 'Inscritos y llegada</button>' : '') +
         (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
@@ -318,7 +318,7 @@
         else if (act === 'luma') openUrl(e.luma_url); else if (act === 'rurl') openUrl(e.route_url); else if (act === 'route') loadRoute(e);
         else if (act === 'meet') openUrl(meetOf(e).url); else if (act === 'gomeet') goMeet(e, b);
         else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
-        else if (act === 'chat') chatSheet(e); else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') manageSheet(e);
+        else if (act === 'bell') toggleMute(e.id); else if (act === 'chat') chatSheet(e); else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') manageSheet(e);
         else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
       }); });
     });
@@ -496,13 +496,29 @@
     }, function () { if (!last) say('No hay permiso para usar la cámara. Dáselo a la app en los ajustes del móvil, o escribe el código.', 'bad'); });
   }
   /* ---------- chat del evento: solo quienes van (apuntados, lista de espera) y los administradores ---------- */
+  // Avisos del chat: cada uno los quita o los pone por evento (la campana de la tarjeta y la del propio chat).
+  var MUTES = null, BELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7 2.5 7h-17S6 15 6 9"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>';
+  function muted(id) { return !!(MUTES && MUTES[id]); }
+  function bellHtml(id) { var on = !muted(id); return '<button class="ev-bell" data-act="bell" data-bell="' + id + '" type="button" aria-pressed="' + on + '" aria-label="Avisos del chat" title="' + (on ? 'Avisos del chat activados' : 'Avisos del chat silenciados') + '">' + BELL + '</button>'; }
+  function paintBells() { $$('[data-bell]').forEach(function (b) { var on = !muted(b.dataset.bell); b.setAttribute('aria-pressed', String(on)); b.title = on ? 'Avisos del chat activados' : 'Avisos del chat silenciados'; }); var t = $('#chMuteTx'); if (t) t.textContent = muted(t.dataset.ev) ? 'Avisos de este chat: silenciados' : 'Avisos de este chat: activados'; }
+  function loadMutes() { if (!S.user) return; sb.from('event_chat_mutes').select('event_id').eq('user_id', S.user.id).then(function (r) { if (r.error) return; MUTES = {}; (r.data || []).forEach(function (x) { MUTES[x.event_id] = 1; }); paintBells(); }, function () {}); }
+  function toggleMute(id) {
+    MUTES = MUTES || {}; var was = muted(id);
+    if (was) delete MUTES[id]; else MUTES[id] = 1; paintBells();
+    (was ? sb.from('event_chat_mutes').delete().eq('event_id', id).eq('user_id', S.user.id) : sb.from('event_chat_mutes').upsert({ event_id: id, user_id: S.user.id }))
+      .then(function (r) { ok(r); A.toast(was ? 'Te avisaré de los mensajes de este chat.' : 'Chat silenciado: no te llegarán avisos de este evento.', 'ok'); })
+      .catch(function (er) { if (was) MUTES[id] = 1; else delete MUTES[id]; paintBells(); fail(er); });
+  }
+  setTimeout(loadMutes, 2500); setInterval(function () { if (MUTES === null) loadMutes(); }, 6000);
   var chatT = 0;
   function chatSheet(e) {
     clearInterval(chatT);
     Cl.sheet('<div class="head"><h1>Chat del evento</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
       '<p class="muted" style="text-align:left;margin:0">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + '. Solo lo ven quienes van y los administradores.</p>' +
       '<div class="ev-chat" id="chList"><p class="muted">Cargando…</p></div>' +
-      '<form class="ev-chat-form" id="chForm"><input id="chIn" maxlength="1000" autocomplete="off" enterkeyhint="send" placeholder="Escribe un mensaje" aria-label="Mensaje"><button class="btn primary" type="submit">Enviar</button></form>');
+      '<form class="ev-chat-form" id="chForm"><input id="chIn" maxlength="1000" autocomplete="off" enterkeyhint="send" placeholder="Escribe un mensaje…" aria-label="Mensaje"><button class="ch-send" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></form>' +
+      '<div class="ch-mute"><span id="chMuteTx" data-ev="' + e.id + '"></span>' + bellHtml(e.id).replace(' data-act="bell"', '') + '</div>');
+    $('#rgSheet [data-bell]').addEventListener('click', function () { toggleMute(e.id); }); paintBells(); if (MUTES === null) loadMutes();
     $('#clX').addEventListener('click', function () { clearInterval(chatT); Cl.closeSheet(); });
     var last = -1;
     function load(force) {

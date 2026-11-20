@@ -198,7 +198,25 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
 .rg-split button[aria-pressed=true] .art svg{animation:rgArtIn .6s cubic-bezier(.2,1.4,.3,1) both}
 @keyframes rgArtIn{from{transform:translateX(-26px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.rg-split button,.rg-split .art,.rg-split .art svg{transition:none;animation:none}}
-.auth .rg-split{margin:0 0 18px}.maker .ban{display:block;width:100%;border-radius:16px;aspect-ratio:3/2;object-fit:cover;margin:0 0 14px}
+
+/* fotos reales en la entrada partida */
+.rg-split{height:min(46vh,340px);background:#fff}
+.rg-split .ph{position:absolute;inset:0;background-size:cover;background-position:50% 50%;transition:transform .6s cubic-bezier(.2,.9,.3,1)}
+.rg-split button[data-m=login] .ph{background-size:135% auto;background-position:92% 46%}
+.rg-split button[data-m=signup] .ph{background-size:150% auto;background-position:12% 62%}
+.rg-split .ph::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,12,25,.72) 0,rgba(15,12,25,.12) 42%,rgba(15,12,25,.35) 100%)}
+.rg-split button[data-m=login] .ph::after{background:linear-gradient(180deg,rgba(59,26,133,.85) 0,rgba(59,26,133,.1) 45%,rgba(15,12,25,.4) 100%)}
+.rg-split button[aria-pressed=true] .ph{transform:scale(1.04)}
+.rg-split:not(.nophoto) .art{display:none}
+.rg-split:not(.nophoto) button,.rg-split:not(.nophoto) button[data-m=signup]{color:#fff}
+.rg-split:not(.nophoto) .tx{text-shadow:0 1px 10px rgba(0,0,0,.55)}
+.rg-split:not(.nophoto) button[data-m=signup] .tx b{color:#D9F21C}
+.rg-split.nophoto .ph{display:none}
+.rg-split button[data-m=login]{clip-path:polygon(0 0,57.4% 0,37.4% 100%,0 100%)}
+.rg-split[data-on=login] button[data-m=login]{clip-path:polygon(0 0,71.4% 0,51.4% 100%,0 100%)}
+.rg-split[data-on=signup] button[data-m=login]{clip-path:polygon(0 0,45.4% 0,25.4% 100%,0 100%)}
+.rg-split button[aria-pressed=false]{filter:saturate(.6) brightness(.62)}
+.auth .rg-split{margin:0 0 18px;height:260px}.maker .ban{display:block;width:100%;border-radius:16px;aspect-ratio:3/2;object-fit:cover;margin:0 0 14px}
 </style>
 </head>
 <body>

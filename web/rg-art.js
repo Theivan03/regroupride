@@ -18,9 +18,13 @@
     '<circle cx="32" cy="34" r="11" fill="currentColor"/>' +
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M32 52 V88" stroke-width="14"/><path d="M32 88 L24 124 M32 88 L42 124" stroke-width="8"/><path d="M34 56 L58 44" stroke-width="7"/></g>' +
     '<g class="a2s" fill="none" stroke-width="4" stroke-linecap="round"><circle cx="66" cy="38" r="6"/><path d="M72 38 H88 M82 38 v6 M87 38 v5"/></g></svg>';
+  // Fotos de Unsplash (licencia libre): Jusdevoyage (dos motos en curva) y Tim Cook (motero junto a su moto).
+  var U = 'https://images.unsplash.com/photo-', Q = '?auto=format&fit=crop&w=900&q=70';
+  var PHOTO = { login: U + '1590506978404-d3e577192a18' + Q, signup: U + '1464876008302-fda7c9655196' + Q }, fail = false;
+  ['login', 'signup'].forEach(function (k) { var im = new Image(); im.onerror = function () { fail = true; var el = document.getElementById('rgMode'); if (el) el.classList.add('nophoto'); }; im.src = PHOTO[k]; });
   function split(mode) {
-    var b = function (m, art, t, s) { return '<button type="button" data-m="' + m + '" aria-pressed="' + (mode === m) + '"><span class="art">' + art + '</span><span class="tx"><b>' + t + '</b><small>' + s + '</small></span></button>'; };
-    return '<div class="rg-split" id="rgMode" data-on="' + mode + '">' + b('login', LOGIN, 'Entrar', 'Ya tengo cuenta') + b('signup', SIGNUP, 'Crear cuenta', 'Soy nuevo') + '<i></i></div>';
+    var b = function (m, art, t, s) { return '<button type="button" data-m="' + m + '" aria-pressed="' + (mode === m) + '"><span class="ph" style="background-image:url(' + PHOTO[m] + ')"></span><span class="art">' + art + '</span><span class="tx"><b>' + t + '</b><small>' + s + '</small></span></button>'; };
+    return '<div class="rg-split' + (fail ? ' nophoto' : '') + '" id="rgMode" data-on="' + mode + '">' + b('login', LOGIN, 'Entrar', 'Ya tengo cuenta') + b('signup', SIGNUP, 'Crear cuenta', 'Soy nuevo') + '<i></i></div>';
   }
   window.RGArt = { login: LOGIN, signup: SIGNUP, split: split };
 })();
