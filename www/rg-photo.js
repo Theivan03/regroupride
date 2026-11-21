@@ -33,6 +33,19 @@
     sb.rpc('photo_list', { p_lat: f ? f.lat : null, p_lon: f ? f.lon : null }).then(function (r) { D = ok(r); draw(); })
       .catch(function (e) { Cl.sheet(head('Fotógrafos') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>'); $('#phX').addEventListener('click', Cl.closeSheet); });
   }
+  // La primera vez que se entra: un bocadillo, como los del tutorial, con el aviso de prudencia.
+  function safeBubble() {
+    if (store('rg.photo.safe') === '1' || document.querySelector('.rg-tour')) return;
+    var el = document.createElement('div'); el.className = 'rg-tour';
+    el.innerHTML = '<div class="rg-tour-hole" style="left:50%;top:50%;width:0;height:0;opacity:1"></div><div class="rg-tour-bub" data-arrow="none"><span class="rg-tour-n">Antes de nada</span><b>La foto no vale un susto</b>' +
+      '<p>Cuando veas que hay un fotógrafo cerca, pasa a tu ritmo y por tu carril. No fuerces la inclinación ni la velocidad para salir mejor.</p><p>Un accidente lo paga quien se cae, pero también los compañeros que vienen detrás, el fotógrafo y la gente que rueda por ahí. La mejor foto es la que te llevas a casa.</p>' +
+      '<div class="rg-tour-act"><button class="btn small primary" type="button">Entendido, con cabeza</button></div></div>';
+    document.body.appendChild(el);
+    var bub = el.querySelector('.rg-tour-bub'), w = Math.min(340, window.innerWidth - 24);
+    bub.style.width = w + 'px'; bub.style.left = (window.innerWidth - w) / 2 + 'px'; bub.style.top = Math.max(12, (window.innerHeight - bub.offsetHeight) / 2) + 'px';
+    setTimeout(function () { bub.classList.add('in'); }, 60);
+    el.querySelector('button').addEventListener('click', function () { store('rg.photo.safe', '1'); el.classList.add('out'); setTimeout(function () { el.remove(); }, 260); });
+  }
   function draw() {
     var m = D.me, pend = (D.pending || []).filter(function (x) { return x.status === 'pending'; });
     var tabs = [['spots', 'Dónde están'], ['people', 'Todos'], ['mine', m && m.status === 'approved' ? 'Mi ficha' : 'Soy fotógrafo']];
@@ -43,10 +56,12 @@
     $$('#phTabs button').forEach(function (b) { b.addEventListener('click', function () { tab = b.dataset.t; draw(); }); });
     if (tab === 'admin' && !D.admin) tab = 'spots';
     ({ spots: paneSpots, people: panePeople, mine: paneMine, admin: paneAdmin })[tab]();
+    setTimeout(safeBubble, 350);
   }
   function paneSpots() {
     var host = $('#phPane'), day = '';
-    host.innerHTML = D.spots.length ? D.spots.map(function (s) {
+    var SAFE = '<div class="rt-note warn ph-safe"><b><svg><use href="#i-warn"/></svg>Sin forzar para la foto</b><p>Pasa a tu ritmo y por tu carril. Una foto no vale un susto, ni para ti ni para los que vienen detrás.</p></div>';
+    host.innerHTML = D.spots.length ? SAFE + D.spots.map(function (s) {
       var d = dayName(s.starts_at), sep = d !== day ? '<span class="label">' + d + '</span>' : ''; day = d;
       var live = s.starts_at <= Date.now() && s.ends_at > Date.now();
       return sep + '<div class="club-card ph-card"><div class="ph-top">' + pic(s, '📸') + '<div><b>' + esc(s.name) + '</b><span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(s.place) + '</span></div>' + (live ? '<span class="mstatus ok">Ahora</span>' : '') + '</div>' +
@@ -157,8 +172,8 @@
     if (Date.now() - nearAt < 4 * 60000) return; nearAt = Date.now();
     sb.rpc('photo_near', { p_lat: f.lat, p_lon: f.lon }).then(function (r) {
       (r.data || []).forEach(function (s) {
-        var headTx = '📸 ' + s.name + ' está a ' + s.km + ' km', body = s.place + ', de ' + s.from + ' a ' + s.to + '. Pásate y llévate tus fotos.';
-        A.toast(headTx + ' · ' + s.place, 'ok');
+        var headTx = '📸 ' + s.name + ' está a ' + s.km + ' km', body = s.place + ', de ' + s.from + ' a ' + s.to + '. Pasa a tu ritmo, sin forzar para la foto: la mejor es la que te llevas a casa.';
+        A.toast(headTx + ' · ' + s.place + '. Sin forzar para la foto.', 'ok');
         if (RA && RA.newsNow) RA.newsNow({ items: [{ kind: 'note', id: 'phn-' + s.id, community: 'Fotógrafos', head: headTx, title: body }], silent: false }).catch(function () {});
       });
     }, function () {});

@@ -1184,3 +1184,5 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .rt-note.warn{background:color-mix(in srgb,#e08a00 16%,transparent);border-left:4px solid #e08a00}.rt-note.warn b{color:#b06c00}
 .rt-note.tip{background:color-mix(in srgb,#2e9e5b 14%,transparent);border-left:4px solid #2e9e5b}.rt-note.tip b{color:#23804a}
 .ph-ico{overflow:hidden}.ph-ico img{width:100%;height:100%;object-fit:cover;display:block}
+
+.ph-safe{margin-bottom:2px}
