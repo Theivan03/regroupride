@@ -3,24 +3,18 @@
   'use strict';
   var A = window.RGApp, Cl = window.RGCloud; if (!A) return;
   function limit() { var v = (A.vehicles ? A.vehicles() : []).filter(function (x) { return x.principal && x.type !== 'coche'; })[0]; return v && v.leanLimit ? { deg: v.leanLimit, share: !!v.leanShare } : null; }
-  var badge = document.createElement('div'); badge.className = 'lean-badge'; badge.hidden = true; document.body.appendChild(badge);
-  var full = document.getElementById('leanFull'), note = null;
+  // Aviso solo visual y solo en el propio indicador: la línea que se inclina (aguja y arco) se pone naranja al acercarse
+  // al margen (80 %) y parpadea en rojo cuando falta un 10 % o menos para alcanzarlo.
+  var full = document.getElementById('leanFull'), gauges = [document.getElementById('gaugeFull'), document.getElementById('gaugeMini')].filter(Boolean), note = null;
   if (full) { note = document.createElement('div'); note.className = 'lean-margin'; note.hidden = true; var rd = full.querySelector('.readout'); if (rd) rd.appendChild(note); }
-  var lastState = '';
+  var lastState = null;
   setInterval(function () {
-    var L = limit(), lean = A.leanNow ? A.leanNow() : null, rec = A.isRec && A.isRec(), inFull = full && !full.hidden;
-    var st = '';
-    if (L && lean != null && (rec || inFull)) { var r = lean / L.deg; st = r >= 1 ? 'over' : r >= 0.8 ? 'warn' : ''; }
+    var L = limit(), lean = A.leanNow ? A.leanNow() : null, st = '';
+    if (L && lean != null) { var r = lean / L.deg; st = r >= 0.9 ? 'over' : r >= 0.8 ? 'warn' : ''; }
     if (note) { note.hidden = !L; if (L) note.textContent = 'Margen orientativo de tu moto: ' + L.deg + '°'; }
-    if (st !== lastState) {
-      lastState = st;
-      if (full) { full.classList.toggle('lean-warn', st === 'warn'); full.classList.toggle('lean-over', st === 'over'); }
-      badge.className = 'lean-badge' + (st ? ' ' + st : '');
-    }
-    var show = !!st && rec && !inFull;
-    badge.hidden = !show;
-    if (show) badge.textContent = Math.round(lean) + '° · ' + (st === 'over' ? 'por encima del margen (' + L.deg + '°)' : 'cerca del margen (' + L.deg + '°)');
-  }, 250);
+    if (st === lastState) return; lastState = st;
+    gauges.forEach(function (g) { g.classList.toggle('lean-warn', st === 'warn'); g.classList.toggle('lean-over', st === 'over'); });
+  }, 200);
 
   // Compartir el margen con el grupo: solo si el dueño lo ha marcado en su moto principal (por defecto, no).
   var sent;
