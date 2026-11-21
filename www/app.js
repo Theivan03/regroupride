@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.40.1';
+  var APP_VERSION = '0.40.2';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -590,7 +590,10 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   function setHTML(id, v) { if (prev[id] !== v) { prev[id] = v; var e = $(id); if (e) e.innerHTML = v; } }
   function setClass(id, v) { if (prev['c' + id] !== v) { prev['c' + id] = v; var e = $(id); if (e) e.className = v; } }
   var toastTimer = null;
-  function toast(msg, kind) { var n = $('#toast'); n.textContent = msg; n.className = 'toast notice' + (kind ? ' ' + kind : ''); n.hidden = false; if (toastTimer) clearTimeout(toastTimer); toastTimer = setTimeout(function () { n.hidden = true; }, kind === 'bad' ? 9000 : 5000); }
+  // Los avisos de arriba se reservan para lo que importa: errores, cosas que faltan por hacer y lo que llega de otros
+  // (avisos en ruta, novedades, fotógrafos cerca). Las confirmaciones de «hecho» o «guardado» ya no salen: se ve en pantalla.
+  var TOAST_KEEP = /Confirma el correo|enviado un correo|Solicitud enviada|[Aa]viso|ha iniciado la ruta|está a \d+ km|Nuevo evento: |Tablón: |Info: |Ruta terminada para todos|Reparto|no te llegarán avisos/;
+  function toast(msg, kind) { if (kind === 'ok' && !TOAST_KEEP.test(String(msg))) return; var n = $('#toast'); n.textContent = msg; n.className = 'toast notice' + (kind ? ' ' + kind : ''); n.hidden = false; if (toastTimer) clearTimeout(toastTimer); toastTimer = setTimeout(function () { n.hidden = true; }, kind === 'bad' ? 9000 : 5000); }
   function showNotice(msg, kind) { var n = $('#notice'); n.textContent = msg; n.className = 'notice' + (kind ? ' ' + kind : ''); n.hidden = false; }
   function hideNotice() { $('#notice').hidden = true; }
   function render() {

@@ -193,14 +193,14 @@
       // Las paradas con nombre (reagrupamiento, gasolinera, almuerzo…) se ven con su nombre; los puntos de paso, solo con su número.
       if (kind) { el.className = 'stop-marker named ' + kind; el.innerHTML = '<span class="ico">' + POI[kind][1] + '</span><span class="lbl">' + esc(nm.length > 26 ? nm.slice(0, 25) + '…' : nm) + '</span>'; }
       else { el.className = 'stop-marker' + (i === 0 ? ' start' : (last ? ' end' : '')); el.textContent = String(i + 1); }
-      el.addEventListener('click', function (e) { e.stopPropagation(); A.toast((i + 1) + '. ' + (nm || (i === 0 ? 'Salida' : (last ? 'Llegada' : 'Punto ' + (i + 1)))), 'ok'); });
+      el.addEventListener('click', function (e) { e.stopPropagation(); A.toast((i + 1) + '. ' + (nm || (i === 0 ? 'Salida' : (last ? 'Llegada' : 'Punto ' + (i + 1)))), 'info'); });
       stopMk.push(new maplibregl.Marker(kind ? { element: el, anchor: 'left', offset: [-15, 0] } : { element: el, anchor: 'center' }).setLngLat([w[1], w[0]]).addTo(m));
     });
     // Puntos marcados aparte en la ruta: gasolineras, sitios para comer, miradores…
     (p.pois || []).forEach(function (q) {
       var el = document.createElement('div'), kind = POI[q[3]] ? q[3] : 'poi';
       el.className = 'poi-marker ' + kind; el.innerHTML = POI[kind][1];
-      el.addEventListener('click', function (e) { e.stopPropagation(); A.toast(POI[kind][0] + (q[2] && q[2] !== POI[kind][0] ? ': ' + q[2] : ''), 'ok'); });
+      el.addEventListener('click', function (e) { e.stopPropagation(); A.toast(POI[kind][0] + (q[2] && q[2] !== POI[kind][0] ? ': ' + q[2] : ''), 'info'); });
       stopMk.push(new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([q[1], q[0]]).addTo(m));
     });
   }
