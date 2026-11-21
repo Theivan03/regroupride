@@ -73,7 +73,7 @@
   function repaint(cid) {
     var c = cur();
     if (!c || c.id !== cid || $('#view-club').hidden || !vis()) return;
-    var f = ({ events: paneEvents, board: paneBoard, pages: panePages, members: paneMembers })[S.tab];
+    var f = ({ events: paneEvents, routes: paneRoutes, board: paneBoard, pages: panePages, members: paneMembers })[S.tab];
     if (f) f(c, false).catch(function () {});
   }
   // Lo último publicado de ese tipo en esa comunidad (con mi sesión: solo lo que ya podría ver).
@@ -137,14 +137,14 @@
     if (!c) { renderJoin(); return; }
     box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.zone || c.style ? '<span class="club-zone">' + icn('locate') + esc([c.zone, c.style].filter(Boolean).join(' · ')) + '</span>' : '') + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><div class="club-head-act">' + (isAdmin() ? '<button class="btn small" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '<button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button></div></div>' +
       '<div class="pills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button><button class="pill pill-trips" type="button" id="clTrips" aria-pressed="false">' + icn('route') + 'Mis viajes</button></div>' +
-      '<div class="seg rg-wide" id="clTabs">' + [['events', 'Eventos'], ['board', 'Tablón'], ['pages', 'Info'], ['members', 'Miembros']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
+      '<div class="seg rg-wide seg-5" id="clTabs">' + [['events', 'Eventos'], ['routes', 'Rutas'], ['board', 'Tablón'], ['pages', 'Info'], ['members', 'Gente']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
     $('#clInvite').addEventListener('click', invite);
     if ($('#clEdit')) $('#clEdit').addEventListener('click', function () { editCommunity(c); });
     $('#clOther').addEventListener('click', renderJoin);
     $('#clTrips').addEventListener('click', function () { if (window.RGTrips) RGTrips.list(); });
     $$('[data-cid]', box).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); render(); }); });
     $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.t; render(); }); });
-    ({ events: paneEvents, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
+    ({ events: paneEvents, routes: paneRoutes, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
   }
   function renderJoin() {
     box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Buscar comunidades</b><p class="muted">Encuentra grupos por nombre o por zona y únete.</p><div class="club-find-box">' + icn('search') + '<input type="text" inputmode="search" enterkeyhint="search" id="clFind" maxlength="40" placeholder="Nombre, pueblo, provincia…" autocomplete="off"></div><div id="clFound" class="club-found"><p class="muted">Cargando…</p></div></div>' +
@@ -159,6 +159,84 @@
     $('#clCreate').addEventListener('click', function (ev) { var name = $('#clName').value.trim(); if (name.length < 2) { A.toast('Ponle un nombre.', 'warn'); return; }
       Cl.busy(ev.currentTarget, function () { return sb.rpc('create_community', { p_name: name, p_description: '' }).then(function (r) { setCid(ok(r)); A.toast('Comunidad creada. Invita a la gente con el código.', 'ok'); return load().then(render); }); }); });
   }
+  /* ---------- catálogo de rutas de la comunidad: las suben los administradores y cualquiera puede cargarlas ---------- */
+  var LEVELS = { facil: 'Fácil', media: 'Media', exigente: 'Exigente' }, RT_COLS = 'id,name,description,kind,level,start_name,dist,dur,created_at';
+  function hm(s) { var m = Math.round((s || 0) / 60), h = Math.floor(m / 60); return h ? h + ' h ' + ('0' + (m % 60)).slice(-2) + ' min' : m + ' min'; }
+  function routeCards(rows, admin) {
+    return rows.map(function (x) {
+      return '<div class="club-card rt-card" data-id="' + x.id + '"><b class="rt-name">' + esc(x.name) + '</b>' +
+        '<div class="rt-tags">' + (x.level ? '<span class="rt-tag lv-' + x.level + '">' + LEVELS[x.level] + '</span>' : '') + (x.kind ? '<span class="rt-tag">' + esc(x.kind) + '</span>' : '') + '</div>' +
+        '<div class="rt-meta"><span>' + icn('route') + String(+x.dist).replace('.', ',') + ' km</span>' + (x.dur ? '<span>' + icn('clock') + hm(x.dur) + '</span>' : '') + (x.start_name ? '<span>' + icn('locate') + esc(x.start_name) + '</span>' : '') + '</div>' +
+        (x.description ? '<p class="rt-desc">' + esc(x.description) + '</p>' : '') +
+        '<div class="rt-acts"><button class="btn small primary" data-rt="see" type="button">' + icn('map') + 'Ver en el mapa</button><button class="btn small" data-rt="save" type="button">' + icn('download') + 'Guardar en mis rutas</button>' +
+        (admin ? '<button class="link danger" data-rt="del" type="button">Borrar</button>' : '') + '</div></div>';
+    }).join('');
+  }
+  function wireRoutes(host, rows, after) {
+    var full = function (id) { return sb.from('community_routes').select('name,dist,dur,route').eq('id', id).single().then(function (r) { var x = ok(r), rt = x.route || {}; if (!rt.coords || rt.coords.length < 2) throw new Error('Esa ruta no tiene trazado.'); return { id: parseInt(id.replace(/-/g, '').slice(0, 12), 16), name: x.name, wps: rt.wps || [], pois: rt.pois || [], coords: rt.coords, dist: +x.dist || rt.dist || 0, dur: x.dur || rt.dur || 0, routed: true, steps: rt.steps || [], created: Date.now() }; }); };
+    $$('[data-rt]', host).forEach(function (b) { b.addEventListener('click', function () {
+      var id = b.closest('.rt-card').dataset.id, act = b.dataset.rt;
+      if (act === 'del') { armed(b, '¿Seguro? Toca otra vez', function () { sb.from('community_routes').delete().eq('id', id).then(function (r) { ok(r); A.toast('Ruta quitada del catálogo.', 'ok'); if (after) after(); }).catch(fail); }); return; }
+      Cl.busy(b, function () { return full(id).then(function (p) {
+        if (act === 'save') return A.savePlan(p).then(function () { A.toast('Guardada en tus rutas. La tienes en Rutas → Planificadas.', 'ok'); });
+        Cl.closeSheet(); A.previewPlan(p); A.toast('«' + p.name + '» en el mapa. Pulsa «Iniciar ruta» para seguirla.', 'ok');
+      }); });
+    }); });
+  }
+  function paneRoutes(c) {
+    return sb.from('community_routes').select(RT_COLS).eq('community_id', c.id).order('created_at', { ascending: false }).then(function (r) {
+      var rows = ok(r) || [], pane = $('#clPane'); if (!pane || S.tab !== 'routes' || !cur() || cur().id !== c.id) return;
+      pane.innerHTML = (isAdmin() ? '<button class="btn big primary club-add" id="rtNew" type="button"><svg><use href="#i-plus"/></svg>Añadir ruta al catálogo</button>' : '') +
+        (rows.length ? '<span class="label">' + rows.length + (rows.length === 1 ? ' ruta' : ' rutas') + ' de ' + esc(c.name) + '</span>' + routeCards(rows, isAdmin()) :
+          '<div class="empty">Todavía no hay rutas en el catálogo.' + (isAdmin() ? ' Añade las que soléis hacer para que el grupo las tenga a mano.' : ' Los administradores irán subiendo las que suele hacer el grupo.') + '</div>') +
+        (isAdmin() && !c.listed ? '<p class="muted rg-small">Ahora mismo solo las ven los miembros. Si activas «Aparecer en el buscador» en Editar, cualquiera con la app podrá ver vuestro catálogo.</p>' : '');
+      if ($('#rtNew')) $('#rtNew').addEventListener('click', function () { routeForm(c); });
+      wireRoutes(pane, rows, function () { paneRoutes(c); });
+    });
+  }
+  function catalogSheet(cid, name) {
+    Cl.sheet('<div class="head"><h1>Rutas de ' + esc(name) + '</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><div id="rtCat"><p class="muted">Cargando…</p></div>');
+    $('#clX').addEventListener('click', Cl.closeSheet);
+    sb.from('community_routes').select(RT_COLS).eq('community_id', cid).order('created_at', { ascending: false }).then(function (r) {
+      var rows = ok(r) || [], host = $('#rtCat'); if (!host) return;
+      host.innerHTML = rows.length ? routeCards(rows, false) : '<div class="empty">Esta comunidad todavía no tiene rutas en su catálogo.</div>';
+      wireRoutes(host, rows);
+    }).catch(function (e) { if ($('#rtCat')) $('#rtCat').innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
+  }
+  function routeForm(c) {
+    var plans = A.plans ? A.plans() : [], picked = null;
+    Cl.sheet('<div class="head"><h1>Añadir ruta</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      '<form class="rg-form" id="rtForm"><label>La ruta<select id="rtPlan"><option value="">Elige una de tus rutas…</option>' + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
+      '<div class="tr-gpx"><button class="btn small" id="rtGpx" type="button">' + icn('download') + 'O importa un GPX</button><input type="file" id="rtFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden></div>' +
+      '<label>Nombre<input id="rtName" required minlength="2" maxlength="80" placeholder="Vuelta a la Carrasqueta"></label>' +
+      '<label>Descripción<textarea id="rtDesc" class="note" maxlength="600" placeholder="Cómo es, dónde parar a almorzar, tramos a tener en cuenta…"></textarea></label>' +
+      '<div class="tr-two"><label>Dificultad<select id="rtLevel"><option value="">Sin indicar</option><option value="facil">Fácil</option><option value="media">Media</option><option value="exigente">Exigente</option></select></label><label>Tipo<input id="rtKind" maxlength="30" placeholder="Curvas, puerto, costa…"></label></div>' +
+      '<label>Sale de<input id="rtStart" maxlength="80" placeholder="Gasolinera, plaza, pueblo…"></label>' +
+      '<button class="btn big primary" type="submit">Añadir al catálogo</button></form>');
+    $('#clX').addEventListener('click', Cl.closeSheet);
+    var take = function (r, name) { picked = r; if (!$('#rtName').value.trim()) $('#rtName').value = (name || r.name || '').slice(0, 80); };
+    $('#rtPlan').addEventListener('change', function () { var p = plans.filter(function (x) { return String(x.id) === $('#rtPlan').value; })[0]; if (p) take({ name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur }, p.name); else picked = null; });
+    $('#rtGpx').addEventListener('click', function () { $('#rtFile').value = ''; $('#rtFile').click(); });
+    $('#rtFile').addEventListener('change', function () {
+      var file = this.files && this.files[0], b = $('#rtGpx'); if (!file || !window.RGNav || !RGNav.gpxRoute) return;
+      var old = b.innerHTML, rd = new FileReader(); b.disabled = true; b.textContent = 'Leyendo el GPX…';
+      rd.onload = function () { RGNav.gpxRoute(String(rd.result || ''), file.name).then(function (r) {
+        take(r, r.name); $('#rtPlan').value = ''; b.disabled = false; b.innerHTML = icn('check') + esc(r.name) + ' · ' + String(r.dist).replace('.', ',') + ' km';
+        if (A.savePlan) A.savePlan({ id: Date.now(), name: r.name, wps: r.wps, pois: r.pois || [], coords: r.coords, dist: r.dist, dur: r.dur, routed: true, steps: r.steps || [], created: Date.now(), gpx: true }).catch(function () {});
+      }).catch(function (e) { b.disabled = false; b.innerHTML = old; A.toast(e.message || 'No se pudo importar.', 'bad'); }); };
+      rd.readAsText(file);
+    });
+    $('#rtForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      if (!picked || !picked.coords || picked.coords.length < 2) { A.toast('Elige una de tus rutas o importa un GPX.', 'warn'); return; }
+      Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
+        return sb.from('community_routes').insert({ community_id: c.id, name: $('#rtName').value.trim(), description: $('#rtDesc').value.trim(), kind: $('#rtKind').value.trim(), level: $('#rtLevel').value, start_name: $('#rtStart').value.trim(), dist: Math.round((+picked.dist || 0) * 10) / 10, dur: Math.round(+picked.dur || 0), route: picked, created_by: S.user.id }).then(function (r) {
+          ok(r); Cl.closeSheet(); A.toast('Ruta añadida al catálogo.', 'ok'); return paneRoutes(c);
+        });
+      });
+    });
+  }
+
   /* ---------- buscador de comunidades y ficha (zona, estilo, cómo se entra) ---------- */
   var MODES = { open: 'Cualquiera puede unirse', request: 'Hay que pedirlo y un administrador acepta', code: 'Solo con el código de invitación' };
   function findCommunities() {
@@ -170,8 +248,9 @@
       out.innerHTML = rows.length ? rows.map(function (x) {
         var btn = x.mine ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>Ya estás</span>' : x.requested ? '<span class="mstatus soon">Solicitud enviada</span>' :
           x.join_mode === 'open' ? '<button class="btn small primary" data-j="' + x.id + '" type="button">Unirme</button>' : x.join_mode === 'request' ? '<button class="btn small primary" data-j="' + x.id + '" data-ask="1" type="button">Pedir unirme</button>' : '<span class="muted rg-small">Solo con código</span>';
-        return '<div class="club-find"><div><b>' + esc(x.name) + '</b><span class="club-zone">' + icn('locate') + esc([x.zone || 'Sin zona', x.style].filter(Boolean).join(' · ')) + '</span><span class="muted rg-small">' + x.members + (x.members === 1 ? ' miembro' : ' miembros') + (x.events_next ? ' · ' + x.events_next + (x.events_next === 1 ? ' evento próximo' : ' eventos próximos') : '') + '</span>' + (x.description ? '<p>' + esc(x.description) + '</p>' : '') + '</div>' + btn + '</div>';
+        return '<div class="club-find"><div><b>' + esc(x.name) + '</b><span class="club-zone">' + icn('locate') + esc([x.zone || 'Sin zona', x.style].filter(Boolean).join(' · ')) + '</span><span class="muted rg-small">' + x.members + (x.members === 1 ? ' miembro' : ' miembros') + (x.events_next ? ' · ' + x.events_next + (x.events_next === 1 ? ' evento próximo' : ' eventos próximos') : '') + '</span>' + (x.description ? '<p>' + esc(x.description) + '</p>' : '') + (x.routes ? '<button class="link" data-cat="' + x.id + '" data-name="' + esc(x.name) + '" type="button">Ver sus ' + x.routes + (x.routes === 1 ? ' ruta' : ' rutas') + '</button>' : '') + '</div>' + btn + '</div>';
       }).join('') : '<p class="muted">' + (q ? 'No hay ninguna comunidad con «' + esc(q) + '».' : 'Todavía no hay comunidades en el buscador.') + ' Si la tuya no sale, pídele el código a su organizador.</p>';
+      $$('[data-cat]', out).forEach(function (b) { b.addEventListener('click', function () { catalogSheet(b.dataset.cat, b.dataset.name); }); });
       $$('[data-j]', out).forEach(function (b) { b.addEventListener('click', function () {
         Cl.busy(b, function () { return sb.rpc('community_ask', { p_id: b.dataset.j, p_message: '' }).then(function (r2) {
           var res = ok(r2);

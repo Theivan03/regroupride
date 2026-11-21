@@ -1146,3 +1146,21 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .club-find-box{position:relative;display:flex}
 .club-find-box svg{position:absolute;left:14px;top:50%;width:18px;height:18px;transform:translateY(-50%);opacity:.55;pointer-events:none}
 .club-find-box input{flex:1;min-width:0;padding-left:42px!important}
+
+/* ===== 0.36 · catálogo de rutas de la comunidad ===== */
+.seg.seg-5 button{padding-left:4px;padding-right:4px;font-size:14px;min-width:0}
+.rt-card{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.rt-name{font-size:18px;line-height:1.25}
+.rt-tags{display:flex;flex-wrap:wrap;gap:6px}
+.rt-tag{padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:color-mix(in srgb,var(--marca,#7B5CF0) 16%,transparent);color:var(--marca,#7B5CF0)}
+.rt-tag.lv-facil{background:color-mix(in srgb,#2e9e5b 18%,transparent);color:#2e9e5b}
+.rt-tag.lv-media{background:color-mix(in srgb,#d99a00 20%,transparent);color:#b07c00}
+.rt-tag.lv-exigente{background:color-mix(in srgb,#d64545 18%,transparent);color:#d64545}
+.rt-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}
+.rt-meta span{display:inline-flex;align-items:center;gap:5px}.rt-meta svg{width:15px;height:15px;opacity:.7}
+.rt-desc{margin:0;font-size:15px;white-space:pre-wrap}
+.rt-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%}
+#rtCat{display:flex;flex-direction:column;gap:12px}
+.club-head{flex-wrap:wrap;row-gap:10px}
+.club-head .club-title{flex:1 1 100%;min-width:0}
+.club-head-act{width:100%}.club-head-act .btn{flex:1}

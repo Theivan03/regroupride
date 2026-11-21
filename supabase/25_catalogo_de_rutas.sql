@@ -1,0 +1,3 @@
+-- ReGroupRide · 25 — catálogo de rutas de cada comunidad. Aplicado en producción como migración «catalogo_de_rutas».
+--  · community_routes: las suben los administradores; las ven los miembros y, si la comunidad está en el buscador, cualquiera con la app.
+--  · community_search() devuelve también cuántas rutas tiene cada comunidad.
