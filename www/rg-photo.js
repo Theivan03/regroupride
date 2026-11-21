@@ -10,7 +10,7 @@
   function fail(e) { A.toast(Cl.msg ? Cl.msg(e) : (e && e.message) || 'No se ha podido.', 'bad'); }
   function me() { var u = Cl.user && Cl.user(); return u ? u.id : null; }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} return null; }
-  function fix() { return A.lastFix ? A.lastFix() : null; }
+  function fix() { return A.anyFix ? A.anyFix() : (A.lastFix ? A.lastFix() : null); }      // vale también la posición aproximada: aquí solo se usa para distancias
   function head(t) { return '<div class="head"><h1>' + t + '</h1><button class="btn small icon" id="phX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>'; }
   function hhmm(ms) { return new Date(ms).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); }
   function ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }

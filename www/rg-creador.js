@@ -59,6 +59,30 @@
     box.querySelector('#makerWrite').addEventListener('click', function () { Cl.openFeedback(); });
     box.querySelector('#makerTour').addEventListener('click', function () { if (window.RGTour) RGTour.start(); });
 
+    /* ---------- resumen del creador: solo aparece en la cuenta del creador ---------- */
+    var dev = document.createElement('div'); dev.className = 'rg-maker rg-dev'; dev.hidden = true;
+    var acc = document.getElementById('rgAccount'); if (acc && acc.nextSibling) acc.parentNode.insertBefore(dev, acc.nextSibling); else about.parentNode.insertBefore(dev, about);
+    var devU = null, devAt = 0;
+    function devLoad(force) {
+      var u = Cl.user && Cl.user(), id = u ? u.id : '';
+      if (id !== devU) { devU = id; devAt = 0; dev.hidden = true; }
+      if (!id || (!force && Date.now() - devAt < 5 * 60000)) return;
+      devAt = Date.now();
+      Cl.sb.rpc('dev_stats').then(function (r) {
+        if (r.error || !r.data || devU !== id) { if (r.error) devAt = Date.now() + 30 * 60000; return; }      // no es el creador: no se vuelve a preguntar en un buen rato
+        var s = r.data, k = function (v, l) { return '<div><b>' + v + '</b><span>' + l + '</span></div>'; };
+        dev.hidden = false;
+        dev.innerHTML = '<span class="label">Panel del creador · solo lo ves tú</span>' +
+          '<div class="tr-kpis">' + k(s.dau, 'hoy') + k(s.wau, '7 días') + k(s.mau, '30 días') + k(s.accounts, 'cuentas') + '</div>' +
+          '<div class="tr-kpis">' + k(s.devices, 'aparatos') + k(s.returning_30, 'vuelven') + k(s.communities, 'comunid.') + k(s.feedback_unanswered, 'sin contestar') + '</div>' +
+          '<p class="muted rg-small">Activos ayer: ' + s.dau_prev + ' · Cuentas nuevas en 7 días: ' + s.accounts_7 + ' · Eventos próximos: ' + s.events_next + ' · Inscripciones: ' + s.signups + ' · Rutas grabadas: ' + s.rides + ' (' + Number(s.km).toLocaleString('es-ES') + ' km)</p>' +
+          '<div class="rg-row"><a class="btn small primary" href="https://regroupride-eventos.netlify.app/?dev=1" target="_blank" rel="noopener">Panel completo</a><button class="btn small" id="devPh" type="button">Altas de fotógrafos</button><button class="btn small" id="devRl" type="button">Actualizar</button></div>';
+        dev.querySelector('#devRl').addEventListener('click', function () { devLoad(true); });
+        dev.querySelector('#devPh').addEventListener('click', function () { if (window.RGPhoto) RGPhoto.open('admin'); });
+      }, function () {});
+    }
+    setTimeout(devLoad, 4000); setInterval(devLoad, 15000);
+
     /* ---------- códigos de ventaja ---------- */
     var NAMES = { sin_anuncios: 'Sin publicidad', premium: 'Premium', todo_gratis: 'Todo gratis' };
     var cb = document.createElement('div'); cb.className = 'rg-maker';

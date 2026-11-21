@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.39.0';
+  var APP_VERSION = '0.39.1';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -228,7 +228,22 @@
     if (Math.abs(c.lat - q.lat) > 1e-5 || Math.abs(c.lng - q.lon) > 1e-5 || Math.abs(map.getZoom() - z) > 0.01) map.jumpTo({ center: [q.lon, q.lat], zoom: z });
     if (posMarker) { posMarker.getElement().classList.add('approx'); posMarker.setLngLat([q.lon, q.lat]); if (!posMarker._added) { posMarker.addTo(map); posMarker._added = true; } }
   }
-  Platform.quickPosition(function (pos) { if (lastFix || !pos || !pos.coords) return; quickFix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy }; showQuick(); });
+  function askQuick() { Platform.quickPosition(function (pos) { if (!pos || !pos.coords) return; if (lastFix && Date.now() - lastFix.ts < 20000) return; quickFix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, at: Date.now() }; if (lastFix) staleShow(); else showQuick(); }); }
+  // Al volver a la app con la posición vieja: se enseña ya la que tenga el teléfono (aproximada) mientras el GPS vuelve a coger señal.
+  function staleShow() { if (!quickFix || !map || !posMarker || rec) return; posMarker.getElement().classList.add('approx'); posMarker.setLngLat([quickFix.lon, quickFix.lat]); if (mapFollow && currentView === 'map' && mapReady) map.easeTo({ center: [quickFix.lon, quickFix.lat], duration: 500 }); }
+  askQuick();
+  // Vigilante del GPS: si a los pocos segundos de pedirlo no ha llegado ninguna posición (pasa al abrir en frío o al volver de
+  // segundo plano), se vuelve a pedir la rápida y se reinicia la escucha, en vez de quedarse esperando.
+  var gpsKicks = 0;
+  function gpsCheck() {
+    if (rec || sens.demo || gpsMode !== 'fg' || document.visibilityState === 'hidden') return;
+    var age = sens.lastGps ? performance.now() - sens.lastGps : Infinity;
+    if (age < 7000) { gpsKicks = 0; return; }
+    askQuick();
+    if (gpsKicks < 3) { gpsKicks++; stopGps(); startGps('fg'); }
+  }
+  setTimeout(gpsCheck, 6000); setInterval(gpsCheck, 12000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState !== 'visible' || rec) return; gpsKicks = 0; askQuick(); setTimeout(gpsCheck, 5000); });
   function setFollow(on) { mapFollow = on; settings.follow = on; saveSettings(); $('#btnFollow').setAttribute('aria-pressed', String(on)); if (on && lastFix) updatePosition(lastFix, true); }
   $('#btnFollow').addEventListener('click', function () { setFollow(!mapFollow); });
   $('#btnHeading').addEventListener('click', function () { settings.headingUp = !settings.headingUp; saveSettings(); $('#btnHeading').setAttribute('aria-pressed', String(settings.headingUp)); if (map && !settings.headingUp) map.easeTo({ bearing: 0 }); });
@@ -1295,7 +1310,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     stopRide: function () { if (rec) stopRide(); },
     setAvatar: function (d) { setAvatar(d); },
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
-    map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, activePlan: function () { return planMode ? null : activePlan; },
+    map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, anyFix: function () { return lastFix || (quickFix ? { lat: quickFix.lat, lon: quickFix.lon, acc: quickFix.acc, ts: Date.now(), approx: true } : (savedFix ? { lat: savedFix.lat, lon: savedFix.lon, acc: 5000, ts: savedFix.t, approx: true } : null)); }, activePlan: function () { return planMode ? null : activePlan; },
     isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { askAndStart(); }, reloadProfile: reloadProfile, setProfileName: setProfileName, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
     plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); }, vehicles: function () { return vehicles.slice(); },
