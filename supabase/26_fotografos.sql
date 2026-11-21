@@ -1,0 +1,4 @@
+-- ReGroupRide · 26 — fotógrafos. Aplicado en producción como migración «fotografos» (texto completo allí).
+--  · photographers (ficha; la aprueba el creador; pro = plan Destacado), photo_spots («estoy aquí»: sitio, coordenadas, horas),
+--    photo_notified (para no repetir avisos) y user_zone (zona aproximada de cada usuario, redondeada a ~10 km).
+--  · photographer_save(), photographer_set(), zone_set(), photo_list(), photo_near() y la versión vigente de community_news().

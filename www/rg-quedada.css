@@ -1164,3 +1164,15 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .club-head{flex-wrap:wrap;row-gap:10px}
 .club-head .club-title{flex:1 1 100%;min-width:0}
 .club-head-act{width:100%}.club-head-act .btn{flex:1}
+
+/* ===== 0.37 · fotógrafos ===== */
+#phPane{display:flex;flex-direction:column;gap:12px}
+.ph-card{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.ph-top{display:flex;align-items:center;gap:12px;width:100%}
+.ph-top>div{flex:1;min-width:0}.ph-top b{display:block;font-size:17px}
+.ph-ico{flex:none;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:color-mix(in srgb,var(--marca,#7B5CF0) 16%,transparent)}
+.ph-place{display:flex;align-items:center;gap:4px;font-size:14px;opacity:.85}.ph-place svg{width:14px;height:14px;flex:none}
+.ph-links{display:flex;flex-wrap:wrap;gap:8px}
+.ph-pro{width:100%;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px;border:1.5px dashed var(--linea,rgba(127,127,127,.35));font-size:14px}
+.ph-pro.on{border-style:solid;border-color:#B9D40F;background:color-mix(in srgb,#D9F21C 18%,transparent)}
+#spForm{gap:12px}

@@ -57,7 +57,7 @@ final class EventNotices {
     private static final long CHECK_EVERY = 60000L;
     private static final long NEWS_EVERY = 60000L;
     private static final String CH = "rg_events";
-    private static final String CH_NEWS = "rg_news";
+    private static final String CH_NEWS = "rg_news_2";      // canal nuevo: los avisos salen en pantalla al llegar, como un mensaje
     private static final String PREFS = "rg_events";
 
     private EventNotices() { }
@@ -271,7 +271,8 @@ final class EventNotices {
         } else {
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
-                NotificationChannel ch = new NotificationChannel(CH_NEWS, "Novedades de la comunidad", NotificationManager.IMPORTANCE_DEFAULT);
+                try { nm.deleteNotificationChannel("rg_news"); } catch (Exception ignored) { }
+                NotificationChannel ch = new NotificationChannel(CH_NEWS, "Novedades de la comunidad", NotificationManager.IMPORTANCE_HIGH);
                 ch.setDescription("Avisa cuando se publica un evento, un mensaje en el tablón o una página de información.");
                 nm.createNotificationChannel(ch);
             }
@@ -296,7 +297,7 @@ final class EventNotices {
                 .setSmallIcon(R.drawable.ic_stat_rg)
                 .setContentTitle(head).setContentText(body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-                .setPriority("call".equals(kind) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory("call".equals(kind) ? NotificationCompat.CATEGORY_EVENT : NotificationCompat.CATEGORY_SOCIAL)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
