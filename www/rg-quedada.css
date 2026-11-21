@@ -1176,3 +1176,11 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .ph-pro{width:100%;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px;border:1.5px dashed var(--linea,rgba(127,127,127,.35));font-size:14px}
 .ph-pro.on{border-style:solid;border-color:#B9D40F;background:color-mix(in srgb,#D9F21C 18%,transparent)}
 #spForm{gap:12px}
+
+/* 0.38 · avisos del catálogo y foto del fotógrafo */
+.rt-note{width:100%;border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+.rt-note b{display:flex;align-items:center;gap:6px;font-size:14px}.rt-note svg{width:16px;height:16px;flex:none}
+.rt-note p{margin:0;font-size:15px;white-space:pre-wrap}
+.rt-note.warn{background:color-mix(in srgb,#e08a00 16%,transparent);border-left:4px solid #e08a00}.rt-note.warn b{color:#b06c00}
+.rt-note.tip{background:color-mix(in srgb,#2e9e5b 14%,transparent);border-left:4px solid #2e9e5b}.rt-note.tip b{color:#23804a}
+.ph-ico{overflow:hidden}.ph-ico img{width:100%;height:100%;object-fit:cover;display:block}

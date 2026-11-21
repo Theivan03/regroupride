@@ -163,7 +163,7 @@
       Cl.busy(ev.currentTarget, function () { return sb.rpc('create_community', { p_name: name, p_description: '' }).then(function (r) { setCid(ok(r)); A.toast('Comunidad creada. Invita a la gente con el código.', 'ok'); return load().then(render); }); }); });
   }
   /* ---------- catálogo de rutas de la comunidad: las suben los administradores y cualquiera puede cargarlas ---------- */
-  var LEVELS = { facil: 'Fácil', media: 'Media', exigente: 'Exigente' }, RT_COLS = 'id,name,description,kind,level,start_name,dist,dur,created_at';
+  var LEVELS = { facil: 'Fácil', media: 'Media', exigente: 'Exigente' }, RT_COLS = 'id,name,description,kind,level,start_name,dist,dur,created_at,warnings,tips';
   function hm(s) { var m = Math.round((s || 0) / 60), h = Math.floor(m / 60); return h ? h + ' h ' + ('0' + (m % 60)).slice(-2) + ' min' : m + ' min'; }
   function routeCards(rows, admin) {
     return rows.map(function (x) {
@@ -171,6 +171,8 @@
         '<div class="rt-tags">' + (x.level ? '<span class="rt-tag lv-' + x.level + '">' + LEVELS[x.level] + '</span>' : '') + (x.kind ? '<span class="rt-tag">' + esc(x.kind) + '</span>' : '') + '</div>' +
         '<div class="rt-meta"><span>' + icn('route') + String(+x.dist).replace('.', ',') + ' km</span>' + (x.dur ? '<span>' + icn('clock') + hm(x.dur) + '</span>' : '') + (x.start_name ? '<span>' + icn('locate') + esc(x.start_name) + '</span>' : '') + '</div>' +
         (x.description ? '<p class="rt-desc">' + esc(x.description) + '</p>' : '') +
+        (x.warnings ? '<div class="rt-note warn"><b>' + icn('warn') + 'Ojo en esta ruta</b><p>' + esc(x.warnings) + '</p></div>' : '') +
+        (x.tips ? '<div class="rt-note tip"><b>' + icn('star') + 'Recomendaciones</b><p>' + esc(x.tips) + '</p></div>' : '') +
         '<div class="rt-acts"><button class="btn small primary" data-rt="see" type="button">' + icn('map') + 'Ver en el mapa</button><button class="btn small" data-rt="save" type="button">' + icn('download') + 'Guardar en mis rutas</button>' +
         (admin ? '<button class="link danger" data-rt="del" type="button">Borrar</button>' : '') + '</div></div>';
     }).join('');
@@ -215,6 +217,8 @@
       '<label>Descripción<textarea id="rtDesc" class="note" maxlength="600" placeholder="Cómo es, dónde parar a almorzar, tramos a tener en cuenta…"></textarea></label>' +
       '<div class="tr-two"><label>Dificultad<select id="rtLevel"><option value="">Sin indicar</option><option value="facil">Fácil</option><option value="media">Media</option><option value="exigente">Exigente</option></select></label><label>Tipo<input id="rtKind" maxlength="30" placeholder="Curvas, puerto, costa…"></label></div>' +
       '<label>Sale de<input id="rtStart" maxlength="80" placeholder="Gasolinera, plaza, pueblo…"></label>' +
+      '<label>Advertencias: tramos complicados o con cuidado<textarea id="rtWarn" class="note" maxlength="600" placeholder="Gravilla en la bajada del puerto, km 12 con el firme roto, radar de tramo, mucho ciclista los domingos…"></textarea></label>' +
+      '<label>Recomendaciones<textarea id="rtTips" class="note" maxlength="600" placeholder="Mejor por la mañana, repostar en el pueblo antes de subir, almuerzo en la venta, mirador para la foto…"></textarea></label>' +
       '<button class="btn big primary" type="submit">Añadir al catálogo</button></form>');
     $('#clX').addEventListener('click', Cl.closeSheet);
     var take = function (r, name) { picked = r; if (!$('#rtName').value.trim()) $('#rtName').value = (name || r.name || '').slice(0, 80); };
@@ -233,7 +237,7 @@
       ev.preventDefault();
       if (!picked || !picked.coords || picked.coords.length < 2) { A.toast('Elige una de tus rutas o importa un GPX.', 'warn'); return; }
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
-        return sb.from('community_routes').insert({ community_id: c.id, name: $('#rtName').value.trim(), description: $('#rtDesc').value.trim(), kind: $('#rtKind').value.trim(), level: $('#rtLevel').value, start_name: $('#rtStart').value.trim(), dist: Math.round((+picked.dist || 0) * 10) / 10, dur: Math.round(+picked.dur || 0), route: picked, created_by: S.user.id }).then(function (r) {
+        return sb.from('community_routes').insert({ community_id: c.id, name: $('#rtName').value.trim(), description: $('#rtDesc').value.trim(), kind: $('#rtKind').value.trim(), level: $('#rtLevel').value, start_name: $('#rtStart').value.trim(), warnings: $('#rtWarn').value.trim(), tips: $('#rtTips').value.trim(), dist: Math.round((+picked.dist || 0) * 10) / 10, dur: Math.round(+picked.dur || 0), route: picked, created_by: S.user.id }).then(function (r) {
           ok(r); Cl.closeSheet(); A.toast('Ruta añadida al catálogo.', 'ok'); return paneRoutes(c);
         });
       });

@@ -18,8 +18,11 @@
   function links(p) {
     var ig = String(p.instagram || '').replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/[^\w.]/g, ''), wa = String(p.whatsapp || '').replace(/[^\d]/g, ''), web = String(p.web || '').trim();
     if (web && !/^https?:\/\//i.test(web)) web = 'https://' + web;
-    return '<div class="ph-links">' + (ig ? '<a class="btn small" href="https://instagram.com/' + ig + '" target="_blank" rel="noopener">Instagram</a>' : '') + (web ? '<a class="btn small" href="' + esc(web) + '" target="_blank" rel="noopener">Sus fotos</a>' : '') + (wa ? '<a class="btn small" href="https://wa.me/' + (wa.length === 9 ? '34' + wa : wa) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + '</div>';
+    var fb = String(p.facebook || '').trim(), em = String(p.email || '').trim();
+    if (fb) fb = /^https?:\/\//i.test(fb) ? fb : (/^[\w.]+$/.test(fb) ? 'https://facebook.com/' + fb : 'https://www.facebook.com/search/top?q=' + encodeURIComponent(fb));
+    return '<div class="ph-links">' + (ig ? '<a class="btn small" href="https://instagram.com/' + ig + '" target="_blank" rel="noopener">Instagram</a>' : '') + (web ? '<a class="btn small" href="' + esc(web) + '" target="_blank" rel="noopener">Sus fotos</a>' : '') + (wa ? '<a class="btn small" href="https://wa.me/' + (wa.length === 9 ? '34' + wa : wa) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + (fb ? '<a class="btn small" href="' + esc(fb) + '" target="_blank" rel="noopener">Facebook</a>' : '') + (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em) ? '<a class="btn small" href="mailto:' + esc(em) + '">Correo</a>' : '') + '</div>';
   }
+  function pic(p, emo) { return '<span class="ph-ico">' + (/^https:\/\//.test(p.photo || '') ? '<img src="' + esc(p.photo) + '" alt="" loading="lazy">' : emo) + '</span>'; }
   var D = null, tab = 'spots';
 
   function open(t) {
@@ -46,7 +49,7 @@
     host.innerHTML = D.spots.length ? D.spots.map(function (s) {
       var d = dayName(s.starts_at), sep = d !== day ? '<span class="label">' + d + '</span>' : ''; day = d;
       var live = s.starts_at <= Date.now() && s.ends_at > Date.now();
-      return sep + '<div class="club-card ph-card"><div class="ph-top"><span class="ph-ico">📸</span><div><b>' + esc(s.name) + '</b><span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(s.place) + '</span></div>' + (live ? '<span class="mstatus ok">Ahora</span>' : '') + '</div>' +
+      return sep + '<div class="club-card ph-card"><div class="ph-top">' + pic(s, '📸') + '<div><b>' + esc(s.name) + '</b><span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(s.place) + '</span></div>' + (live ? '<span class="mstatus ok">Ahora</span>' : '') + '</div>' +
         '<div class="rt-meta"><span><svg><use href="#i-clock"/></svg>' + hhmm(s.starts_at) + ' – ' + hhmm(s.ends_at) + '</span>' + (s.km != null ? '<span><svg><use href="#i-route"/></svg>a ' + s.km + ' km de ti</span>' : '') + '</div>' +
         (s.note ? '<p class="rt-desc">' + esc(s.note) + '</p>' : '') +
         '<div class="ph-links"><a class="btn small primary" href="https://www.google.com/maps/dir/?api=1&destination=' + s.lat + ',' + s.lon + '" target="_blank" rel="noopener"><svg><use href="#i-gmaps"/></svg>Cómo llegar</a></div>' + links(s) +
@@ -56,23 +59,32 @@
   }
   function panePeople() {
     $('#phPane').innerHTML = D.people.length ? D.people.map(function (p) {
-      return '<div class="club-card ph-card"><div class="ph-top"><span class="ph-ico">📷</span><div><b>' + esc(p.name) + '</b>' + (p.zones ? '<span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(p.zones) + '</span>' : '') + '</div>' + (p.pro ? '<span class="rt-tag">Destacado</span>' : '') + '</div>' + (p.bio ? '<p class="rt-desc">' + esc(p.bio) + '</p>' : '') + links(p) + '</div>';
+      return '<div class="club-card ph-card"><div class="ph-top">' + pic(p, '📷') + '<div><b>' + esc(p.name) + '</b>' + (p.zones ? '<span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(p.zones) + '</span>' : '') + '</div>' + (p.pro ? '<span class="rt-tag">Destacado</span>' : '') + '</div>' + (p.bio ? '<p class="rt-desc">' + esc(p.bio) + '</p>' : '') + links(p) + '</div>';
     }).join('') : '<div class="empty">Todavía no hay fotógrafos dados de alta.</div>';
   }
   function profileForm(m, label) {
     m = m || {};
-    return '<form class="rg-form" id="phForm"><label>Nombre con el que te conocen<input id="pfName" required minlength="2" maxlength="60" placeholder="FotoCurvas Alicante" value="' + esc(m.name || '') + '"></label>' +
+    return '<form class="rg-form" id="phForm"><button class="rg-pic" id="pfPic" type="button"><span class="rg-ava' + (m.photo ? ' has' : '') + '" id="pfPicAva">' + (/^https:\/\//.test(m.photo || '') ? '<img src="' + esc(m.photo) + '" alt="">' : '<svg width="26" height="26"><use href="#i-camera"/></svg>') + '</span><span><b>Tu foto o logo</b><small>Es lo que verán los moteros junto a tu nombre.</small></span></button><label>Nombre con el que te conocen<input id="pfName" required minlength="2" maxlength="60" placeholder="FotoCurvas Alicante" value="' + esc(m.name || '') + '"></label>' +
       '<label>Dónde sueles ponerte<input id="pfZones" maxlength="200" placeholder="Carrasqueta, Canalís, Maigmó…" value="' + esc(m.zones || '') + '"></label>' +
       '<label>Sobre ti y cómo conseguir las fotos<textarea id="pfBio" class="note" maxlength="400" placeholder="Subo las fotos a mi web el mismo día. Precio por foto, packs…">' + esc(m.bio || '') + '</textarea></label>' +
       '<div class="tr-two"><label>Instagram<input id="pfIg" maxlength="60" placeholder="@usuario" value="' + esc(m.instagram || '') + '"></label><label>WhatsApp<input id="pfWa" type="tel" inputmode="tel" maxlength="20" placeholder="600 000 000" value="' + esc(m.whatsapp || '') + '"></label></div>' +
+      '<div class="tr-two"><label>Facebook<input id="pfFb" maxlength="120" placeholder="Página o usuario" value="' + esc(m.facebook || '') + '"></label><label>Correo de contacto<input id="pfEm" type="email" maxlength="120" placeholder="tu@correo.com" value="' + esc(m.email || '') + '"></label></div>' +
       '<label>Web donde se ven o compran las fotos<input id="pfWeb" maxlength="200" placeholder="https://…" value="' + esc(m.web || '') + '"></label>' +
       '<p class="muted rg-small">Estos datos los verá cualquiera que use la app.</p><button class="btn big primary" type="submit">' + label + '</button></form>';
   }
   function wireProfile() {
+    var newPic = null;
+    $('#pfPic').addEventListener('click', function () { if (!window.RGCrop) return; RGCrop.pick().then(function (d) { if (!d) return; newPic = d; var a = $('#pfPicAva'); a.classList.add('has'); a.innerHTML = '<img src="' + d + '" alt="">'; }); });
+    var upload = function () {      // la foto nueva se sube a la carpeta del usuario; devuelve su dirección (o null si no se ha cambiado)
+      if (!newPic) return Promise.resolve(null);
+      var mm = /^data:(image\/\w+);base64,(.*)$/.exec(newPic), bin = atob(mm[2]), arr = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      var path = me() + '/ph-' + Date.now().toString(36) + '.jpg';
+      return sb.storage.from('avatars').upload(path, new Blob([arr], { type: mm[1] }), { contentType: mm[1] }).then(function (r) { if (r.error) throw r.error; return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl; });
+    };
     $('#phForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
-        return sb.rpc('photographer_save', { p_name: $('#pfName').value.trim(), p_bio: $('#pfBio').value.trim(), p_zones: $('#pfZones').value.trim(), p_instagram: $('#pfIg').value.trim(), p_web: $('#pfWeb').value.trim(), p_whatsapp: $('#pfWa').value.trim() }).then(function (r) {
+        return upload().then(function (url) { return sb.rpc('photographer_save', { p_name: $('#pfName').value.trim(), p_bio: $('#pfBio').value.trim(), p_zones: $('#pfZones').value.trim(), p_instagram: $('#pfIg').value.trim(), p_web: $('#pfWeb').value.trim(), p_whatsapp: $('#pfWa').value.trim(), p_facebook: $('#pfFb').value.trim(), p_email: $('#pfEm').value.trim(), p_photo: url }); }).then(function (r) {
           var st = ok(r); A.toast(st === 'approved' ? 'Ficha guardada.' : 'Solicitud enviada. Te avisaremos cuando esté aprobada.', 'ok'); open('mine');
         });
       });
@@ -84,6 +96,7 @@
     if (m.status === 'pending') { host.innerHTML = '<div class="club-card"><b>Solicitud enviada</b><p class="muted">Estamos revisando tu ficha. Te llegará un aviso en cuanto esté aprobada.</p></div>' + profileForm(m, 'Guardar cambios'); wireProfile(); return; }
     if (m.status === 'rejected') { host.innerHTML = '<div class="club-card"><b>No hemos podido aprobar tu ficha</b><p class="muted">Revisa los datos y vuelve a enviarla.</p></div>' + profileForm(m, 'Volver a enviar'); wireProfile(); return; }
     var mine = D.spots.filter(function (s) { return s.user_id === me(); }), d = new Date(), f = fix();
+    var h0 = d.getHours() >= 9 ? Math.min(20, d.getHours() + 1) : 9, t1 = ('0' + h0).slice(-2) + ':00', t2 = ('0' + Math.min(23, h0 + 4)).slice(-2) + ':00';
     var known = {}; mine.forEach(function (s) { known[s.place] = s; }); try { JSON.parse(store('rg.photo.places') || '[]').forEach(function (s) { if (!known[s.place]) known[s.place] = s; }); } catch (e) {}
     host.innerHTML = '<form class="rg-form club-card" id="spForm"><b>Avisar de dónde voy a estar</b>' +
       '<label>Sitio<input id="spPlace" required minlength="2" maxlength="80" placeholder="Curva Venta Teresa (Carrasqueta)" list="spKnown"><datalist id="spKnown">' + Object.keys(known).map(function (k) { return '<option value="' + esc(k) + '">'; }).join('') + '</datalist></label>' +
@@ -91,7 +104,7 @@
       '<button class="btn small" id="spHere" type="button"><svg><use href="#i-locate"/></svg>Estoy aquí ahora: usar mi ubicación</button>' +
       '<p class="muted rg-small">En Google Maps, mantén pulsado el punto, copia las coordenadas (38.6123, -0.4712) y pégalas arriba.</p>' +
       '<label>Día<input id="spDay" type="date" required min="' + ymd(d) + '" value="' + ymd(d) + '"></label>' +
-      '<div class="tr-two"><label>Desde<input id="spFrom" type="time" required value="09:00"></label><label>Hasta<input id="spTo" type="time" required value="13:00"></label></div>' +
+      '<div class="tr-two"><label>Desde<input id="spFrom" type="time" required value="' + t1 + '"></label><label>Hasta<input id="spTo" type="time" required value="' + t2 + '"></label></div>' +
       '<label>Nota (opcional)<input id="spNote" maxlength="140" placeholder="Estoy en la segunda curva, lado derecho"></label>' +
       '<div class="ph-pro ' + (m.pro ? 'on' : '') + '">' + (m.pro ? '<b>Plan Destacado activo</b><span>Al publicar, se avisa al móvil de los moteros que estén a menos de 30 km.</span>' : '<b>Avisar a los moteros a 30 km</b><span>Disponible en el plan Destacado. Escríbenos desde Ajustes → «Escribirme» si te interesa.</span>') + '</div>' +
       '<button class="btn big primary" type="submit">Publicar</button></form>' +
@@ -107,6 +120,7 @@
       if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) { A.toast('No entiendo el sitio. Pega las coordenadas (38.6123, -0.4712) o pulsa «usar mi ubicación».', 'warn'); return; }
       var a = new Date($('#spDay').value + 'T' + $('#spFrom').value), b = new Date($('#spDay').value + 'T' + $('#spTo').value);
       if (isNaN(a) || isNaN(b) || b <= a) { A.toast('Revisa las horas.', 'warn'); return; }
+      if (b.getTime() < Date.now()) { A.toast('Ese horario ya ha pasado: no saldría en la lista. Pon un día u hora que aún no haya terminado.', 'warn'); return; }
       var place = $('#spPlace').value.trim();
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
         return sb.from('photo_spots').insert({ user_id: me(), place: place, lat: lat, lon: lon, starts_at: a.toISOString(), ends_at: b.toISOString(), note: $('#spNote').value.trim() }).then(function (r) {
@@ -120,7 +134,7 @@
     var host = $('#phPane'), all = (D.pending || []).concat(D.people.map(function (p) { return Object.assign({ status: 'approved' }, p); }));
     host.innerHTML = all.length ? all.map(function (p) {
       return '<div class="club-card ph-card" data-u="' + p.user_id + '"><div class="ph-top"><div><b>' + esc(p.name) + '</b><span class="ph-place">' + esc(p.zones || 'Sin zonas') + '</span></div><span class="rt-tag ' + (p.status === 'approved' ? 'lv-facil' : p.status === 'pending' ? 'lv-media' : 'lv-exigente') + '">' + ({ approved: 'Aprobado', pending: 'Pendiente', rejected: 'Rechazado' })[p.status] + '</span></div>' +
-        (p.bio ? '<p class="rt-desc">' + esc(p.bio) + '</p>' : '') + (p.email ? '<span class="muted rg-small">' + esc(p.email) + '</span>' : '') + links(p) +
+        (p.bio ? '<p class="rt-desc">' + esc(p.bio) + '</p>' : '') + (p.account ? '<span class="muted rg-small">Cuenta: ' + esc(p.account) + '</span>' : '') + links(p) +
         '<div class="rt-acts">' + (p.status !== 'approved' ? '<button class="btn small primary" data-a="approved" type="button">Aprobar</button>' : '') + (p.status !== 'rejected' ? '<button class="link danger" data-a="rejected" type="button">' + (p.status === 'approved' ? 'Dar de baja' : 'Rechazar') + '</button>' : '') +
         (p.status === 'approved' ? '<button class="btn small" data-pro="' + (p.pro ? '0' : '1') + '" type="button">' + (p.pro ? 'Quitar plan Destacado' : 'Poner plan Destacado') + '</button>' : '') + '</div></div>';
     }).join('') : '<div class="empty">No hay fotógrafos todavía.</div>';
