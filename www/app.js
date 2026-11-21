@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.39.1';
+  var APP_VERSION = '0.40.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -1012,7 +1012,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       var mine = rides.filter(function (r) { return r.vehicleId === v.id || (!r.vehicleId && principal && principal.id === v.id); });
       var vkm = mine.reduce(function (s, r) { return s + (r.dist || 0); }, 0), vs = mine.reduce(function (s, r) { return s + (r.movingS || 0); }, 0), odo = Math.round((v.odoStart || 0) + vkm), digits = String(odo).padStart(6, '0');
       var d = document.createElement('div'); d.className = 'vehicle' + (v.principal ? ' main' : '');
-      d.innerHTML = '<div class="vhead"><div>' + (v.principal ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>principal</span>' : '<span class="label">' + (v.type === 'coche' ? 'Coche' : 'Moto') + '</span>') + '<div class="name">' + esc(v.name) + '</div><div class="muted">' + esc([v.make, v.model].filter(Boolean).join(' ')) + '</div></div></div>' +
+      d.innerHTML = '<div class="vhead"><div>' + (v.principal ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>principal</span>' : '<span class="label">' + (v.type === 'coche' ? 'Coche' : 'Moto') + '</span>') + '<div class="name">' + esc(v.name) + '</div><div class="muted">' + esc([[v.make, v.model].filter(Boolean).join(' '), v.leanLimit ? 'margen orientativo ' + v.leanLimit + '°' : ''].filter(Boolean).join(' · ')) + '</div></div></div>' +
         '<div><span class="label">Odómetro · km</span><br><span class="odo">' + digits.slice(0, 5) + '<b>' + digits.slice(5) + '</b></span></div>' +
         '<div class="vstats">' + fig('Rutas', String(mine.length)) + fig('Horas', (vs / 3600).toFixed(0)) + fig('Km en la app', Math.round(vkm) + '') + '</div>' +
         '<div class="actions">' + (v.principal ? '' : '<button class="btn small" type="button" data-act="main">Hacer principal</button>') + '<button class="btn small" type="button" data-act="edit"><svg><use href="#i-edit"/></svg>Editar</button><button class="btn small danger" type="button" data-act="del">Quitar del garaje</button></div>' +
@@ -1144,15 +1144,20 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     $('#vehicleFormTitle').textContent = v ? 'Editar vehículo' : 'Nuevo vehículo';
     $('#vName').value = v ? v.name : ''; $('#vMake').value = v ? v.make || '' : ''; $('#vModel').value = v ? v.model || '' : ''; $('#vOdo').value = v ? (v.odoStart || 0) : '';
     $$('#vType button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.t === vType)); });
+    $('#vStyle').value = v && v.style ? v.style : ''; $('#vLean').value = v && v.leanLimit ? v.leanLimit : ''; $('#vLeanShare').checked = !!(v && v.leanShare); $('#vLeanBox').hidden = vType === 'coche';
     $('#vehicleForm').hidden = false; $('#vName').focus();
   }
   $('#btnAddVehicle').addEventListener('click', function () { openVehicleForm(null); });
-  $$('#vType button').forEach(function (b) { b.addEventListener('click', function () { vType = b.dataset.t; $$('#vType button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
+  $$('#vType button').forEach(function (b) { b.addEventListener('click', function () { vType = b.dataset.t; $$('#vType button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); $('#vLeanBox').hidden = vType === 'coche'; }); });
+  // valor típico según el estilo: solo se propone si el campo está vacío o tenía otro valor típico
+  var LEAN_TYP = { custom: 30, scooter: 38, trail: 42, naked: 47, sport: 52 };
+  $('#vStyle').addEventListener('change', function () { var cur = parseInt($('#vLean').value, 10), typ = LEAN_TYP[this.value]; if (typ && (!cur || Object.keys(LEAN_TYP).some(function (k) { return LEAN_TYP[k] === cur; }))) $('#vLean').value = typ; });
   $('#vCancel').addEventListener('click', function () { $('#vehicleForm').hidden = true; }); $('#vClose').addEventListener('click', function () { $('#vehicleForm').hidden = true; });
   $('#vSave').addEventListener('click', function () {
     var name = $('#vName').value.trim(); if (!name) { $('#vName').focus(); return; }
     var v = editingVehicle || { id: Date.now(), principal: vehicles.length === 0 };
     v.name = name; v.make = $('#vMake').value.trim(); v.model = $('#vModel').value.trim(); v.type = vType; v.odoStart = Math.max(0, parseInt($('#vOdo').value, 10) || 0);
+    var ll = parseInt($('#vLean').value, 10); v.style = vType === 'coche' ? '' : $('#vStyle').value; v.leanLimit = vType !== 'coche' && ll >= 15 && ll <= 65 ? ll : null; v.leanShare = !!(v.leanLimit && $('#vLeanShare').checked);
     DB.putVehicle(v).then(reloadVehicles).then(function () { $('#vehicleForm').hidden = true; renderGarage(); return checkAchievements(); });
   });
 
@@ -1310,7 +1315,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     stopRide: function () { if (rec) stopRide(); },
     setAvatar: function (d) { setAvatar(d); },
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
-    map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, anyFix: function () { return lastFix || (quickFix ? { lat: quickFix.lat, lon: quickFix.lon, acc: quickFix.acc, ts: Date.now(), approx: true } : (savedFix ? { lat: savedFix.lat, lon: savedFix.lon, acc: 5000, ts: savedFix.t, approx: true } : null)); }, activePlan: function () { return planMode ? null : activePlan; },
+    map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, leanNow: function () { return est.state.ready && !sens.demo ? Math.abs(live.phi) : (sens.demo ? Math.abs(live.phi) : null); }, recInfo: function () { return rec ? { maxL: rec.maxL, maxR: rec.maxR } : null; }, anyFix: function () { return lastFix || (quickFix ? { lat: quickFix.lat, lon: quickFix.lon, acc: quickFix.acc, ts: Date.now(), approx: true } : (savedFix ? { lat: savedFix.lat, lon: savedFix.lon, acc: 5000, ts: savedFix.t, approx: true } : null)); }, activePlan: function () { return planMode ? null : activePlan; },
     isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { askAndStart(); }, reloadProfile: reloadProfile, setProfileName: setProfileName, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
     plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); }, vehicles: function () { return vehicles.slice(); },

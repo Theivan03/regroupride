@@ -29,7 +29,7 @@
   try { var nm0 = JSON.parse(localStorage.getItem('rg.club.names') || '{}'); S.names = nm0.n || {}; NAMES_AT = nm0.t || {}; } catch (e) {}
   function saveNames() { try { var ids = Object.keys(S.names).slice(-400), n = {}, t = {}; ids.forEach(function (id) { n[id] = S.names[id]; t[id] = NAMES_AT[id] || 0; }); localStorage.setItem('rg.club.names', JSON.stringify({ n: n, t: t })); } catch (e) {} }
   function fetchNames(ids) {
-    return sb.from('profiles').select('id,name,bike_brand,bike_model,avatar_url').in('id', ids).then(function (r) { (r.data || []).forEach(function (p) { S.names[p.id] = p; NAMES_AT[p.id] = Date.now(); }); saveNames(); });
+    return sb.from('profiles').select('id,name,bike_brand,bike_model,avatar_url,lean_limit').in('id', ids).then(function (r) { (r.data || []).forEach(function (p) { S.names[p.id] = p; NAMES_AT[p.id] = Date.now(); }); saveNames(); });
   }
   function names(ids) {
     var uniq = ids.filter(function (id, i) { return id && ids.indexOf(id) === i; }), need = uniq.filter(function (id) { return !S.names[id]; });
@@ -52,7 +52,7 @@
   }
   function who(id) { var p = S.names[id]; return (p && p.name) || 'Motero'; }
   function ava(id, cls) { var p = S.names[id], u = p && p.avatar_url; return '<span class="rg-ava' + (cls ? ' ' + cls : '') + '">' + (/^https:\/\//.test(u || '') ? '<img src="' + esc(u) + '" alt="" loading="lazy">' : esc(who(id).charAt(0).toUpperCase())) + '</span>'; }
-  function bike(id) { var p = S.names[id]; return p ? [p.bike_brand, p.bike_model].filter(Boolean).join(' ') : ''; }
+  function bike(id) { var p = S.names[id]; return p ? [p.bike_brand, p.bike_model].filter(Boolean).join(' ') + (p.lean_limit ? ' · margen ' + p.lean_limit + '°' : '') : ''; }
 
   /* ---------- carga ---------- */
   function load() {
