@@ -1186,3 +1186,17 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .ph-ico{overflow:hidden}.ph-ico img{width:100%;height:100%;object-fit:cover;display:block}
 
 .ph-safe{margin-bottom:2px}
+
+/* fila de comunidades: indica que se desliza de lado */
+.pills-wrap{position:relative;min-width:0}
+.pills-wrap .pills{display:flex;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-right:36px}
+.pills-wrap .pills::-webkit-scrollbar{display:none}
+.pills-wrap .pill{flex:none}
+.pills-more{position:absolute;right:-2px;top:0;bottom:0;width:56px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;font-size:30px;font-weight:800;line-height:1;color:var(--marca,#5A2DB0);background:linear-gradient(90deg,transparent,var(--fondo,#f3f1f8) 62%);pointer-events:none;opacity:0;transition:opacity .25s}
+.pills-wrap.more .pills-more{opacity:1;animation:rgNudge 1.6s ease-in-out infinite}
+@keyframes rgNudge{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+/* fotógrafos en el mapa */
+.ph-mk{width:38px;height:38px;border-radius:50% 50% 50% 6px;transform:rotate(-45deg);display:grid;place-items:center;background:#5A2DB0;border:2.5px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.35);cursor:pointer}
+.ph-mk span{transform:rotate(45deg);font-size:18px;line-height:1}
+.ph-mk.live{background:#D9F21C;animation:phPulse 1.8s ease-out infinite}
+@keyframes phPulse{0%{box-shadow:0 0 0 0 rgba(217,242,28,.7),0 4px 12px rgba(0,0,0,.35)}100%{box-shadow:0 0 0 16px rgba(217,242,28,0),0 4px 12px rgba(0,0,0,.35)}}

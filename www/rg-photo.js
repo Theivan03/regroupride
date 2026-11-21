@@ -30,7 +30,7 @@
     if (t) tab = t;
     Cl.sheet(head('Fotógrafos') + '<p class="muted">Cargando…</p>'); $('#phX').addEventListener('click', Cl.closeSheet);
     var f = fix();
-    sb.rpc('photo_list', { p_lat: f ? f.lat : null, p_lon: f ? f.lon : null }).then(function (r) { D = ok(r); draw(); })
+    sb.rpc('photo_list', { p_lat: f ? f.lat : null, p_lon: f ? f.lon : null }).then(function (r) { D = ok(r); draw(); try { if (paintMarks(D.spots || [])) marksAt = Date.now(); } catch (e) {} })
       .catch(function (e) { Cl.sheet(head('Fotógrafos') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>'); $('#phX').addEventListener('click', Cl.closeSheet); });
   }
   // La primera vez que se entra: un bocadillo, como los del tutorial, con el aviso de prudencia.
@@ -67,9 +67,12 @@
       return sep + '<div class="club-card ph-card"><div class="ph-top">' + pic(s, '📸') + '<div><b>' + esc(s.name) + '</b><span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(s.place) + '</span></div>' + (live ? '<span class="mstatus ok">Ahora</span>' : '') + '</div>' +
         '<div class="rt-meta"><span><svg><use href="#i-clock"/></svg>' + hhmm(s.starts_at) + ' – ' + hhmm(s.ends_at) + '</span>' + (s.km != null ? '<span><svg><use href="#i-route"/></svg>a ' + s.km + ' km de ti</span>' : '') + '</div>' +
         (s.note ? '<p class="rt-desc">' + esc(s.note) + '</p>' : '') +
-        '<div class="ph-links"><a class="btn small primary" href="https://www.google.com/maps/dir/?api=1&destination=' + s.lat + ',' + s.lon + '" target="_blank" rel="noopener"><svg><use href="#i-gmaps"/></svg>Cómo llegar</a></div>' + links(s) +
+        '<div class="ph-links"><button class="btn small primary" data-go="' + s.id + '" type="button"><svg><use href="#i-route"/></svg>Llévame</button><button class="btn small" data-see="' + s.id + '" type="button"><svg><use href="#i-map"/></svg>Ver en el mapa</button><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=' + s.lat + ',' + s.lon + '" target="_blank" rel="noopener"><svg><use href="#i-gmaps"/></svg>Google Maps</a></div>' + links(s) +
         (s.user_id === me() || D.admin ? '<button class="link danger" data-del="' + s.id + '" type="button">Quitar</button>' : '') + '</div>';
     }).join('') : '<div class="empty">Ahora mismo ningún fotógrafo ha avisado de dónde va a estar. Vuelve a mirar el fin de semana.</div>';
+    var byId = function (id) { return D.spots.filter(function (x) { return x.id === id; })[0]; };
+    $$('[data-go]', host).forEach(function (b) { b.addEventListener('click', function () { goTo(byId(b.dataset.go), b); }); });
+    $$('[data-see]', host).forEach(function (b) { b.addEventListener('click', function () { var s = byId(b.dataset.see), map = A.map && A.map(); Cl.closeSheet(); A.showView('map'); if (map) map.flyTo({ center: [s.lon, s.lat], zoom: 13 }); }); });
     $$('[data-del]', host).forEach(function (b) { b.addEventListener('click', function () { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = '¿Seguro? Toca otra vez'; return; } sb.from('photo_spots').delete().eq('id', b.dataset.del).then(function (r) { ok(r); open(); }).catch(fail); }); });
   }
   function panePeople() {
@@ -158,6 +161,46 @@
       Cl.busy(b, function () { return sb.rpc('photographer_set', { p_user: u, p_status: b.dataset.a || null, p_pro: b.dataset.pro ? b.dataset.pro === '1' : null }).then(function (r) { ok(r); A.toast('Hecho.', 'ok'); open('admin'); }); });
     }); });
   }
+
+  /* ---------- fotógrafos en el mapa: un punto donde hay uno o va a estar; al tocarlo, la ficha y «Llévame» ---------- */
+  var marks = [], marksAt = 0;
+  function goTo(s, btn) {
+    var f = fix(); if (!f) { A.toast('Todavía no tengo tu ubicación. Espera a que el mapa te sitúe.', 'warn'); return; }
+    Cl.busy(btn, function () { return A.routeBetween([[f.lon, f.lat], [s.lon, s.lat]]).then(function (r) {
+      if (!r || !r.coords || r.coords.length < 2) throw new Error('No se ha podido calcular la ruta hasta allí.');
+      Cl.closeSheet();
+      A.previewPlan({ id: Date.now(), name: 'Hasta ' + s.place, wps: [[f.lon, f.lat], [s.lon, s.lat]], pois: [], coords: r.coords, dist: Math.round(r.dist * 10) / 10, dur: Math.round(r.dur), routed: !!r.routed, steps: r.steps || [], created: Date.now() });
+      A.toast('Ruta hasta ' + s.place + ' en el mapa. Pulsa «Iniciar ruta» y ve a tu ritmo.', 'ok');
+    }); });
+  }
+  function spotSheet(s) {
+    var live = s.starts_at <= Date.now() && s.ends_at > Date.now();
+    Cl.sheet(head('Fotógrafo') + '<div class="club-card ph-card"><div class="ph-top">' + pic(s, '📸') + '<div><b>' + esc(s.name) + '</b><span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(s.place) + '</span></div>' + (live ? '<span class="mstatus ok">Ahora</span>' : '') + '</div>' +
+      '<div class="rt-meta"><span><svg><use href="#i-clock"/></svg>' + dayName(s.starts_at) + ' · ' + hhmm(s.starts_at) + ' – ' + hhmm(s.ends_at) + '</span>' + (s.km != null ? '<span><svg><use href="#i-route"/></svg>a ' + s.km + ' km de ti</span>' : '') + '</div>' + (s.note ? '<p class="rt-desc">' + esc(s.note) + '</p>' : '') + links(s) + '</div>' +
+      '<div class="rt-note warn"><b><svg><use href="#i-warn"/></svg>Sin forzar para la foto</b><p>Pasa a tu ritmo y por tu carril. Una foto no vale un susto.</p></div>' +
+      '<button class="btn big primary" id="phGo" type="button"><svg><use href="#i-route"/></svg>Llévame hasta allí</button><a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=' + s.lat + ',' + s.lon + '" target="_blank" rel="noopener"><svg><use href="#i-gmaps"/></svg>Abrir en Google Maps</a>');
+    $('#phX').addEventListener('click', Cl.closeSheet);
+    $('#phGo').addEventListener('click', function () { goTo(s, this); });
+  }
+  function paintMarks(spots) {
+    var map = A.map && A.map(); if (!map || !window.maplibregl) return false;
+    marks.forEach(function (m) { m.remove(); }); marks = [];
+    var seen = {};
+    spots.forEach(function (s) {
+      var k = s.lat.toFixed(4) + ',' + s.lon.toFixed(4) + '|' + s.user_id; if (seen[k]) return; seen[k] = 1;      // el mismo fotógrafo en el mismo sitio varios días: un solo punto (el más próximo)
+      var el = document.createElement('div'), live = s.starts_at <= Date.now() && s.ends_at > Date.now();
+      el.className = 'ph-mk' + (live ? ' live' : ''); el.innerHTML = '<span>📸</span>'; el.title = s.name + ' · ' + s.place;
+      el.addEventListener('click', function (ev) { ev.stopPropagation(); spotSheet(s); });
+      marks.push(new maplibregl.Marker({ element: el, anchor: 'bottom-left' }).setLngLat([s.lon, s.lat]).addTo(map));
+    });
+    return true;
+  }
+  function loadMarks(force) {
+    if (!me() || (!force && Date.now() - marksAt < 10 * 60000)) return;
+    var f = fix();
+    sb.rpc('photo_list', { p_lat: f ? f.lat : null, p_lon: f ? f.lon : null }).then(function (r) { if (r.error || !r.data) return; if (paintMarks(r.data.spots || [])) marksAt = Date.now(); }, function () {});
+  }
+  setTimeout(function () { loadMarks(true); }, 7000); setInterval(function () { if (document.visibilityState !== 'hidden') loadMarks(false); }, 60000);
 
   /* ---------- avisos de fotógrafos cerca ---------- */
   function off() { return store('rg.photo.off') === '1'; }
