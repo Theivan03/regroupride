@@ -73,7 +73,7 @@
   function repaint(cid) {
     var c = cur();
     if (!c || c.id !== cid || $('#view-club').hidden || !vis()) return;
-    var f = ({ events: paneEvents, routes: paneRoutes, board: paneBoard, pages: panePages, members: paneMembers })[S.tab];
+    var f = ({ events: paneEvents, routes: paneRoutes, groups: paneGroups, board: paneBoard, pages: panePages, members: paneMembers })[S.tab];
     if (f) f(c, false).catch(function () {});
   }
   // Lo último publicado de ese tipo en esa comunidad (con mi sesión: solo lo que ya podría ver).
@@ -137,7 +137,7 @@
     if (!c) { renderJoin(); return; }
     box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.zone || c.style ? '<span class="club-zone">' + icn('locate') + esc([c.zone, c.style].filter(Boolean).join(' · ')) + '</span>' : '') + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><div class="club-head-act">' + (isAdmin() ? '<button class="btn small" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '<button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button></div></div>' +
       '<div class="pills-wrap"><div class="pills" id="clPills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill pill-trips" type="button" id="clTrips" aria-pressed="false">' + icn('route') + 'Mis viajes</button><button class="pill pill-trips" type="button" id="clPhoto" aria-pressed="false">' + icn('camera') + 'Fotógrafos</button><button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button></div><span class="pills-more" aria-hidden="true">›</span></div>' +
-      '<div class="seg rg-wide seg-5" id="clTabs">' + [['events', 'Eventos'], ['routes', 'Rutas'], ['board', 'Tablón'], ['pages', 'Info'], ['members', 'Gente']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
+      '<div class="seg rg-wide seg-5 seg-6" id="clTabs">' + [['events', 'Eventos'], ['routes', 'Rutas'], ['groups', 'Grupos'], ['board', 'Tablón'], ['pages', 'Info'], ['members', 'Gente']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
     $('#clInvite').addEventListener('click', invite);
     if ($('#clEdit')) $('#clEdit').addEventListener('click', function () { editCommunity(c); });
     $('#clOther').addEventListener('click', renderJoin);
@@ -148,7 +148,7 @@
     $('#clPhoto').addEventListener('click', function () { if (window.RGPhoto) RGPhoto.open('spots'); });
     $$('[data-cid]', box).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); render(); }); });
     $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.t; render(); }); });
-    ({ events: paneEvents, routes: paneRoutes, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
+    ({ events: paneEvents, routes: paneRoutes, groups: paneGroups, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
   }
   function renderJoin() {
     box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Buscar comunidades</b><p class="muted">Encuentra grupos por nombre o por zona y únete.</p><div class="club-find-box">' + icn('search') + '<input type="text" inputmode="search" enterkeyhint="search" id="clFind" maxlength="40" placeholder="Nombre, pueblo, provincia…" autocomplete="off"></div><div id="clFound" class="club-found"><p class="muted">Cargando…</p></div></div>' +
@@ -191,6 +191,7 @@
       }); });
     }); });
   }
+  function paneGroups(c) { var pane = $('#clPane'); if (!pane || !window.RGGroups) return Promise.resolve(); return RGGroups.pane(c, pane); }
   function paneRoutes(c) {
     return sb.from('community_routes').select(RT_COLS).eq('community_id', c.id).order('created_at', { ascending: false }).then(function (r) {
       var rows = ok(r) || [], pane = $('#clPane'); if (!pane || S.tab !== 'routes' || !cur() || cur().id !== c.id) return;
@@ -665,7 +666,7 @@
     function load(force) {
       if (!$('#chList')) { clearInterval(chatT); return Promise.resolve(); }
       return sb.from('event_messages').select('id,user_id,body,created_at').eq('event_id', e.id).order('id', { ascending: false }).limit(200).then(function (r) {
-        var rows = ok(r).reverse(), top = rows.length ? rows[rows.length - 1].id : 0; if (top === last && !force) return;
+        var rows = ok(r).reverse().filter(function (x) { return !(window.RGGroups && RGGroups.hidden(x.user_id)); }), top = rows.length ? rows[rows.length - 1].id : 0; if (top === last && !force) return;
         return names(rows.map(function (x) { return x.user_id; })).catch(function () {}).then(function () {
           var el = $('#chList'); if (!el || el.dataset.ev !== e.id) return;
           var stick = last < 0 || el.scrollHeight - el.scrollTop - el.clientHeight < 80, day = '';
@@ -673,9 +674,10 @@
           el.innerHTML = rows.length ? rows.map(function (x) {
             var d = new Date(x.created_at), k = d.toDateString(), me = x.user_id === S.user.id, sep = '';
             if (k !== day) { day = k; sep = '<span class="ev-chat-day">' + d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) + '</span>'; }
-            return sep + '<div class="ev-msg' + (me ? ' me' : '') + '">' + (me ? '' : ava(x.user_id)) + '<div><b>' + esc(who(x.user_id)) + (bikeOf(x.user_id) ? ' <small>· ' + esc(bikeOf(x.user_id)) + '</small>' : '') + '</b><p>' + esc(x.body) + '</p><time>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '</time></div></div>';
+            return sep + '<div class="ev-msg' + (me ? ' me' : '') + '">' + (me ? '' : ava(x.user_id)) + '<div><b>' + esc(who(x.user_id)) + (bikeOf(x.user_id) ? ' <small>· ' + esc(bikeOf(x.user_id)) + '</small>' : '') + '</b><p>' + esc(x.body) + '</p><time>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + (me ? '' : '<button class="gr-more" data-crep="' + x.id + '" type="button" aria-label="Reportar">⋯</button>') + '</time></div></div>';
           }).join('') : '<p class="muted">Todavía no ha escrito nadie. Rompe el hielo: ¿de dónde sales?</p>';
           if (stick) el.scrollTop = el.scrollHeight;
+          $$('[data-crep]', el).forEach(function (b) { b.addEventListener('click', function () { var x = rows.filter(function (q) { return String(q.id) === b.dataset.crep; })[0]; if (!x || !window.RGGroups) return; clearInterval(chatT); RGGroups.report({ target: x.user_id, name: who(x.user_id), kind: 'mensaje', excerpt: x.body, place: 'Chat de ' + e.title, back: function () { chatSheet(e); } }); }); });
         });
       }).catch(function (er) { var el = $('#chList'); if (el && last < 0) el.innerHTML = '<p class="muted">' + esc(Cl.msg(er)) + '</p>'; });
     }
@@ -837,7 +839,7 @@
         pane.innerHTML = '<div id="clReqs"></div><span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span><div class="club-card club-people">' + ms.map(function (m) {
           var me = m.user_id === S.user.id;
           return '<div class="club-person" data-u="' + m.user_id + '">' + ava(m.user_id, m.role === 'admin' ? 'rol-admin' : 'rol-comp') + '<div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
-            (isAdmin() && !me ? '<span class="rg-macts"><button class="link" data-act="role" type="button">' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</button><button class="link danger" data-act="kick" type="button">Expulsar</button></span>' : '') + '</div>';
+            (!me ? '<span class="rg-macts">' + (isAdmin() ? '<button class="link" data-act="role" type="button">' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</button><button class="link danger" data-act="kick" type="button">Expulsar</button>' : '') + '<button class="link" data-rep="' + m.user_id + '" type="button">Reportar</button></span>' : '') + '</div>';
         }).join('') + '</div><button class="btn" id="clLeave" type="button"><svg><use href="#i-exit"/></svg>Salir de esta comunidad</button>';
         $$('[data-act]', pane).forEach(function (b) { b.addEventListener('click', function () {
           var uid = b.closest('.club-person').dataset.u, m = ms.filter(function (x) { return x.user_id === uid; })[0];
@@ -857,6 +859,7 @@
             }); });
           });
         }, function () {});
+        $$('[data-rep]', pane).forEach(function (b) { b.addEventListener('click', function () { if (window.RGGroups) RGGroups.report({ target: b.dataset.rep, name: who(b.dataset.rep), kind: 'persona', place: c.name, back: function () { Cl.closeSheet(); } }); }); });
         $('#clLeave').addEventListener('click', function (ev) {
           if (isAdmin() && ms.filter(function (x) { return x.role === 'admin'; }).length === 1 && ms.length > 1) { A.toast('Eres el único administrador: nombra a otro antes de salir.', 'warn'); return; }
           armed(ev.currentTarget, ms.length === 1 ? 'Eres el último: la comunidad se borrará. Toca otra vez' : '¿Seguro? Te quitas también de sus eventos. Toca otra vez', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; listAt = 0; inbox(true); return load().then(render); }).catch(fail); });
@@ -1092,5 +1095,5 @@
     if (u) setTimeout(pushRegister, 2500);
     if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) { forgetReminders(); liveSync(); } else setTimeout(function () { nativePending(); inbox(true); if (!S.loaded) load().catch(function () {}); else liveSync(); }, 1500); if (!$('#view-club').hidden) show(); }
   });
-  window.RGClub = { show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, ring: function (cid, m) { ring(cid, m); }, mine: function () { return IN.events.slice(); } };
+  window.RGClub = { show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, api: { names: names, who: who, ava: ava, isAdmin: isAdmin, cur: cur, S: S }, ring: function (cid, m) { ring(cid, m); }, mine: function () { return IN.events.slice(); } };
 })();

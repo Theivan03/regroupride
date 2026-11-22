@@ -1,0 +1,5 @@
+-- ReGroupRide · 29 — grupos dentro de la comunidad, reportes y «no ver más a alguien».
+-- Aplicado en producción como migraciones «grupos_y_reportes» y «grupos_ver_sin_autoconsulta» (texto completo allí).
+--  · reports + report_send(), dev_reports(), dev_report_set(); user_hides.
+--  · community_groups (kind 'chat'|'routes', can_write 'owner'|'admins'|'all', is_private), group_members, group_messages, group_mutes.
+--  · group_sees(), group_writes(), groups_list(); community_news() avisa de reportes (al creador) y de mensajes de los grupos.

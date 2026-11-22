@@ -725,7 +725,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
   function devView() {
     setBack(back('/'));
     if (!DV.d) app.innerHTML = '<p class="muted">Cargando…</p>';
-    Promise.all([rpc('dev_stats'), rpc('dev_feedback'), rpc('dev_users'), rpc('dev_communities'), rpc('dev_codes'), rpc('dev_blocks').catch(function () { return []; })]).then(function (r) { DV.d = { s: r[0], fb: r[1], us: r[2], co: r[3], cd: r[4], bl: r[5] || [] }; drawDev(); }, function (e) {
+    Promise.all([rpc('dev_stats'), rpc('dev_feedback'), rpc('dev_users'), rpc('dev_communities'), rpc('dev_codes'), rpc('dev_blocks').catch(function () { return []; }), rpc('dev_reports').catch(function () { return []; })]).then(function (r) { DV.d = { s: r[0], fb: r[1], us: r[2], co: r[3], cd: r[4], bl: r[5] || [], rp: r[6] || [] }; drawDev(); }, function (e) {
       app.innerHTML = '<div class="auth card"><h1>Panel del creador</h1><p class="msg bad">' + esc(/Solo el creador/.test(e.message || '') ? 'Esta página es solo para el creador de ReGroupRide.' : err(e)) + '</p><a class="btn" href="/">Ir al inicio</a></div>';
     });
   }
@@ -753,7 +753,7 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
   var T_CO = { all: function () { return true; }, solo: function (c) { return c.members <= 1; }, noev: function (c) { return !c.events; }, live: function (c) { return c.events_next > 0; }, pub: function (c) { return c.web_public; } };
   function drawDev() {
     var d = DV.d, tab = DV.tab, body = '', q = DV.q.toLowerCase(), has = function (t) { return !q || String(t || '').toLowerCase().indexOf(q) >= 0; };
-    var tabs = [['resumen', 'Resumen'], ['fb', 'Comentarios · ' + d.fb.filter(T_FB.pend).length], ['us', 'Cuentas · ' + d.us.length], ['co', 'Comunidades · ' + d.co.length], ['cd', 'Códigos · ' + d.cd.length]];
+    var tabs = [['resumen', 'Resumen'], ['fb', 'Comentarios · ' + d.fb.filter(T_FB.pend).length], ['us', 'Cuentas · ' + d.us.length], ['co', 'Comunidades · ' + d.co.length], ['cd', 'Códigos · ' + d.cd.length], ['rp', 'Reportes · ' + d.rp.filter(function (x) { return x.status === 'nuevo'; }).length]];
     var search = '<input id="dq" type="search" placeholder="Buscar…" value="' + esc(DV.q) + '" style="margin:0 0 12px">';
     if (tab === 'resumen') body = devSummary(d.s);
     else if (tab === 'fb') {
@@ -774,6 +774,16 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
         ((d.bl || []).length ? '<details style="margin-top:14px"><summary><b>Bloqueos activos (' + d.bl.length + ')</b> <span class="muted small">correos, teléfonos y aparatos que no pueden registrarse</span></summary><div class="list" style="margin-top:10px">' + d.bl.map(function (x) {
           return '<div class="card fb" data-id="' + x.id + '"><div class="meta"><span class="tag">' + ({ email: 'Correo', phone: 'Teléfono', device: 'Aparato', hw: 'Aparato (Android)' })[x.kind] + '</span><b>' + esc(x.kind === 'device' || x.kind === 'hw' ? x.value.slice(0, 12) + '…' : x.value) + '</b><span>' + esc(x.label) + '</span><span>' + dstr(x.at) + '</span></div><div class="act"><button class="btn" data-a="delblock" type="button">Quitar este bloqueo</button></div></div>';
         }).join('') + '</div></details>' : '');
+    } else if (tab === 'rp') {
+      var RS = { acoso: 'Acoso o insultos', temeraria: 'Conducción temeraria', spam: 'Spam', suplantacion: 'Suplantación', otro: 'Otro' }, RK = { persona: 'Persona', mensaje: 'Mensaje', ruta: 'Ruta', fotografo: 'Fotógrafo' };
+      DV.f.rp = DV.f.rp || 'nuevo';
+      var lr = d.rp.filter(function (x) { return DV.f.rp === 'all' || x.status === DV.f.rp; }).filter(function (x) { return has(x.target) || has(x.reporter) || has(x.detail) || has(x.excerpt); });
+      body = chips('rp', [['nuevo', 'Sin revisar'], ['resuelto', 'Resueltos'], ['descartado', 'Descartados'], ['all', 'Todos']], { nuevo: d.rp.filter(function (x) { return x.status === 'nuevo'; }).length, resuelto: d.rp.filter(function (x) { return x.status === 'resuelto'; }).length, descartado: d.rp.filter(function (x) { return x.status === 'descartado'; }).length, all: d.rp.length }) + search + '<div class="list">' + (lr.length ? lr.map(function (x) {
+        return '<div class="card fb" data-id="' + x.id + '" data-u="' + (x.target_id || '') + '"><div class="meta"><b>' + esc(x.target) + '</b><span class="tag">' + RS[x.reason] + '</span><span class="tag ok">' + RK[x.kind] + '</span>' + (x.target_blocked ? '<span class="tag" style="background:#d64545;color:#fff">Bloqueada</span>' : '') + (x.target_reports > 1 ? '<span class="tag">' + x.target_reports + ' reportes</span>' : '') + '<span>' + dstr(x.at, true) + '</span>' + (x.target_email ? '<a href="mailto:' + esc(x.target_email) + '">' + esc(x.target_email) + '</a>' : '') + '</div>' +
+          '<p class="txt2">' + esc(x.detail) + '</p>' + (x.excerpt ? '<p class="small" style="margin:0;padding:10px 12px;border-left:3px solid var(--marca);background:rgba(127,127,127,.1);border-radius:8px;white-space:pre-wrap"><b>Contenido reportado:</b> ' + esc(x.excerpt) + '</p>' : '') +
+          '<p class="muted small" style="margin:0">Lo reporta ' + esc(x.reporter) + (x.reporter_email ? ' (' + esc(x.reporter_email) + ')' : '') + (x.place ? ' · en ' + esc(x.place) : '') + '</p>' +
+          '<div class="act">' + (x.target_id && !x.target_blocked ? '<button class="btn del" data-a="rpblock" type="button">Bloquear la cuenta</button>' : '') + (x.status !== 'resuelto' ? '<button class="btn" data-a="rpdone" type="button">Marcar resuelto</button>' : '') + (x.status !== 'descartado' ? '<button class="btn" data-a="rpdrop" type="button">Descartar</button>' : '') + '</div></div>';
+      }).join('') : '<p class="muted">Nada con este filtro.</p>') + '</div>';
     } else if (tab === 'co') {
       var lc = d.co.filter(T_CO[DV.f.co]).filter(function (c) { return has(c.name) || has(c.owner) || has(c.people.join(' ')); });
       body = chips('co', [['all', 'Todas'], ['live', 'Con eventos próximos'], ['noev', 'Sin eventos'], ['solo', 'Con 1 miembro'], ['pub', 'Con página pública']], count(d.co, T_CO)) + search + '<div class="list">' + (lc.length ? lc.map(function (c) {
@@ -810,6 +820,8 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
         else if (a === 'block') sure(b, '¿Bloquear? No podrá entrar ni registrarse otra vez. Toca otra vez', function () { return rpc('dev_user_block', { p_id: id, p_on: true }).then(devView); });
         else if (a === 'unblock') busy(b, function () { return rpc('dev_user_block', { p_id: id, p_on: false }).then(devView); });
         else if (a === 'delblock') busy(b, function () { return rpc('dev_block_remove', { p_id: +id }).then(devView); });
+        else if (a === 'rpblock') sure(b, '¿Bloquear? No podrá entrar ni registrarse otra vez. Toca otra vez', function () { return rpc('dev_user_block', { p_id: el.dataset.u, p_on: true }).then(function () { return rpc('dev_report_set', { p_id: +id, p_status: 'resuelto' }); }).then(devView); });
+        else if (a === 'rpdone' || a === 'rpdrop') busy(b, function () { return rpc('dev_report_set', { p_id: +id, p_status: a === 'rpdone' ? 'resuelto' : 'descartado' }).then(devView); });
         else if (a === 'delcom') sure(b, '¿Seguro? Se borran sus eventos y miembros. Toca otra vez', function () { return rpc('dev_community_remove', { p_id: id }).then(devView); });
         else if (a === 'delcode') sure(b, '¿Seguro? Quien lo usó pierde la ventaja. Toca otra vez', function () { return rpc('dev_code_remove', { p_code: id }).then(devView); });
         else if (a === 'togcode') { var c = d.cd.filter(function (x) { return x.code === id; })[0]; busy(b, function () { return rpc('dev_code_save', { p_code: c.code, p_label: c.label, p_benefit: c.benefit, p_max: c.max_uses, p_expires: c.expires_at ? new Date(c.expires_at).toISOString() : null, p_active: !c.active }).then(devView); }); }

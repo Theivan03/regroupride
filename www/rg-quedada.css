@@ -1222,3 +1222,21 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 
 .rg-blocked{position:fixed;inset:0;z-index:9000;display:grid;place-items:center;padding:28px;background:var(--fondo,#14101F);color:var(--texto,#fff);text-align:center}
 .rg-blocked b{display:block;font-size:28px;margin-bottom:10px}.rg-blocked p{margin:0 0 8px;font-size:17px;line-height:1.45}
+
+/* ===== 0.43 · grupos de la comunidad y reportes ===== */
+.seg.seg-6 button{font-size:13px;padding-left:2px;padding-right:2px;letter-spacing:-.01em}
+.gr-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;border-radius:16px;padding:12px;background:var(--superficie,var(--color-surface));color:inherit;font:inherit;cursor:pointer}
+.gr-ico{flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--marca,#5A2DB0);color:var(--sobre-marca,#fff)}.gr-ico svg{width:22px;height:22px}
+.gr-info{flex:1;min-width:0}.gr-info b{display:flex;align-items:center;gap:6px;font-size:17px}.gr-info small{display:block;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gr-side{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:12px;opacity:.7}
+.gr-muted svg{width:16px;height:16px;opacity:.6}
+.gr-sub{text-align:left;margin:0}
+.gr-bar{display:flex;align-items:center;gap:10px}.gr-bar .btn{margin-left:auto}
+.gr-pin p{white-space:pre-wrap}
+.gr-more{border:0;background:none;color:inherit;font:inherit;font-size:16px;line-height:1;padding:0 0 0 8px;opacity:.7;cursor:pointer}
+.gr-acts{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(127,127,127,.3)}
+.gr-acts[hidden]{display:none}
+.ev-msg.me .gr-acts .link{color:inherit}
+.gr-route{display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:12px;background:rgba(127,127,127,.14);margin:4px 0}
+.gr-route b{display:flex;align-items:center;gap:6px;font-size:15px!important;color:inherit!important}.gr-route svg{width:16px;height:16px;flex:none}
+.ev-msg.me .gr-route b{display:flex}
