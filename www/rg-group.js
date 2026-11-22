@@ -12,7 +12,7 @@
   var C = window.Capacitor, native = !!(C && C.isNativePlatform && C.isNativePlatform()), P = native ? (C.Plugins || {}) : {};
   var EVERY = 15000, FAST = 5000;   // posiciones cada 15 s; el organizador, quien espera la salida y quien espera respuesta a un aviso, cada 5 s
   var RA = native && P.RideAlerts ? P.RideAlerts : null, noop = function () {};
-  var KIND = { sos: { t: 'SOS', say: 'pide ayuda', loud: true }, averia: { t: 'Avería', say: 'tiene una avería', loud: true }, gasolina: { t: 'Gasolina', say: 'necesita repostar', loud: false } };
+  var KIND = { sos: { t: 'SOS', say: 'pide ayuda', loud: true }, averia: { t: 'Avería', say: 'tiene una avería', loud: true }, gasolina: { t: 'Gasolina', say: 'necesita repostar', loud: false }, parada: { t: 'Parada', say: 'se ha parado y no responde', loud: true } };
   function speak(t) { if (A.settings.navVoice === true && window.Platform && Platform.canSpeak && Platform.canSpeak()) Platform.speak(t); }   // la voz viene apagada: se enciende en Ajustes
   var G = { s: null, rows: [], rank: null, lastSync: 0, busy: false, wasRec: false, markers: {}, timer: null, sheetOpen: false, skew: 0, alarm: null, bannerKey: '', lastTry: 0, admin: false, groups: null, groupsAt: 0, lastPace: 0, autoStart: 0, pop: null, callsAt: 0, callsOff: false };
   try { G.s = JSON.parse(localStorage.getItem('rg.group') || 'null'); } catch (e) {}
@@ -191,6 +191,50 @@
       G.busy = false; call();
     }, function () { if (!again) { A.toast('Sin cobertura: el aviso se enviará en cuanto haya señal.', 'warn'); speak('Sin cobertura. El aviso se enviará en cuanto haya señal.'); } });
   }
+  /* ---------- parada inesperada: si alguien del grupo se queda parado y no contesta, se avisa a los administradores ----------
+     Se mira en el móvil de quien se para. No cuenta si va entre los primeros (pueden estar esperando al resto) ni si se ha
+     parado con más gente (repostaje, reagrupar). Antes de avisar se le pregunta: si toca «Estoy bien», no pasa nada. */
+  var SW = { buf: [], movedAt: 0, okStop: false, ask: null };
+  function stopAskClose() { if (SW.ask) { clearInterval(SW.ask.t); SW.ask.el.remove(); SW.ask = null; } }
+  function stopAsk() {
+    if (SW.ask) return;
+    var el = document.createElement('div'); el.className = 'rg-stopask';
+    el.innerHTML = '<div class="rg-stopask-in"><b>¿Todo bien?</b><p>Te has parado y el grupo sigue. Si no tocas nada, aviso a los administradores en <span id="saN">30</span> s.</p>' +
+      '<button class="btn big primary" data-a="ok" type="button">Estoy bien</button><button class="btn big" data-a="help" type="button">Necesito ayuda</button></div>';
+    document.body.appendChild(el);
+    var end = Date.now() + 30000;
+    SW.ask = { el: el, t: setInterval(function () { var left = Math.ceil((end - Date.now()) / 1000), n = el.querySelector('#saN'); if (n) n.textContent = Math.max(0, left); if (left <= 0) { stopAskClose(); if (G.s && !G.s.myAlert) sendAlert('parada'); } }, 500) };
+    el.addEventListener('click', function (ev) { var b = ev.target.closest('[data-a]'); if (!b) return; stopAskClose(); SW.okStop = true; if (b.dataset.a === 'help') sendAlert('sos'); });
+    speak('Te has parado. Si estás bien, toca la pantalla.');
+    try { if (navigator.vibrate) navigator.vibrate([300, 150, 300]); } catch (e) {}
+  }
+  function stopWatch() {
+    var f = A.lastFix && A.lastFix(), now = Date.now(), uid = me();
+    if (!G.s || !uid || !f || now - f.ts > 20000) { SW.buf = []; stopAskClose(); return; }
+    SW.buf.push([now, f.lat, f.lon]); while (SW.buf.length && now - SW.buf[0][0] > 90000) SW.buf.shift();
+    var d15 = null, d75 = null;      // lo que me he movido en los últimos 15 y 75 segundos
+    for (var i = 0; i < SW.buf.length; i++) { var b = SW.buf[i], age = now - b[0], dd = L.dist(b[1], b[2], f.lat, f.lon); if (d75 == null && age >= 70000) d75 = dd; if (age >= 12000 && age <= 20000) d15 = dd; }
+    if (d15 != null && d15 > 60) {      // en marcha (más de unos 15 km/h)
+      SW.movedAt = now; SW.okStop = false; stopAskClose();
+      if (G.s.myAlert === 'parada') sendAlert(null);      // vuelvo a rodar: el aviso de parada se retira solo
+      return;
+    }
+    if (SW.ask || SW.okStop || G.s.myAlert || d75 == null || d75 > 30) return;      // parado menos de 70 s, ya preguntado o con otro aviso
+    if (!SW.movedAt || now - SW.movedAt > 15 * 60000) return;                        // solo si venía rodando
+    var mine = row(uid), others = G.rows.filter(function (r) { return r.user_id !== uid && r.lat != null; });
+    if (others.length < 2) return;
+    var near = others.filter(function (r) { return L.dist(f.lat, f.lon, r.lat, r.lon) < 200; }).length;
+    if (near >= 2 || near >= others.length / 2) { SW.okStop = true; return; }          // parada de grupo
+    if (mine && mine.along != null) {
+      var ahead = others.filter(function (r) { return r.along != null && r.along > mine.along + 300; }).length;
+      if (ahead < 2) { SW.okStop = true; return; }                                      // voy entre los primeros: puede ser una parada para esperar
+    } else {                                                                           // sin ruta marcada: solo si el grupo ya está lejos
+      var far = others.filter(function (r) { return L.dist(f.lat, f.lon, r.lat, r.lon) > 600; }).length;
+      if (far < Math.max(2, others.length / 2)) return;
+    }
+    stopAsk();
+  }
+  setInterval(stopWatch, 5000);
   function retryAlert() { if (G.s && G.s.alertPending && Date.now() - G.lastTry > 8000) sendAlert(G.s.myAlert, true); }
   function done(key) { if (!G.s) return; G.s.done = G.s.done || {}; G.s.done[key] = 1; save(); }
   // Mira los avisos que vienen en la lectura del grupo.

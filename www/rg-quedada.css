@@ -1212,3 +1212,10 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 #vStyle{width:100%;min-height:52px;border-radius:14px;border:1.5px solid transparent;background:var(--superficie-2,#e9ecf1);color:inherit;font:inherit;font-size:16px;padding:0 14px;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
 #vStyle:focus{outline:0;border-color:var(--marca,#5A2DB0)}
 #vLeanBox .two{align-items:end}
+
+/* ¿todo bien? — parada inesperada en una ruta en grupo */
+.rg-stopask{position:fixed;inset:0;z-index:4200;display:grid;place-items:center;padding:20px;background:rgba(10,8,20,.82);animation:rgFade .25s both}
+.rg-stopask-in{width:min(360px,100%);background:var(--superficie,#fff);color:var(--texto,#14101F);border-radius:24px;padding:22px;display:flex;flex-direction:column;gap:12px;text-align:center}
+.rg-stopask-in b{font-size:28px;line-height:1.1}.rg-stopask-in p{margin:0;font-size:17px;line-height:1.4}
+.rg-stopask-in #saN{font-weight:800;font-size:22px;color:#d64545}
+.rg-stopask-in .btn.big{min-height:64px;font-size:19px}

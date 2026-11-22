@@ -330,27 +330,49 @@
     sb.rpc('stats_add', { p_rides: o.n, p_km: Math.round(o.km * 10) / 10, p_moving_s: Math.round(o.s), p_corners: o.c, p_lean_sum: Math.round(o.lean * 10) / 10, p_lean_max: Math.round(o.max * 10) / 10 }).then(function (r) {
       if (r.error) return;
       todo.forEach(function (x) { sent[x.id] = 1; }); try { localStorage.setItem('rg.statsSent', JSON.stringify(sent)); } catch (e) {}
-      setTimeout(function () { levelNudge(false); }, 6000);
+      // (la propuesta de nivel ya no sale al guardar una ruta: solo al entrar en Ajustes y nunca en plena salida)
     }, function () {});
   }
   window.RGStats = { rideSaved: function () { setTimeout(sendStats, 1500); } };
 
   /* ---- ¿cuadra tu nivel con tus rutas? Se dice con cariño, y solo de vez en cuando ---- */
   function adviceText(adv, cur) {
-    var data = 'media de ' + adv.speed + ' km/h en movimiento y ' + adv.lean + '° en curva en ' + adv.rides + ' rutas', sug = '«' + L.LEVELS[adv.suggest] + '»';
+    var data = 'media de ' + adv.speed + ' km/h en movimiento y ' + adv.lean + '° en curva en tus ' + adv.rides + ' últimas rutas de carretera (las vueltas cortas y por ciudad no cuentan)', sug = '«' + L.LEVELS[adv.suggest] + '»';
     if (adv.dir === 'set') return ['Ya te vamos conociendo', 'Aún no has elegido nivel. Por tus rutas (' + data + '), lo tuyo es ' + sug + '.'];
     if (adv.dir === 'up') return ['Te estás quitando méritos', 'Tienes puesto «' + L.LEVELS[cur] + '», pero tus rutas (' + data + ') son más de ' + sug + '. No seas modesto: así el grupo que te toque irá a tu ritmo.'];
     return ['Entre tú y yo…', 'Tienes puesto «' + L.LEVELS[cur] + '», y nadie te quita lo bailado, pero tus rutas (' + data + ') suenan más a ' + sug + '. No es ninguna deshonra: con el nivel bien puesto te toca un grupo en el que disfrutas en vez de sufrir por seguir el ritmo.'];
+  }
+  // Para opinar sobre el nivel solo cuentan las rutas «de verdad»: al menos 30 km, 40 minutos en movimiento, 40 km/h de media
+  // en movimiento y 15 curvas medidas. Las vueltas por el pueblo, los recados y los trayectos cortos no entran, y solo se miran
+  // las 15 últimas. Para proponer BAJAR hace falta más: 6 rutas así y un nivel y medio de diferencia.
+  function realStats() {
+    var o = { rides: 0, km: 0, moving_s: 0, corners: 0, lean_sum: 0 };
+    (A.rides ? A.rides() : []).filter(function (r) {
+      if (r.demo || r.imported || r.inProgress) return false;
+      var km = r.dist || 0, s = r.movingS || 0, peaks = (r.corners || []).filter(function (c) { var x = Math.abs(c.peak || 0); return x >= 5 && x <= 70; }).length;
+      return km >= 30 && s >= 2400 && km / (s / 3600) >= 40 && peaks >= 15;
+    }).sort(function (a, b) { return (b.start || 0) - (a.start || 0); }).slice(0, 15).forEach(function (r) {
+      var peaks = (r.corners || []).map(function (c) { return Math.abs(c.peak || 0); }).filter(function (x) { return x >= 5 && x <= 70; });
+      o.rides++; o.km += r.dist; o.moving_s += r.movingS; o.corners += peaks.length; peaks.forEach(function (x) { o.lean_sum += x; });
+    });
+    return o;
+  }
+  function realAdvice(cur) {
+    var st = realStats(); if (st.rides < 4) return null;
+    var adv = L.levelAdvice(cur, st); if (!adv) return null;
+    if (adv.dir === 'down' && (st.rides < 6 || cur - adv.score < 1.5)) return null;
+    return adv;
   }
   function setLevel(lv) { return sb.from('profiles').update({ level: lv }).eq('id', user.id).then(function (r) { if (r.error) throw r.error; return refresh(); }); }
   // Después de guardar una ruta (o al entrar): si el nivel elegido y los datos no cuadran, se propone cambiarlo.
   // Si dice que no, no se vuelve a sacar el tema en un mes, salvo que los datos cambien de nivel.
   function levelNudge(force) {
     if (!sb || !user || A.isRec() || !$('#rgSheet').hidden) return;
-    sb.from('rider_stats').select('*').eq('user_id', user.id).maybeSingle().then(function (q) {
-      var cur = profile && profile.level, adv = L.levelAdvice(cur, q.data); if (!adv || A.isRec() || !$('#rgSheet').hidden) return;
+    if (window.RGGroup && RGGroup.state && RGGroup.state.s) return;      // en una ruta en grupo, ni mención
+    Promise.resolve().then(function () {
+      var cur = profile && profile.level, adv = realAdvice(cur); if (!adv || A.isRec() || !$('#rgSheet').hidden) return;
       var mem = null; try { mem = JSON.parse(localStorage.getItem('rg.levelNudge') || 'null'); } catch (e) {}
-      if (!force && mem && mem.s === adv.suggest && mem.l === (cur || 0) && Date.now() - mem.at < 30 * 86400e3) return;
+      if (!force && mem && mem.s === adv.suggest && mem.l === (cur || 0) && Date.now() - mem.at < 60 * 86400e3) return;
       try { localStorage.setItem('rg.levelNudge', JSON.stringify({ s: adv.suggest, l: cur || 0, at: Date.now() })); } catch (e) {}
       var t = adviceText(adv, cur);
       sheet('<div class="head"><h1>' + t[0] + '</h1></div><p>' + esc(t[1]) + '</p><p class="muted rg-small" style="text-align:left">El nivel solo lo ven los administradores de las rutas a las que vas, y sirve para repartir los grupos.</p>' +
@@ -608,7 +630,7 @@
     $('#rdX').addEventListener('click', closeSheet);
     sb.from('rider_stats').select('*').eq('user_id', user.id).maybeSingle().then(function (q) {
       var st = q.data, el = $('#rdStats'); if (!el || !st || !st.rides) return;
-      var adv = L.levelAdvice(lvl, st);
+      var adv = realAdvice(lvl);
       if (adv) {     // aquí se dice siempre, con un botón para ponerlo
         var tx = adviceText(adv, lvl), box = document.createElement('div'); box.className = 'notice rg-advice';
         box.innerHTML = '<div><b>' + esc(tx[0]) + '</b><span>' + esc(tx[1]) + '</span><button class="btn small" type="button">Poner «' + esc(L.LEVELS[adv.suggest]) + '»</button></div>';
