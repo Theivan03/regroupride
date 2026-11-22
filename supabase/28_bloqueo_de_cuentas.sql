@@ -1,0 +1,5 @@
+-- ReGroupRide · 28 — bloqueo de cuentas. Aplicado en producción como migraciones «bloqueo_de_cuentas» y «bloqueo_no_alcanza_al_creador».
+--  · blocks(kind 'email'|'phone'|'device'|'hw', value): lo que no puede volver a registrarse.
+--  · handle_new_user() rechaza el alta si el correo, el teléfono o el aparato están bloqueados.
+--  · app_ping(device, platform, version, hw) devuelve true si la cuenta o el aparato están bloqueados (el creador nunca).
+--  · dev_user_block(), dev_blocks(), dev_block_remove() para el panel.

@@ -512,8 +512,10 @@
   var SB_URL = 'https://lpkeaxtzfbuqjkkusjit.supabase.co', SB_KEY = 'sb_publishable_lUo3IlFV8X0pVL5HUfbgNA_VLeizTOw';   // clave pública: la seguridad la ponen las reglas de la base de datos
   var sb = null, user = null, profile = null;
   try { if (window.supabase && window.supabase.createClient) sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }); } catch (e) { sb = null; }
+  function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
   function msg(e) {
     var m = String((e && e.message) || e || '').toLowerCase();
+    if (m.indexOf('rg_blocked') >= 0 || m.indexOf('database error saving new user') >= 0 || m.indexOf('banned') >= 0) return 'No se puede usar ReGroupRide con estos datos o desde este dispositivo: la cuenta está bloqueada.';
     if (m.indexOf('invalid login') >= 0) return 'Correo o contraseña incorrectos.';
     if (m.indexOf('already registered') >= 0) return 'Ese correo ya tiene cuenta. Entra con tu contraseña.';
     if (m.indexOf('password should be') >= 0) return 'La contraseña tiene que tener al menos 6 caracteres.';
@@ -592,7 +594,7 @@
         var email = $('#rgEmail').value.trim(), pass = $('#rgPass').value, name = mode === 'signup' ? $('#rgName').value.trim() : '', lvl = mode === 'signup' ? +$('#rgLevel').value : 0, tel = mode === 'signup' ? $('#rgTel').value.trim() : '';
         busy(ev.target.querySelector('button[type=submit]'), function () {
           if (!sb) throw new Error('No se ha podido cargar la conexión con el servidor.');
-          var job = mode === 'login' ? sb.auth.signInWithPassword({ email: email, password: pass }) : sb.auth.signUp({ email: email, password: pass, options: { data: { name: name, phone: tel } } });
+          var job = mode === 'login' ? sb.auth.signInWithPassword({ email: email, password: pass }) : sb.auth.signUp({ email: email, password: pass, options: { data: { name: name, phone: tel, device: lsGet('rg.dev'), hw: lsGet('rg.hw') } } });
           return job.then(function (r) {
             if (r.error) throw r.error;
             if (mode === 'signup' && pic && A.setAvatar) A.setAvatar(pic);

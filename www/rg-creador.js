@@ -9,18 +9,29 @@
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); });
   }
 
-  /* ---------- señal de uso: una al día por aparato (y otra si se entra en una cuenta) ---------- */
+  /* ---------- señal de uso (una por arranque y al entrar en una cuenta) y comprobación de bloqueo ---------- */
+  // Identificador del aparato: el de Android (el mismo aunque se reinstale la app) cuando lo hay, además del propio de la app.
+  var hw = store('rg.hw') || '';
+  try { var Dv = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Device; if (native && Dv && Dv.getId) Dv.getId().then(function (r) { var v = r && (r.identifier || r.uuid); if (v) { hw = String(v); store('rg.hw', hw); } }, function () {}); } catch (e) {}
+  if (!store('rg.dev')) store('rg.dev', uuid());
+  function blockedScreen() {
+    if (document.querySelector('.rg-blocked')) return;
+    var el = document.createElement('div'); el.className = 'rg-blocked';
+    el.innerHTML = '<div><b>Cuenta bloqueada</b><p>No puedes usar ReGroupRide con esta cuenta ni desde este dispositivo.</p><p class="muted">Si crees que es un error, escribe al creador de la app.</p></div>';
+    document.body.appendChild(el);
+    try { store('rg.wall', '1'); Cl.sb.auth.signOut().then(function () {}, function () {}); } catch (e) {}
+  }
+  var pinged = '';
   function ping() {
     if (document.visibilityState && document.visibilityState !== 'visible') return;
-    var id = store('rg.dev'); if (!id) { id = uuid(); store('rg.dev', id); }
-    var u = Cl.user && Cl.user(), mark = new Date().toDateString() + '|' + (u ? u.id : '');
-    if (store('rg.ping') === mark) return;
-    Cl.sb.rpc('app_ping', { p_device: id, p_platform: native ? window.Capacitor.getPlatform() : 'web', p_version: (A && A.version) || '' })
-      .then(function (r) { if (!r.error) store('rg.ping', mark); }, function () {});
+    var id = store('rg.dev'), u = Cl.user && Cl.user(), mark = new Date().toDateString() + '|' + (u ? u.id : '');
+    if (pinged === mark) return;
+    Cl.sb.rpc('app_ping', { p_device: id, p_platform: native ? window.Capacitor.getPlatform() : 'web', p_version: (A && A.version) || '', p_hw: hw })
+      .then(function (r) { if (r.error) return; pinged = mark; if (r.data === true) blockedScreen(); }, function () {});
   }
-  setTimeout(ping, 4000);
+  setTimeout(ping, 3500);
   document.addEventListener('visibilitychange', function () { setTimeout(ping, 1500); });
-  setInterval(ping, 30 * 60000);
+  setInterval(ping, 60000);
 
   /* ---------- foto de perfil: la que pones en «Perfil» se sube a tu cuenta para que la vean los demás ---------- */
   var avaBusy = false;

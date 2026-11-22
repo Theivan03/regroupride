@@ -1219,3 +1219,6 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 .rg-stopask-in b{font-size:28px;line-height:1.1}.rg-stopask-in p{margin:0;font-size:17px;line-height:1.4}
 .rg-stopask-in #saN{font-weight:800;font-size:22px;color:#d64545}
 .rg-stopask-in .btn.big{min-height:64px;font-size:19px}
+
+.rg-blocked{position:fixed;inset:0;z-index:9000;display:grid;place-items:center;padding:28px;background:var(--fondo,#14101F);color:var(--texto,#fff);text-align:center}
+.rg-blocked b{display:block;font-size:28px;margin-bottom:10px}.rg-blocked p{margin:0 0 8px;font-size:17px;line-height:1.45}
