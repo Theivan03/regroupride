@@ -107,7 +107,7 @@
     latest(c, k).then(function (it) {
       if (!it) return;
       var v = vis();
-      if (v) A.toast(c.name + ' · ' + (k === 'event' ? 'Nuevo evento: ' : k === 'post' ? 'Tablón: ' : 'Info: ') + it.title, 'ok');
+      if (v) A.toast(c.name + ' · ' + (k === 'event' ? 'Nueva salida: ' : k === 'post' ? 'Tablón: ' : 'Info: ') + it.title, 'ok');
       if (RA && RA.newsNow) RA.newsNow({ items: [it], silent: v }).catch(function () {});
     });
   }
@@ -130,32 +130,41 @@
   function render() {
     if (!box) return;
     if (!sb) { box.innerHTML = '<div class="empty">No se ha podido conectar con el servidor.</div>'; return; }
-    if (!S.user) { box.innerHTML = '<div class="club-card"><b>Tu comunidad, en un solo sitio</b><p class="muted">Eventos y rutas, avisos, normas y descuentos. Entra en tu cuenta para unirte con el código que te pase el organizador.</p><button class="btn big primary" id="clLogin" type="button">Entrar o crear cuenta</button></div>'; $('#clLogin').addEventListener('click', function () { Cl.openAuth(false); }); return; }
+    if (!S.user) { box.innerHTML = '<div class="club-card"><b>Tu comunidad, en un solo sitio</b><p class="muted">Salidas y rutas, avisos, normas y descuentos. Entra en tu cuenta para unirte con el código que te pase el organizador.</p><button class="btn big primary" id="clLogin" type="button">Entrar o crear cuenta</button></div>'; $('#clLogin').addEventListener('click', function () { Cl.openAuth(false); }); return; }
     if (!S.loaded) { box.innerHTML = '<div class="empty">Cargando…</div>'; return; }
     if (S.missing) { box.innerHTML = '<div class="notice">Las comunidades aún no están activadas en el servidor. Falta ejecutar el archivo 02_comunidades.sql en Supabase.</div>'; return; }
     var c = cur();
     if (!c) { renderJoin(); return; }
-    box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.zone || c.style ? '<span class="club-zone">' + icn('locate') + esc([c.zone, c.style].filter(Boolean).join(' · ')) + '</span>' : '') + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><div class="club-head-act">' + (isAdmin() ? '<button class="btn small" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '<button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button></div></div>' +
-      '<div class="pills-wrap"><div class="pills" id="clPills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill pill-trips" type="button" id="clTrips" aria-pressed="false">' + icn('route') + 'Mis viajes</button><button class="pill pill-trips" type="button" id="clPhoto" aria-pressed="false">' + icn('camera') + 'Fotógrafos</button><button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button></div><span class="pills-more" aria-hidden="true">›</span></div>' +
-      '<div class="seg rg-wide seg-5 seg-6" id="clTabs">' + [['events', 'Eventos'], ['routes', 'Rutas'], ['groups', 'Grupos'], ['board', 'Tablón'], ['pages', 'Info'], ['members', 'Gente']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
+    box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.zone || c.style ? '<span class="club-zone">' + icn('locate') + esc([c.zone, c.style].filter(Boolean).join(' · ')) + '</span>' : '') + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><div class="club-head-act">' + (isAdmin() ? '<button class="btn small" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '<button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button><button class="btn small" data-hm="groups" type="button" aria-pressed="' + (S.tab === 'groups') + '">' + icn('list') + 'Charlas</button><button class="btn small" data-hm="pages" type="button" aria-pressed="' + (S.tab === 'pages') + '">' + icn('info') + 'Info</button></div></div>' +
+      '<div id="clMine"></div>' +
+      '<div class="pills-wrap"><div class="pills" id="clPills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button></div><span class="pills-more" aria-hidden="true">›</span></div>' +
+      '<div class="seg rg-wide" id="clTabs">' + [['events', 'Salidas'], ['routes', 'Rutas'], ['board', 'Tablón'], ['members', 'Gente']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
     $('#clInvite').addEventListener('click', invite);
     if ($('#clEdit')) $('#clEdit').addEventListener('click', function () { editCommunity(c); });
     $('#clOther').addEventListener('click', renderJoin);
     // la fila de arriba se desliza de lado: una flecha lo indica mientras quede algo por ver
     var pl = $('#clPills'), more = function () { if (pl) pl.parentNode.classList.toggle('more', pl.scrollWidth - pl.clientWidth - pl.scrollLeft > 8); };
     if (pl) { pl.addEventListener('scroll', more, { passive: true }); setTimeout(more, 60); setTimeout(more, 600); var on = pl.querySelector('[aria-pressed=true]'); if (on && on.offsetLeft > pl.clientWidth - 80) pl.scrollLeft = on.offsetLeft - 16; }
-    $('#clTrips').addEventListener('click', function () { if (window.RGTrips) RGTrips.list(); });
-    $('#clPhoto').addEventListener('click', function () { if (window.RGPhoto) RGPhoto.open('spots'); });
+    $$('[data-hm]', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.hm; render(); }); });
+    mineBlock();
     $$('[data-cid]', box).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); render(); }); });
     $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.t; render(); }); });
     ({ events: paneEvents, routes: paneRoutes, groups: paneGroups, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
+  }
+  function mineBlock() {
+    var el = $('#clMine'); if (!el) return;
+    var ev = IN.events.filter(function (e) { return e.starts_at > Date.now() - 6 * 36e5; }).sort(function (a, b) { return a.starts_at - b.starts_at; }).slice(0, 3);
+    el.innerHTML = '<div class="rg-mine">' + (ev.length ? '<span class="label">Mis próximas salidas</span>' + ev.map(function (e) { return '<button class="rg-mine-row" type="button" data-me="' + e.id + '"><b>' + esc(e.title) + '</b><span class="muted">' + esc(fmtWhen(e.starts_at)) + ' · ' + esc(e.community || '') + (e.status === 'waiting' ? ' · en espera' : e.status === 'offered' ? ' · ¡tienes plaza!' : '') + '</span></button>'; }).join('') : '') +
+      '<button class="rg-mine-row trips" type="button" id="clTrips">' + icn('route') + '<b>Mis viajes</b><span class="muted">Escapadas de varios días</span></button></div>';
+    $('#clTrips').addEventListener('click', function () { if (window.RGTrips) RGTrips.list(); });
+    $$('[data-me]', el).forEach(function (b) { b.addEventListener('click', function () { var e = IN.events.filter(function (x) { return x.id === b.dataset.me; })[0]; if (!e) return; if (e.status === 'offered') { offerSheet(e); return; } if (e.community_id && S.list.some(function (x) { return x.id === e.community_id; })) { setCid(e.community_id); S.tab = 'events'; render(); } else if (window.RGTrips) RGTrips.open(e.id); }); });
   }
   function renderJoin() {
     box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Buscar comunidades</b><p class="muted">Encuentra grupos por nombre o por zona y únete.</p><div class="club-find-box">' + icn('search') + '<input type="text" inputmode="search" enterkeyhint="search" id="clFind" maxlength="40" placeholder="Nombre, pueblo, provincia…" autocomplete="off"></div><div id="clFound" class="club-found"><p class="muted">Cargando…</p></div></div>' +
       '<div class="club-card"><b>Viajes de varios días</b><p class="muted">Organiza una escapada con etapas, alojamiento y gastos, con tu comunidad o entre amigos.</p><button class="btn" id="clTrips2" type="button" style="width:100%">' + icn('route') + 'Mis viajes</button></div>' +
       '<div class="club-card"><b>Fotógrafos en ruta</b><p class="muted">Mira qué fotógrafos están hoy en los puertos y dónde, para pasar por delante y llevarte tus fotos.</p><button class="btn" id="clPhoto2" type="button" style="width:100%">' + icn('camera') + 'Ver fotógrafos</button></div>' +
       '<div class="club-card"><b>Tengo un código</b><p class="muted">Escribe el código que te ha pasado el organizador.</p><div class="plan-link"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="clJoin" type="button">Unirme</button></div></div>' +
-      '<div class="club-card"><b>Crear una comunidad</b><p class="muted">Serás su administrador: podrás crear eventos, publicar avisos e invitar a la gente.</p><input type="text" id="clName" maxlength="60" placeholder="Nombre de la comunidad"><button class="btn" id="clCreate" type="button" style="margin-top:10px;width:100%">Crear comunidad</button></div>';
+      '<div class="club-card"><b>Crear una comunidad</b><p class="muted">Serás su administrador: podrás crear salidas, publicar avisos e invitar a la gente.</p><input type="text" id="clName" maxlength="60" placeholder="Nombre de la comunidad"><button class="btn" id="clCreate" type="button" style="margin-top:10px;width:100%">Crear comunidad</button></div>';
     if ($('#clBack')) $('#clBack').addEventListener('click', render);
     $('#clTrips2').addEventListener('click', function () { if (window.RGTrips) RGTrips.list(); });
     $('#clPhoto2').addEventListener('click', function () { if (window.RGPhoto) RGPhoto.open('spots'); });
@@ -259,7 +268,7 @@
       out.innerHTML = rows.length ? rows.map(function (x) {
         var btn = x.mine ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>Ya estás</span>' : x.requested ? '<span class="mstatus soon">Solicitud enviada</span>' :
           x.join_mode === 'open' ? '<button class="btn small primary" data-j="' + x.id + '" type="button">Unirme</button>' : x.join_mode === 'request' ? '<button class="btn small primary" data-j="' + x.id + '" data-ask="1" type="button">Pedir unirme</button>' : '<span class="muted rg-small">Solo con código</span>';
-        return '<div class="club-find"><div><b>' + esc(x.name) + '</b><span class="club-zone">' + icn('locate') + esc([x.zone || 'Sin zona', x.style].filter(Boolean).join(' · ')) + '</span><span class="muted rg-small">' + x.members + (x.members === 1 ? ' miembro' : ' miembros') + (x.events_next ? ' · ' + x.events_next + (x.events_next === 1 ? ' evento próximo' : ' eventos próximos') : '') + '</span>' + (x.description ? '<p>' + esc(x.description) + '</p>' : '') + (x.routes ? '<button class="link" data-cat="' + x.id + '" data-name="' + esc(x.name) + '" type="button">Ver sus ' + x.routes + (x.routes === 1 ? ' ruta' : ' rutas') + '</button>' : '') + '</div>' + btn + '</div>';
+        return '<div class="club-find"><div><b>' + esc(x.name) + '</b><span class="club-zone">' + icn('locate') + esc([x.zone || 'Sin zona', x.style].filter(Boolean).join(' · ')) + '</span><span class="muted rg-small">' + x.members + (x.members === 1 ? ' miembro' : ' miembros') + (x.events_next ? ' · ' + x.events_next + (x.events_next === 1 ? ' salida próxima' : ' salidas próximas') : '') + '</span>' + (x.description ? '<p>' + esc(x.description) + '</p>' : '') + (x.routes ? '<button class="link" data-cat="' + x.id + '" data-name="' + esc(x.name) + '" type="button">Ver sus ' + x.routes + (x.routes === 1 ? ' ruta' : ' rutas') + '</button>' : '') + '</div>' + btn + '</div>';
       }).join('') : '<p class="muted">' + (q ? 'No hay ninguna comunidad con «' + esc(q) + '».' : 'Todavía no hay comunidades en el buscador.') + ' Si la tuya no sale, pídele el código a su organizador.</p>';
       $$('[data-cat]', out).forEach(function (b) { b.addEventListener('click', function () { catalogSheet(b.dataset.cat, b.dataset.name); }); });
       $$('[data-j]', out).forEach(function (b) { b.addEventListener('click', function () {
@@ -277,7 +286,7 @@
       '<label>Descripción<textarea id="ceDesc" class="note" maxlength="600" placeholder="Quiénes sois, cuándo soléis salir, qué tipo de rutas hacéis…">' + esc(c.description || '') + '</textarea></label>' +
       '<label>Zona<input id="ceZone" maxlength="60" placeholder="Marina Alta, Alicante" value="' + esc(c.zone) + '"></label>' +
       '<label>Estilo o tipo de motos<input id="ceStyle" maxlength="60" placeholder="Curvas tranquilas, naked y sport, trail…" value="' + esc(c.style) + '"></label>' +
-      '<label class="rg-check"><input type="checkbox" id="ceListed"' + (c.listed ? ' checked' : '') + '><span><b>Aparecer en el buscador de comunidades</b><small>Cualquiera con la app podrá encontraros por nombre o zona. Solo se ve esta ficha: el tablón, los eventos y los miembros siguen siendo solo para quien esté dentro.</small></span></label>' +
+      '<label class="rg-check"><input type="checkbox" id="ceListed"' + (c.listed ? ' checked' : '') + '><span><b>Aparecer en el buscador de comunidades</b><small>Cualquiera con la app podrá encontraros por nombre o zona. Solo se ve esta ficha: el tablón, las salidas y los miembros siguen siendo solo para quien esté dentro.</small></span></label>' +
       '<label>Cómo se entra desde el buscador<select id="ceMode">' + Object.keys(MODES).map(function (k) { return '<option value="' + k + '"' + (c.mode === k ? ' selected' : '') + '>' + MODES[k] + '</option>'; }).join('') + '</select></label>' +
       '<button class="btn big primary" type="submit">Guardar</button></form>');
     $('#clX').addEventListener('click', Cl.closeSheet);
@@ -403,7 +412,7 @@
   }
   function drawEvents(c, evs, att) {
     var pane = $('#clPane'); if (!pane || S.tab !== 'events') return;
-    pane.innerHTML = (isAdmin() ? '<button class="btn big primary club-add" id="evNew" type="button"><svg><use href="#i-plus"/></svg>Nuevo evento o ruta</button><button class="btn club-add" id="evTrip" type="button">' + icn('route') + 'Nuevo viaje de varios días</button>' : '') + (evs.length ? evs.map(function (e) {
+    pane.innerHTML = (isAdmin() ? '<button class="btn big primary club-add" id="evNew" type="button"><svg><use href="#i-plus"/></svg>Nueva salida</button><button class="btn club-add" id="evTrip" type="button">' + icn('route') + 'Nuevo viaje de varios días</button>' : '') + (evs.length ? evs.map(function (e) {
       var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
       var taken = takenOf(att, e), queue = queueOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap;
       var st = mine ? mine.status : 'no', iGo = st === 'going', people = going.length + going.filter(function (x) { return x.companion; }).length;
@@ -436,7 +445,7 @@
         (e.trip ? '<button class="btn small primary ev-chat-btn" data-act="trip" type="button">' + ic('route') + 'Ver el viaje: etapas, alojamiento y gastos</button>' : '') +
         (canRun ? '<button class="btn small" data-act="manage" type="button">' + ic('people') + 'Inscritos y llegada</button>' : '') +
         (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
-    }).join('') : '<div class="empty">No hay eventos ni rutas próximas.' + (isAdmin() ? ' Crea el primero.' : '') + '</div>');
+    }).join('') : '<div class="empty">No hay salidas próximas.' + (isAdmin() ? ' Pulsa «Crear» para publicar la primera.' : '') + '</div>');
     if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
         if ($('#evTrip')) $('#evTrip').addEventListener('click', function () { if (window.RGTrips) RGTrips.create(c.id); });
     $$('.ev', pane).forEach(function (card) {
@@ -459,7 +468,7 @@
         else if (act === 'meet') openUrl(meetOf(e).url); else if (act === 'gomeet') goMeet(e, b);
         else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
         else if (act === 'trip') { if (window.RGTrips) RGTrips.open(e.id); } else if (act === 'bell') toggleMute(e.id); else if (act === 'chat') chatSheet(e); else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') manageSheet(e);
-        else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Evento borrado.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
+        else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Salida borrada.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
       }); });
     });
     covers(c, evs);
@@ -526,9 +535,9 @@
     var r = e.route;
     if (r && r.lite) {      // en la lista solo viene el resumen: la ruta entera se pide ahora
       A.toast('Cargando la ruta…', 'ok');
-      return sb.from('events').select('route').eq('id', e.id).single().then(function (q) { e.route = ok(q).route; if (e.route) loadRoute(e); else A.toast('Este evento no tiene ruta.', 'warn'); }).catch(fail);
+      return sb.from('events').select('route').eq('id', e.id).single().then(function (q) { e.route = ok(q).route; if (e.route) loadRoute(e); else A.toast('Esta salida no tiene ruta.', 'warn'); }).catch(fail);
     }
-    if (!r || !r.coords || r.coords.length < 2) { A.toast('Este evento no tiene ruta.', 'warn'); return; }
+    if (!r || !r.coords || r.coords.length < 2) { A.toast('Esta salida no tiene ruta.', 'warn'); return; }
     var p = { id: parseInt(e.id.replace(/-/g, '').slice(0, 12), 16), name: r.name || e.title, wps: r.wps || [], pois: r.pois || [], coords: r.coords, dist: r.dist || 0, dur: r.dur || 0, routed: true, steps: r.steps || [], created: Date.now(), eventId: e.id };
     A.usePlan(p).then(function () { A.toast('Ruta cargada. Pulsa «Iniciar ruta» cuando salgáis.', 'ok'); });
   }
@@ -646,14 +655,14 @@
     MUTES = MUTES || {}; var was = muted(id);
     if (was) delete MUTES[id]; else MUTES[id] = 1; paintBells();
     (was ? sb.from('event_chat_mutes').delete().eq('event_id', id).eq('user_id', S.user.id) : sb.from('event_chat_mutes').upsert({ event_id: id, user_id: S.user.id }))
-      .then(function (r) { ok(r); A.toast(was ? 'Te avisaré de los mensajes de este chat.' : 'Chat silenciado: no te llegarán avisos de este evento.', 'ok'); })
+      .then(function (r) { ok(r); A.toast(was ? 'Te avisaré de los mensajes de este chat.' : 'Chat silenciado: no te llegarán avisos de esta salida.', 'ok'); })
       .catch(function (er) { if (was) MUTES[id] = 1; else delete MUTES[id]; paintBells(); fail(er); });
   }
   setTimeout(loadMutes, 2500); setInterval(function () { if (MUTES === null) loadMutes(); }, 6000);
   var chatT = 0;
   function chatSheet(e) {
     clearInterval(chatT);
-    Cl.sheet('<div class="head"><h1>Chat del evento</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+    Cl.sheet('<div class="head"><h1>Chat de la salida</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
       '<p class="muted" style="text-align:left;margin:0">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + '. Solo lo ven quienes van y los administradores.</p>' +
       '<div class="ev-chat" id="chList"><p class="muted">Cargando…</p></div>' +
       '<form class="ev-chat-form" id="chForm"><input id="chIn" maxlength="1000" autocomplete="off" enterkeyhint="send" placeholder="Escribe un mensaje…" aria-label="Mensaje"><button class="ch-send" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></form>' +
@@ -694,7 +703,7 @@
   function ticketSheet(e) {
     Cl.sheet('<div class="head"><h1>Mi entrada</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
       '<div class="rg-ticket"><div class="rg-ticket-qr" id="tkQr"><span class="muted">Cargando…</span></div><b>' + esc(e.title) + '</b><span class="muted">' + fmtWhen(e.starts_at) + '</span><span class="muted rg-small">Enseña este código al llegar: el organizador lo lee y marca tu llegada.</span></div>' +
-      '<button class="btn" id="tkWeb" type="button">' + icn('share') + 'Compartir el evento</button>');
+      '<button class="btn" id="tkWeb" type="button">' + icn('share') + 'Compartir la salida</button>');
     $('#clX').addEventListener('click', Cl.closeSheet);
     $('#tkWeb').addEventListener('click', function () { var u = WEB + '/?e=' + e.id; if (navigator.share) navigator.share({ title: e.title, url: u }).catch(function () {}); else openUrl(u); });
     sb.rpc('event_public', { p_id: e.id }).then(function (r) {
@@ -715,13 +724,13 @@
   function eventForm(c, e) {
     var plans = A.plans(), keep = e && e.route ? '<option value="keep" selected>' + esc('Mantener: ' + (e.route.name || 'ruta actual')) + '</option>' : '';
     var link0 = e ? (e.meet_url || (e.meet_lat != null ? L.mapsPointUrl(e.meet_lat, e.meet_lon) : '')) : '', v6 = S.v6 !== false;
-    Cl.sheet('<div class="head"><h1>' + (e ? 'Editar evento' : 'Nuevo evento') + '</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><form class="rg-form" id="evForm">' +
+    Cl.sheet('<div class="head"><h1>' + (e ? 'Editar salida' : 'Nueva salida') + '</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><form class="rg-form" id="evForm">' +
       '<label>Nombre<input id="evTitle" required maxlength="120" value="' + esc(e ? e.title : '') + '" placeholder="Ruta del domingo"></label>' +
       '<label>Día y hora de salida<input id="evWhen" type="datetime-local" required value="' + localInput(e && e.starts_at) + '"></label>' +
       '<label>Punto de salida<input id="evMeet" maxlength="120" value="' + esc(e ? e.meet_name : '') + '" placeholder="Gasolinera de…"></label>' +
       (v6 ? '<label>Enlace de Google Maps del punto de salida<input id="evMeetUrl" inputmode="url" maxlength="600" value="' + esc(link0) + '" placeholder="Pega aquí el enlace del sitio"></label>' +
         '<div class="rg-row" style="margin-top:-4px"><button class="btn small" id="evPaste" type="button">Pegar</button><button class="btn small" id="evHere" type="button">Usar donde estoy ahora</button></div>' +
-        '<p class="muted rg-small" style="text-align:left">En Google Maps: toca el sitio → Compartir → Copiar enlace. Si lo dejas vacío y el evento lleva ruta, la salida es donde empieza la ruta.</p>' +
+        '<p class="muted rg-small" style="text-align:left">En Google Maps: toca el sitio → Compartir → Copiar enlace. Si lo dejas vacío y la salida lleva ruta, el punto de encuentro es donde empieza la ruta.</p>' +
         '<label>Plazas (motos)<input id="evCap" type="number" inputmode="numeric" min="1" max="1000" value="' + (e && e.capacity ? e.capacity : '') + '" placeholder="Sin límite"></label>' +
         '<p class="muted rg-small" style="text-align:left">Con límite, quien se apunte cuando esté lleno queda en lista de espera. Si alguien se desapunta, la plaza se ofrece al siguiente y tiene que confirmar.</p>'
         : (isAdmin() ? '<p class="muted rg-small" style="text-align:left">Para poner límite de plazas, lista de espera y enlace de Maps de la salida falta ejecutar <b>supabase/06_plazas_y_salida.sql</b> en Supabase.</p>' : '')) +
@@ -769,8 +778,8 @@
             return r;
           }).then(function (r) {
             ok(r);
-            if (e && !isAdmin() && r.data && !r.data.length) throw new Error('No se ha podido guardar: para que los administradores de la ruta puedan editar el evento falta ejecutar supabase/10_tiempo_real.sql.');
-            Cl.closeSheet(); A.toast(warn || (e ? 'Evento actualizado.' : 'Evento publicado.'), warn ? 'warn' : 'ok');
+            if (e && !isAdmin() && r.data && !r.data.length) throw new Error('No se ha podido guardar: para que los administradores de la ruta puedan editar la salida falta ejecutar supabase/10_tiempo_real.sql.');
+            Cl.closeSheet(); A.toast(warn || (e ? 'Salida actualizada.' : 'Salida publicada.'), warn ? 'warn' : 'ok');
             ring(c.id, { kind: e ? 'edit' : 'event' }); inbox(true); return paneEvents(c);
           });
         });
@@ -862,7 +871,7 @@
         $$('[data-rep]', pane).forEach(function (b) { b.addEventListener('click', function () { if (window.RGGroups) RGGroups.report({ target: b.dataset.rep, name: who(b.dataset.rep), kind: 'persona', place: c.name, back: function () { Cl.closeSheet(); } }); }); });
         $('#clLeave').addEventListener('click', function (ev) {
           if (isAdmin() && ms.filter(function (x) { return x.role === 'admin'; }).length === 1 && ms.length > 1) { A.toast('Eres el único administrador: nombra a otro antes de salir.', 'warn'); return; }
-          armed(ev.currentTarget, ms.length === 1 ? 'Eres el último: la comunidad se borrará. Toca otra vez' : '¿Seguro? Te quitas también de sus eventos. Toca otra vez', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; listAt = 0; inbox(true); return load().then(render); }).catch(fail); });
+          armed(ev.currentTarget, ms.length === 1 ? 'Eres el último: la comunidad se borrará. Toca otra vez' : '¿Seguro? Te quitas también de sus salidas. Toca otra vez', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; listAt = 0; inbox(true); return load().then(render); }).catch(fail); });
         });
       })(); }, useCache);
   }
@@ -1069,7 +1078,7 @@
       var is = noticeIssues(st), r = st.lastResult || '', last;
       if (!st.lastCheck) last = 'Aún no ha comprobado nada: empieza al apuntarte en una lista de espera o al entrar en una comunidad.';
       else last = 'Última comprobación ' + ago(st.lastCheck) + ': ' + (r === 'falta08' ? 'falta ejecutar supabase/08_plaza_avisada.sql en Supabase, así que no puede avisar de plazas con la app cerrada.'
-        : r === 'sinred' ? 'sin conexión.' : r === 'plaza' ? 'te ha avisado de una plaza.' : /^ok:[1-9]/.test(r) ? 'en lista de espera en ' + r.slice(3) + (r.slice(3) === '1' ? ' evento' : ' eventos') + ', sin plaza todavía.' : 'todo en orden.');
+        : r === 'sinred' ? 'sin conexión.' : r === 'plaza' ? 'te ha avisado de una plaza.' : /^ok:[1-9]/.test(r) ? 'en lista de espera en ' + r.slice(3) + (r.slice(3) === '1' ? ' salida' : ' salidas') + ', sin plaza todavía.' : 'todo en orden.');
       box.innerHTML = '<span class="label">Avisos con la app cerrada</span><div class="card rg-noti">' +
         (is.length ? is.map(function (x) { return '<div class="rg-nrow"><span>' + x[1] + '</span><button class="btn small" data-w="' + x[0] + '" type="button">' + x[2] + '</button></div>'; }).join('')
           : '<p class="rg-nok"><svg><use href="#i-check"/></svg>Este móvil deja avisar con la app cerrada (comprueba cada minuto).</p>') +
@@ -1095,5 +1104,5 @@
     if (u) setTimeout(pushRegister, 2500);
     if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) { forgetReminders(); liveSync(); } else setTimeout(function () { nativePending(); inbox(true); if (!S.loaded) load().catch(function () {}); else liveSync(); }, 1500); if (!$('#view-club').hidden) show(); }
   });
-  window.RGClub = { show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, api: { names: names, who: who, ava: ava, isAdmin: isAdmin, cur: cur, S: S }, ring: function (cid, m) { ring(cid, m); }, mine: function () { return IN.events.slice(); } };
+  window.RGClub = { newEvent: function () { var c = cur(); if (!c) { A.showView('club'); return false; } if (!isAdmin()) return false; S.tab = 'events'; A.showView('club'); eventForm(c, null); return true; }, catalog: function (cid, name) { catalogSheet(cid, name); }, goto: function (cid, tab) { if (cid) setCid(cid); if (tab) S.tab = tab; A.showView('club'); }, show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, api: { names: names, who: who, ava: ava, isAdmin: isAdmin, cur: cur, S: S }, ring: function (cid, m) { ring(cid, m); }, mine: function () { return IN.events.slice(); } };
 })();

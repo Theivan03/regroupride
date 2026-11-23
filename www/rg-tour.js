@@ -5,16 +5,15 @@
   var $ = function (s) { return document.querySelector(s); };
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
   var STEPS = [
-    { t: '¡Bienvenido a ReGroupRide!', x: 'En medio minuto te enseño dónde está cada cosa. Puedes saltarlo cuando quieras y repetirlo desde Ajustes.' },
-    { s: '#btnProfile', v: 'map', t: 'Tu perfil', x: 'Empieza por aquí: pon tu nombre y tu foto con el botón «Cambiar foto de perfil». Es lo que verá el resto del grupo.' },
+    { t: '¡Bienvenido a ReGroupRide!', x: 'En medio minuto te enseño dónde está cada cosa. Puedes saltarlo cuando quieras y repetirlo desde Yo → Ajustes → Ayuda.' },
+    { s: '.tab[data-view=profile]', t: 'Yo', x: 'Empieza por aquí: pon tu nombre y tu foto. Dentro están también tus estadísticas, tus logros y los ajustes de la app.' },
     { s: '#btnRide', v: 'map', t: 'Iniciar ruta', x: 'Empieza a grabar tu salida: recorrido, kilómetros, velocidad e inclinación en cada curva.' },
     { s: '#btnTrip', v: 'map', t: 'Trayecto', x: 'Para un desplazamiento corto: mide tiempo y kilómetros sin guardar el recorrido.' },
-    { s: '#btnMore', v: 'map', t: 'Opciones del mapa', x: 'Centrar el mapa, planificar una ruta, aparcar la moto, capas… todo lo del mapa está aquí.' },
-    { s: '.tab[data-view=rides]', t: 'Rutas', x: 'Tus rutas grabadas y planificadas, y las que comparten otros moteros.' },
-    { s: '.tab[data-view=club]', t: 'Comunidad', x: 'El corazón de la app: únete a tu grupo, apúntate a sus eventos, habla en el chat de cada salida y rodad juntos sin perder a nadie.' },
-    { s: '.tab[data-view=stats]', t: 'Datos', x: 'Tus números: kilómetros, inclinaciones máximas, logros y evolución.' },
-    { s: '.tab[data-view=garage]', t: 'Garaje', x: 'Tus motos y su mantenimiento. La moto que guardes aquí se usa al apuntarte a un evento.' },
-    { s: '.tab[data-view=settings]', t: 'Ajustes', x: 'Tu cuenta, los permisos y la voz. Aquí también verás quién ha creado ReGroupRide y podrás escribirle tus sugerencias o los fallos que encuentres.' },
+    { s: '#btnMore', v: 'map', t: 'Opciones del mapa', x: 'Centrar el mapa, rodar en un grupo en vivo, aparcar la moto, capas… todo lo del mapa está aquí.' },
+    { s: '#btnBell', v: 'map', t: 'Avisos y chats', x: 'La campana reúne todo lo que no has leído: novedades de tus comunidades, chats de tus salidas y charlas.' },
+    { s: '.tab[data-view=rides]', t: 'Explorar', x: 'Para buscar por dónde salir: planifica una ruta, mira las de otros moteros y las de tus comunidades, y encuentra fotógrafos.' },
+    { s: '.tab[data-view=club]', t: 'Comunidad', x: 'El corazón de la app: únete a tu grupo, apúntate a sus salidas, habla en el chat de cada una y rodad juntos sin perder a nadie.' },
+    { s: '.tab[data-view=garage]', t: 'Garaje', x: 'Tus motos y su mantenimiento. La moto que guardes aquí se usa al apuntarte a una salida.' },
     { t: '¡Listo para rodar!', x: 'Lo primero: entra en Comunidad y únete a tu grupo con el código que te pase el organizador. Buena ruta.', end: true }
   ];
   var el = null, i = 0, running = false;

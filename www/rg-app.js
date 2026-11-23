@@ -897,9 +897,9 @@
     });
   }
   window.RGPerm = { ensure: ensure, render: renderPerms };
-  var tabSet = document.querySelector('.tab[data-view="settings"]'); if (tabSet) tabSet.addEventListener('click', renderPerms);
+  document.addEventListener('rg:view', function (e) { if (e.detail === 'settings') renderPerms(); });
   // El consejo de nivel sale al guardar una ruta y al entrar en Ajustes, nunca en mitad de otra cosa.
-  if (tabSet) tabSet.addEventListener('click', function () { setTimeout(function () { levelNudge(false); }, 900); });
+  document.addEventListener('rg:view', function (e) { if (e.detail === 'settings') setTimeout(function () { levelNudge(false); }, 900); });
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !$('#view-settings').hidden) renderPerms(); });
 
   // Indicaciones por voz

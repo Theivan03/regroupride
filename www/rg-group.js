@@ -478,10 +478,10 @@
   function arm(btn, label, run) { if (btn.dataset.armed) { run(); return; } btn.dataset.armed = '1'; var old = btn.innerHTML; btn.textContent = label; setTimeout(function () { delete btn.dataset.armed; btn.innerHTML = old; }, 3500); }
   function renderJoin() {
     var p = A.activePlan();
-    Cl.sheet(head('Rodar en grupo') + '<p class="muted">Todos los del grupo se ven en el mapa durante la ruta, y se sabe quién se ha quedado atrás o se ha salido.</p>' +
-      '<div class="club-card"><b>Unirme a un grupo</b><p class="muted">Escribe el código que te pasen o escanea su QR. La ruta se carga sola.</p><div class="plan-link"><input type="text" id="grCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="grJoin" type="button">Unirme</button></div>' +
+    Cl.sheet(head('Grupo en vivo') + '<p class="muted">Todos los del grupo se ven en el mapa durante la ruta, y se sabe quién se ha quedado atrás o se ha salido.</p>' +
+      '<div class="club-card"><b>Unirme a un grupo en vivo</b><p class="muted">Escribe el código que te pasen o escanea su QR. La ruta se carga sola.</p><div class="plan-link"><input type="text" id="grCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="grJoin" type="button">Unirme</button></div>' +
       (P.CapacitorBarcodeScanner ? '<button class="btn" id="grScan" type="button"><svg><use href="#i-qr"/></svg>Escanear QR</button>' : '') + '</div>' +
-      '<div class="club-card"><b>Crear un grupo</b>' + (p ? '<p class="muted">Para la ruta «' + esc(p.name) + '». Te dará un código y un QR para pasar a los demás.</p><button class="btn big primary" id="grCreate" type="button">Crear grupo para esta ruta</button><button class="btn rg-skip" id="grFree" type="button">Crear grupo sin ruta</button>'
+      '<div class="club-card"><b>Crear un grupo en vivo</b>' + (p ? '<p class="muted">Para la ruta «' + esc(p.name) + '». Te dará un código y un QR para pasar a los demás.</p><button class="btn big primary" id="grCreate" type="button">Crear grupo para esta ruta</button><button class="btn rg-skip" id="grFree" type="button">Crear grupo sin ruta</button>'
         : '<p class="muted">Sin ruta marcada: os veis todos en el mapa y cada uno sabe por dónde va. Te dará un código y un QR para pasar a los demás.</p><button class="btn big primary" id="grFree" type="button">Crear grupo</button>') + '</div>');
     $('#grX').addEventListener('click', close);
     var join = function (code, btn) {

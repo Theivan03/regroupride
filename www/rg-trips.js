@@ -293,7 +293,7 @@
   // cid: comunidad donde se crea (administradores). Sin cid: viaje entre amigos, con su grupo oculto y su código.
   function create(cid) {
     var d1 = new Date(Date.now() + 14 * 864e5), d2 = new Date(d1.getTime() + 2 * 864e5);
-    Cl.sheet(head(cid ? 'Nuevo viaje' : 'Viaje entre amigos') + '<p class="muted" style="text-align:left;margin:0">' + (cid ? 'Se publica en la comunidad como un evento de varios días.' : 'Solo lo ve quien tenga el código que tú le pases.') + ' Después añades las etapas, el alojamiento y los gastos.</p>' +
+    Cl.sheet(head(cid ? 'Nuevo viaje' : 'Viaje entre amigos') + '<p class="muted" style="text-align:left;margin:0">' + (cid ? 'Se publica en la comunidad como una salida de varios días.' : 'Solo lo ve quien tenga el código que tú le pases.') + ' Después añades las etapas, el alojamiento y los gastos.</p>' +
       '<form class="rg-form" id="trNewF"><label>Nombre del viaje<input id="nT" required minlength="2" maxlength="120" placeholder="Pirineos en tres días"></label><div class="tr-two"><label>Sale el<input id="nA" type="date" required value="' + ymd(d1) + '"></label><label>Vuelve el<input id="nB" type="date" required value="' + ymd(d2) + '"></label></div><button class="btn big primary" type="submit">Crear viaje</button></form>');
     $('#trX').addEventListener('click', Cl.closeSheet);
     $('#trNewF').addEventListener('submit', function (ev) {

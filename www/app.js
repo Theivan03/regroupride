@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.43.0';
+  var APP_VERSION = '0.44.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -649,7 +649,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     currentView = name;
     for (var k in views) views[k].hidden = k !== name;
     if (changed) { var vw = views[name]; vw.classList.remove('rg-in'); void vw.offsetWidth; vw.classList.add('rg-in'); clearTimeout(inTimer); inTimer = setTimeout(function () { vw.classList.remove('rg-in'); }, 900); }
-    $$('.tab').forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.view === (name === 'detail' ? 'rides' : (name === 'profile' ? 'map' : name)))); });
+    $$('.tab').forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.view === (name === 'detail' ? 'rides' : (name === 'stats' || name === 'settings' ? 'profile' : name)))); });
     if (name === 'map') { if (!rec) startGps('fg'); if (map) setTimeout(function () { map.resize(); }, 50); }
     else if (!rec && gpsMode === 'fg' && name !== 'detail') stopGps();
     if (name === 'club' && window.RGClub) RGClub.show();
@@ -660,6 +660,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     if (name === 'profile') renderProfile();
     if (name !== 'detail') stopReplay();
     views[name].scrollTop = 0;
+    try { document.dispatchEvent(new CustomEvent('rg:view', { detail: name })); } catch (e) {}
   }
   $$('.tab').forEach(function (t) { t.addEventListener('click', function () { showView(t.dataset.view); }); });
   function openLeanFull() { $('#leanFull').hidden = false; startMotion(); if (!gpsMode && !rec) startGps('fg'); }
@@ -681,6 +682,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     $('#ridesSummary').innerHTML = fig('Total', Math.round(km) + '<span class="unit">km</span>') + fig('Este año', Math.round(kmYear) + '<span class="unit">km</span>') + fig('Horas', hours.toFixed(1).replace('.', ',')) + fig('Media', (rides.length ? Math.round(km / rides.length) : 0) + '<span class="unit">km</span>');
     var hasCar = vehicles.some(function (v) { return v.type === 'coche'; }); $('#pillMoto').hidden = !hasCar; $('#pillCoche').hidden = !hasCar;
     if (ridesFilter === 'plans') { $('#ridesActions').hidden = true; renderPlans(list); return; }
+    if (ridesFilter === 'catalog') { $('#ridesActions').hidden = true; list.innerHTML = ''; if (window.RGShell) RGShell.catalog(list, ridesQuery); return; }
     if (ridesFilter === 'public') { $('#ridesActions').hidden = true; list.innerHTML = ''; if (window.RGNav) RGNav.renderPublic(list); return; }
     $('#ridesActions').hidden = rides.length === 0;
     var q = ridesQuery.trim().toLowerCase(), principal = vehicles.filter(function (v) { return v.principal; })[0];
@@ -1319,6 +1321,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     setAvatar: function (d) { setAvatar(d); },
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, leanNow: function () { return est.state.ready && !sens.demo ? Math.abs(live.phi) : (sens.demo ? Math.abs(live.phi) : null); }, recInfo: function () { return rec ? { maxL: rec.maxL, maxR: rec.maxR } : null; }, anyFix: function () { return lastFix || (quickFix ? { lat: quickFix.lat, lon: quickFix.lon, acc: quickFix.acc, ts: Date.now(), approx: true } : (savedFix ? { lat: savedFix.lat, lon: savedFix.lon, acc: 5000, ts: savedFix.t, approx: true } : null)); }, activePlan: function () { return planMode ? null : activePlan; },
+    maintDue: function () { return maintDueSummary(); },
     isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { askAndStart(); }, reloadProfile: reloadProfile, setProfileName: setProfileName, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
     plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); }, vehicles: function () { return vehicles.slice(); },

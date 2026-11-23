@@ -347,7 +347,7 @@
   });
   setInterval(function () { if (uid() && document.visibilityState === 'visible' && Date.now() - S.at > 9 * 60000) sync(false); }, 60000);
   window.addEventListener('online', function () { if (uid()) soon(2000); });
-  var tab = document.querySelector('.tab[data-view="settings"]'); if (tab) tab.addEventListener('click', paint);
+  document.addEventListener('rg:view', function (e) { if (e.detail === 'settings') paint(); });
   paint(); if (uid()) soon(state().owner === uid() && state().at ? 6000 : 500);
 
   window.RGSync = { sync: sync, soon: soon, pushPlan: pushPlan, rideDeleted: rideDeleted, planDeleted: planDeleted, photoDeleted: photoDeleted, pullPhotos: pullPhotos, touch: touch, flush: flush, wipeLocal: wipeLocal, state: S };
