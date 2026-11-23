@@ -379,7 +379,7 @@
   }
   // Una sola petición para la pestaña: los eventos con sus apuntados y sus administradores. La ruta completa de cada
   // evento (decenas de KB) no se baja aquí: solo su nombre, sus km y dónde empieza; el resto, al pulsar «Cargar ruta».
-  var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon,route_url,trip',
+  var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon,route_url,trip,open_near,extra',
     EV_ROUTE = ',route_name:route->>name,route_dist:route->dist,route_start:route->coords->0,route_wp0:route->wps->0', EV_EMBED = ',event_attendees(*),event_admins(user_id)';
   function fetchEvents(c) {
     var since = new Date(Date.now() - 12 * 3600e3).toISOString();
@@ -433,6 +433,8 @@
       var countHtml = '<button class="link ev-count" data-act="who" type="button">' + count + '</button>';
       return '<div class="club-card ev" data-ev="' + e.id + '"><div class="ev-cover" hidden><div class="ev-cover-img"></div><span class="ev-cover-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b></div><div class="ev-estado ev-estado--' + strip[0] + '">' + ic(strip[1]) + '<span>' + strip[2] + '</span></div><div class="ev-cuerpo">' +
         '<span class="ev-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b>' +
+        (e.open_near ? '<span class="ev-open">' + ic('eye') + 'Abierta a moteros de fuera</span>' : '') +
+        (m.lat != null ? '<span class="ev-wx" data-wx="' + m.lat + ',' + m.lon + ',' + new Date(e.starts_at).getTime() + '" hidden></span>' : '') + '<div class="ev-x" data-evx="' + e.id + '"></div>' +
         (m.url ? '<div class="ev-meet"><button class="link" data-act="meet" type="button">' + ic('gmaps') + '<span>Salida: ' + esc(m.name || 'ver en Maps') + '</span></button>' + (m.lat != null ? '<button class="btn small" data-act="gomeet" type="button">' + ic('compass') + 'Ir al punto de salida</button>' : '') + '</div>'
           : (e.meet_name ? '<span class="muted">Salida: ' + esc(e.meet_name) + '</span>' : '')) + (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
         (e.route ? '<div class="ev-route"><span>' + ic('route') + esc(e.route.name || 'Ruta') + ' · ' + String(e.route.dist || 0).replace('.', ',') + ' km</span><button class="btn small" data-act="route" type="button">Cargar ruta</button></div>' : '') +
@@ -732,6 +734,8 @@
         '<div class="rg-row" style="margin-top:-4px"><button class="btn small" id="evPaste" type="button">Pegar</button><button class="btn small" id="evHere" type="button">Usar donde estoy ahora</button></div>' +
         '<p class="muted rg-small" style="text-align:left">En Google Maps: toca el sitio → Compartir → Copiar enlace. Si lo dejas vacío y la salida lleva ruta, el punto de encuentro es donde empieza la ruta.</p>' +
         '<label>Plazas (motos)<input id="evCap" type="number" inputmode="numeric" min="1" max="1000" value="' + (e && e.capacity ? e.capacity : '') + '" placeholder="Sin límite"></label>' +
+        '<label class="rg-check ev-opencheck"><input type="checkbox" id="evOpenNear"' + (e && e.open_near ? ' checked' : '') + '><span><b>Salida abierta</b><small>Cualquier motero de la zona la verá en Explorar y podrá pedir sitio. Tú decides a quién aceptas.</small></span></label>' +
+        '<div id="evExtra"></div>' +
         '<p class="muted rg-small" style="text-align:left">Con límite, quien se apunte cuando esté lleno queda en lista de espera. Si alguien se desapunta, la plaza se ofrece al siguiente y tiene que confirmar.</p>'
         : (isAdmin() ? '<p class="muted rg-small" style="text-align:left">Para poner límite de plazas, lista de espera y enlace de Maps de la salida falta ejecutar <b>supabase/06_plazas_y_salida.sql</b> en Supabase.</p>' : '')) +
       '<label>Descripción<textarea id="evDesc" maxlength="4000" placeholder="Paradas, nivel, normas, lo que quieras contar">' + esc(e ? e.description : '') + '</textarea></label>' +
@@ -760,7 +764,7 @@
         var point = !v6 ? Promise.resolve(null) : (link ? (e && link === link0 && e.meet_lat != null ? Promise.resolve({ url: e.meet_url, lat: e.meet_lat, lon: e.meet_lon }) : window.RGNav.resolvePoint(link)) : Promise.resolve({ url: null, lat: null, lon: null }));
         return point.then(function (pt) {
           if (pt) {
-            row.route_url = rurl || null; row.capacity = cap >= 1 ? cap : null; row.meet_url = pt.url || null; row.meet_lat = pt.lat != null ? pt.lat : null; row.meet_lon = pt.lon != null ? pt.lon : null;
+            row.route_url = rurl || null; row.capacity = cap >= 1 ? cap : null; if ($('#evOpenNear')) { row.open_near = $('#evOpenNear').checked; if (row.open_near) { row.allow_guests = true; row.open_reg = true; row.require_approval = true; } } if (window.RGEventExtra) { try { row.extra = RGEventExtra.read(e); } catch (x) {} } row.meet_url = pt.url || null; row.meet_lat = pt.lat != null ? pt.lat : null; row.meet_lon = pt.lon != null ? pt.lon : null;
             if (pt.url && pt.lat == null) warn = 'El enlace se abrirá en Google Maps, pero no trae coordenadas: no podré marcar la salida en el mapa de la app.';
             if (pt.name && !row.meet_name) row.meet_name = pt.name;
           }
@@ -772,7 +776,7 @@
           };
           return save().then(function (r) {
             if (r.error && pt && /capacity|route_url|meet_(url|lat|lon)/i.test(r.error.message || '')) {     // el servidor aún no tiene el 06
-              S.v6 = false; delete row.capacity; delete row.route_url; delete row.meet_url; delete row.meet_lat; delete row.meet_lon; warn = 'Guardado sin plazas ni enlace de salida: falta ejecutar supabase/06_plazas_y_salida.sql.';
+              S.v6 = false; delete row.capacity; delete row.open_near; delete row.allow_guests; delete row.open_reg; delete row.require_approval; delete row.extra; delete row.route_url; delete row.meet_url; delete row.meet_lat; delete row.meet_lon; warn = 'Guardado sin plazas ni enlace de salida: falta ejecutar supabase/06_plazas_y_salida.sql.';
               return save();
             }
             return r;

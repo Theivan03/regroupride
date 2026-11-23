@@ -24,6 +24,7 @@
   var setV = $('#view-settings'), secNow = 'cuenta';
   function secOf(el) {
     if (el.tagName === 'H1' || el.id === 'setSecs' || el.classList.contains('head')) return '';
+    if (el.dataset && el.dataset.sec) return el.dataset.sec;
     var lab = (($('.label', el) || {}).textContent || '').toLowerCase();
     if (el.id === 'rgPerms' || el.id === 'rgNoti' || /fotógraf/.test(lab)) return 'avisos';
     if (el.classList.contains('rg-fields') || el.classList.contains('rg-music-set')) return 'marcha';

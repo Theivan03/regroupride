@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Seguimiento en directo · ReGroupRide</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="https://regroupride-app.netlify.app/vendor/maplibre-gl.css">
+<style>
+@font-face{font-family:Outfit;src:url(/outfit-latin-wght-normal.woff2) format("woff2");font-weight:100 900;font-display:swap}
+@font-face{font-family:Manrope;src:url(/manrope-latin-wght-normal.woff2) format("woff2");font-weight:200 800;font-display:swap}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{font:500 16px/1.4 Manrope,system-ui,sans-serif;color:#14101F;background:#F3F1F8;display:flex;flex-direction:column}
+#map{flex:1;min-height:0;background:#e9e6f2}
+.card{position:relative;z-index:2;margin:-22px 12px max(12px,env(safe-area-inset-bottom));background:#fff;border-radius:22px;padding:16px 18px;box-shadow:0 8px 30px rgba(30,16,70,.16);display:flex;flex-direction:column;gap:8px}
+.top{display:flex;align-items:center;gap:10px}
+.top img{width:30px;height:30px}
+h1{font:700 22px/1.15 Outfit,system-ui,sans-serif;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{font:700 12.5px/1 Manrope,sans-serif;padding:7px 10px;border-radius:999px;background:#E6F6EC;color:#12703A;white-space:nowrap}
+.pill.old{background:#FFF1CC;color:#7A5200}.pill.end{background:#ECEAF2;color:#57506A}.pill.alert{background:#C62828;color:#fff}
+.row{display:flex;gap:18px;flex-wrap:wrap;color:#57506A;font-size:14.5px}.row b{color:#14101F;font-weight:700}
+.alert-box{background:#FDECEC;color:#8E1B1B;border-radius:14px;padding:12px 14px;font-weight:600;display:none}
+.btns{display:flex;gap:8px;margin-top:4px}
+.btn{flex:1;text-align:center;text-decoration:none;font:700 15px/1 Outfit,sans-serif;padding:14px 10px;border-radius:14px;background:#5A2DB0;color:#fff}
+.btn.sec{background:#EEE8FB;color:#3E1D85}
+.muted{color:#6E6880;font-size:13px}
+.dot{width:22px;height:22px;border-radius:50%;background:#5A2DB0;border:4px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.dot.alert{background:#C62828}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="card">
+  <div class="top"><img src="/simbolo.svg" alt=""><h1 id="name">Seguimiento</h1><span class="pill end" id="state">Cargando…</span></div>
+  <div class="alert-box" id="alert"></div>
+  <div class="row" id="row"></div>
+  <div class="btns" id="btns" hidden><a class="btn" id="goMaps" target="_blank" rel="noopener">Abrir en Google Maps</a><a class="btn sec" href="tel:112">Llamar al 112</a></div>
+  <span class="muted" id="note">Esta página se actualiza sola. Solo la ve quien tenga este enlace.</span>
+</div>
+<script src="https://regroupride-app.netlify.app/vendor/maplibre-gl.js"></script>
+<script>
+(function () {
+  'use strict';
+  var URL0 = 'https://lpkeaxtzfbuqjkkusjit.supabase.co', KEY = 'sb_publishable_lUo3IlFV8X0pVL5HUfbgNA_VLeizTOw';
+  var token = (/[?&]s=([0-9a-f-]{36})/i.exec(location.search) || [])[1], $ = function (id) { return document.getElementById(id); };
+  var map = null, marker = null, first = true, el = null;
+  function hhmm(ms) { return new Date(ms).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); }
+  function show(d) {
+    if (!d) { $('name').textContent = 'Enlace no válido'; $('state').textContent = 'Sin datos'; $('note').textContent = 'Este enlace de seguimiento no existe o ya se ha borrado.'; return; }
+    var age = d.updated_at ? (d.now - d.updated_at) / 1000 : null, st = d.status;
+    $('name').textContent = d.name; document.title = d.name + ' · seguimiento en directo';
+    var p = $('state'); p.className = 'pill' + (st === 'alert' ? ' alert' : st === 'ended' ? ' end' : age == null || age > 180 ? ' old' : '');
+    p.textContent = st === 'alert' ? 'No responde' : st === 'ended' ? 'Ruta terminada' : age == null ? 'Aún sin posición' : age > 180 ? 'Sin señal' : 'En directo';
+    var a = $('alert'); a.style.display = st === 'alert' ? 'block' : 'none';
+    if (st === 'alert') a.textContent = d.name + ' se ha parado en ruta y no ha contestado al aviso de la app. Llámale; si no contesta y te preocupa, llama al 112 y dales esta posición.';
+    $('row').innerHTML = (d.updated_at ? '<span>Última posición <b>' + hhmm(d.updated_at) + '</b></span>' : '') + (st === 'on' && d.speed != null && age < 180 ? '<span>Velocidad <b>' + Math.round(d.speed) + ' km/h</b></span>' : '') + '<span>Salió a las <b>' + hhmm(d.started_at) + '</b></span>';
+    if (d.lat == null) return;
+    $('btns').hidden = false; $('goMaps').href = 'https://www.google.com/maps/search/?api=1&query=' + d.lat + ',' + d.lon;
+    if (!window.maplibregl) return;
+    if (!map) {
+      map = new maplibregl.Map({ container: 'map', style: 'https://tiles.openfreemap.org/styles/liberty', center: [d.lon, d.lat], zoom: 13, attributionControl: { compact: true } });
+      el = document.createElement('div'); el.className = 'dot'; marker = new maplibregl.Marker({ element: el }).setLngLat([d.lon, d.lat]).addTo(map);
+      map.on('load', function () { map.addSource('t', { type: 'geojson', data: line(d) }); map.addLayer({ id: 't', type: 'line', source: 't', paint: { 'line-color': '#5A2DB0', 'line-width': 4, 'line-opacity': .8 }, layout: { 'line-cap': 'round', 'line-join': 'round' } }); });
+    } else { marker.setLngLat([d.lon, d.lat]); var s = map.getSource('t'); if (s) s.setData(line(d)); if (first || st !== 'ended') map.easeTo({ center: [d.lon, d.lat], duration: 800 }); }
+    el.className = 'dot' + (st === 'alert' ? ' alert' : ''); first = false;
+  }
+  function line(d) { var c = (d.trail || []).slice(); if (c.length < 2) c = [[d.lon, d.lat], [d.lon, d.lat]]; return { type: 'Feature', geometry: { type: 'LineString', coordinates: c } }; }
+  function load() {
+    if (!token) { show(null); return; }
+    fetch(URL0 + '/rest/v1/rpc/live_share_get', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_token: token }) })
+      .then(function (r) { return r.json(); }).then(show, function () { $('state').textContent = 'Sin conexión'; });
+  }
+  load(); setInterval(function () { if (document.visibilityState !== 'hidden') load(); }, 15000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') load(); });
+})();
+</script>
+</body>
+</html>
