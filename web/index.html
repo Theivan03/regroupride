@@ -234,6 +234,32 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
 @keyframes rgUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.rg-split::before,.rg-split.sw-signup,.rg-split.sw-login,.rg-swap.rg-in>*{animation:none!important}}
 .auth .rg-split{margin:0 0 18px;height:260px}.rg-only{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .5s cubic-bezier(.3,1,.35,1),opacity .35s ease}.rg-only>div{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:14px}.rg-only>div>:last-child{margin-bottom:14px}#f[data-mode=signup] .rg-only{grid-template-rows:1fr;opacity:1}.maker .ban{display:block;width:100%;border-radius:16px;aspect-ratio:3/2;object-fit:cover;margin:0 0 14px}
+
+/* ===== estética plana (nov. 2026): mismas reglas que la app. Sin fondo vivo, sombras, degradados ni rebotes; negro para la
+   estructura, lima para la acción, violeta para la marca y lo seleccionado. El confeti al conseguir plaza se queda. ===== */
+@font-face{font-family:"Barlow Semi Condensed";src:url(/barlow-semi-condensed-latin-600-normal.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"Barlow Semi Condensed";src:url(/barlow-semi-condensed-latin-700-normal.woff2) format("woff2");font-weight:700 900;font-display:swap}
+@font-face{font-family:"Barlow Condensed";src:url(/barlow-condensed-latin-600-normal.woff2) format("woff2");font-weight:500 600;font-display:swap}
+@font-face{font-family:"Barlow Condensed";src:url(/barlow-condensed-latin-700-normal.woff2) format("woff2");font-weight:700 900;font-display:swap}
+:root{--fondo:#F3F5F8;--sup:#FFFFFF;--sup2:#E9EDF2;--texto:#0E141B;--texto2:#55606E;--linea:#D9DEE5;--suave:#E9EDF2;--sombra:none;--negro:#0E141B}
+@media (prefers-color-scheme:dark){:root{--fondo:#0F0F12;--sup:#1A1A1F;--sup2:#26262C;--texto:#F4F4F6;--texto2:#A7A7B2;--linea:#34343B;--suave:#26262C;--sombra:none;--negro:#000000}}
+.bg{display:none!important}
+h1,h2,h3,button,.t,.btn,.logo{font-family:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif!important;letter-spacing:.1px}
+.ev h1,.hd1 h1,.auth h1{background:none!important;-webkit-text-fill-color:currentColor!important;color:var(--texto)!important;animation:none!important}
+.in>*,.in .ev>div>*,.in .edit>div>*,.in .list>*,.in .stats>*,.in .form>*,.in .cover,.in .tile,.ev>div>.cover{animation:none!important}
+#app.out{transform:none!important}
+.btn{border-radius:14px!important;box-shadow:none!important;animation:none!important}
+.btn::after,.btn::before{display:none!important}
+.btn.pri{box-shadow:none!important}
+.btn.big{border-radius:14px!important}
+.btn.mar{background:var(--texto)!important;color:var(--fondo)!important}
+.card,.ev>div,.tile,.stats>*,.list>*{box-shadow:none!important;animation:none!important}
+.card{border:1px solid var(--linea);border-radius:12px!important}
+input,textarea,select{border-width:1px!important;border-radius:12px!important}
+.top{max-width:none;background:var(--negro);padding:16px 20px;margin-bottom:8px;min-height:68px}
+.top .logo{color:#FFFFFF!important}.top .logo i{color:#B9A2FF}
+.top .btn{background:rgba(255,255,255,.14)!important;color:#FFFFFF!important}
+.top .btn.pri{background:var(--accion)!important;color:var(--sobreacc)!important}
 </style>
 </head>
 <body>

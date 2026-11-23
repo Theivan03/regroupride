@@ -8,22 +8,22 @@
 <link rel="icon" href="/favicon.ico">
 <link rel="stylesheet" href="https://regroupride-app.netlify.app/vendor/maplibre-gl.css">
 <style>
-@font-face{font-family:Outfit;src:url(/outfit-latin-wght-normal.woff2) format("woff2");font-weight:100 900;font-display:swap}
+@font-face{font-family:Outfit;src:url(/barlow-semi-condensed-latin-700-normal.woff2) format("woff2");font-weight:100 900;font-display:swap}
 @font-face{font-family:Manrope;src:url(/manrope-latin-wght-normal.woff2) format("woff2");font-weight:200 800;font-display:swap}
 *{box-sizing:border-box}html,body{height:100%;margin:0}
 body{font:500 16px/1.4 Manrope,system-ui,sans-serif;color:#14101F;background:#F3F1F8;display:flex;flex-direction:column}
 #map{flex:1;min-height:0;background:#e9e6f2}
-.card{position:relative;z-index:2;margin:-22px 12px max(12px,env(safe-area-inset-bottom));background:#fff;border-radius:22px;padding:16px 18px;box-shadow:0 8px 30px rgba(30,16,70,.16);display:flex;flex-direction:column;gap:8px}
+.card{position:relative;z-index:2;margin:-22px 12px max(12px,env(safe-area-inset-bottom));background:#fff;border-radius:22px;padding:16px 18px;border:1px solid #D9DEE5;border-radius:14px;display:flex;flex-direction:column;gap:8px}
 .top{display:flex;align-items:center;gap:10px}
 .top img{width:30px;height:30px}
-h1{font:700 22px/1.15 Outfit,system-ui,sans-serif;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+h1{font:700 26px/1.1 Outfit,system-ui,sans-serif;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pill{font:700 12.5px/1 Manrope,sans-serif;padding:7px 10px;border-radius:999px;background:#E6F6EC;color:#12703A;white-space:nowrap}
 .pill.old{background:#FFF1CC;color:#7A5200}.pill.end{background:#ECEAF2;color:#57506A}.pill.alert{background:#C62828;color:#fff}
 .row{display:flex;gap:18px;flex-wrap:wrap;color:#57506A;font-size:14.5px}.row b{color:#14101F;font-weight:700}
 .alert-box{background:#FDECEC;color:#8E1B1B;border-radius:14px;padding:12px 14px;font-weight:600;display:none}
 .btns{display:flex;gap:8px;margin-top:4px}
-.btn{flex:1;text-align:center;text-decoration:none;font:700 15px/1 Outfit,sans-serif;padding:14px 10px;border-radius:14px;background:#5A2DB0;color:#fff}
-.btn.sec{background:#EEE8FB;color:#3E1D85}
+.btn{flex:1;text-align:center;text-decoration:none;font:700 15px/1 Outfit,sans-serif;padding:14px 10px;border-radius:14px;background:#D9F21C;color:#0E141B}
+.btn.sec{background:#E9EDF2;color:#0E141B}
 .muted{color:#6E6880;font-size:13px}
 .dot{width:22px;height:22px;border-radius:50%;background:#5A2DB0;border:4px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.35)}
 .dot.alert{background:#C62828}
