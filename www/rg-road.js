@@ -204,5 +204,7 @@
 
   var row = $('#exRow');
   if (row) { [['exFuel', 'fuel', 'Gasolineras', fuelOpen], ['exInc', 'warn', 'Incidencias', incOpen]].forEach(function (x) { var b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.id = x[0]; b.innerHTML = ic(x[1]) + x[2]; row.appendChild(b); b.addEventListener('click', x[3]); }); }
-  window.RGRoad = { fuel: fuelOpen, incidents: incOpen, hazard: hazard, state: H };
+  // cortes, accidentes, hielo… de la DGT y peligros avisados que caen sobre un trazado
+  function badOn(coords) { return H.dgt.filter(function (x) { return dgtBad(x) && toLine(x.lat, x.lon, coords) <= 150; }).length + H.hz.filter(function (x) { return toLine(x.lat, x.lon, coords) <= 150; }).length; }
+  window.RGRoad = { badOn: badOn, fuel: fuelOpen, incidents: incOpen, hazard: hazard, state: H };
 })();

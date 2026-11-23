@@ -38,7 +38,7 @@
     $$('#setSecs button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.s === secNow)); });
   }
   if (setV) {
-    $$('#setSecs button').forEach(function (b) { b.addEventListener('click', function () { secNow = b.dataset.s; secPaint(); setV.scrollTop = 0; }); });
+    $$('#setSecs button').forEach(function (b) { b.addEventListener('click', function () { secNow = b.dataset.s; secPaint(); }); });
     // «Ruta simulada» es una herramienta de diagnóstico: va con la ayuda, bajo «Algo no funciona»
     var demo = $('#btnDemo'), diag = $('#diag');
     if (demo && diag) { var hp = diag.parentNode, lb = $('.label', hp); if (lb) lb.textContent = 'Algo no funciona'; var p = document.createElement('p'); p.className = 'muted rg-small'; p.textContent = 'Estos datos sirven para saber si los sensores y el GPS del teléfono responden. Con la ruta simulada pruebas la app sin moverte.'; hp.insertBefore(p, diag); demo.classList.remove('wide'); hp.appendChild(demo); }
@@ -175,15 +175,20 @@
     if (due.length) rows.push({ i: 'wrench', k: 'mt', b: due.length === 1 ? 'Mantenimiento vencido' : due.length + ' mantenimientos vencidos', t: due[0].m.name + ' · ' + (due[0].v.name || 'tu moto'), hot: 1 });
     if (PH.n) rows.push({ i: 'camera', k: 'ph', b: PH.n === 1 ? 'Un fotógrafo cerca hoy' : PH.n + ' fotógrafos cerca hoy', t: PH.place });
     (window.RGToday || []).forEach(function (f) { try { var x = f(); if (x) rows.push(x); } catch (e) {} });
-    el.hidden = !rows.length; if (tot) tot.hidden = !!rows.length;
-    el.innerHTML = rows.length ? '<span class="label">Hoy</span>' + rows.slice(0, 4).map(function (r, i) { return '<button class="rg-td' + (r.hot ? ' hot' : '') + '" type="button" data-n="' + i + '">' + ic(r.i) + '<span><b>' + esc(r.b) + '</b><small>' + esc(r.t || '') + '</small></span>' + ic('chev') + '</button>'; }).join('') : '';
-    $$('[data-n]', el).forEach(function (b) { b.addEventListener('click', function () {
-      var r = rows[+b.dataset.n]; if (r.go) { r.go(); return; }
-      if (r.k === 'mt') A.showView('garage'); else if (r.k === 'ph') { if (window.RGPhoto) RGPhoto.open('spots'); } else if (window.RGClub) RGClub.goto(r.k === 'ev' && next ? next.community_id : null, 'events');
-    }); });
+    var go = function (r) { if (r.go) { r.go(); return; } if (r.k === 'mt') A.showView('garage'); else if (r.k === 'ph') { if (window.RGPhoto) RGPhoto.open('spots'); } else if (window.RGClub) RGClub.goto(r.k === 'ev' && next ? next.community_id : null, 'events'); };
+    var html = function () { return rows.slice(0, 6).map(function (r, i) { return '<button class="rg-td' + (r.hot ? ' hot' : '') + '" type="button" data-n="' + i + '">' + ic(r.i) + '<span><b>' + esc(r.b) + '</b><small>' + esc(r.t || '') + '</small></span>' + ic('chev') + '</button>'; }).join(''); };
+    var bind = function (root, close) { $$('[data-n]', root).forEach(function (b) { b.addEventListener('click', function () { if (close) Cl.closeSheet(); go(rows[+b.dataset.n]); }); }); };
+    // en el mapa: una línea con lo primero y cuántas cosas más hay; con una ruta cargada no sale, para no tapar el mapa
+    var busy = !!(A.activePlan && A.activePlan()) || (A.isPlanMode && A.isPlanMode());
+    el.hidden = !rows.length || busy; if (tot) tot.hidden = !!rows.length || busy;
+    el.innerHTML = rows.length ? '<button class="rg-td rg-td-one' + (rows.some(function (r) { return r.hot; }) ? ' hot' : '') + '" type="button" id="tdOne">' + ic(rows[0].i) + '<span><b>' + esc(rows[0].b) + '</b></span>' + (rows.length > 1 ? '<i>+' + (rows.length - 1) + '</i>' : '') + ic('chev') + '</button>' : '';
+    if ($('#tdOne')) $('#tdOne').addEventListener('click', function () { if (rows.length === 1) { go(rows[0]); return; } var s = openSheet(head('Hoy') + '<div class="rg-today">' + html() + '</div>'); bind(s, true); });
+    // en Explorar: todo a la vista
+    var ex = $('#exToday'); if (ex) { ex.hidden = !rows.length; ex.innerHTML = rows.length ? '<span class="label">Hoy</span>' + html() : ''; bind(ex, false); }
   }
   window.RGToday = window.RGToday || [];
   setTimeout(function () { photoCheck(); today(); }, 6000); setInterval(function () { if (document.visibilityState !== 'hidden') { photoCheck(); today(); } }, 60000);
+  setInterval(function () { if (!$('#view-map').hidden) today(); }, 3000);      // al cargar o quitar una ruta, la línea de «Hoy» se quita o vuelve
 
   /* ---------- fotos: elegir, reducir y subir a la carpeta de cada uno ---------- */
   function pickPhoto(max, multiple) {
@@ -209,7 +214,7 @@
     return sb.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg', upsert: false }).then(function (r) { if (r.error) throw r.error; return sb.storage.from('covers').getPublicUrl(path).data.publicUrl; });
   }
   /* ---------- zona de privacidad: lo que publico sale sin los primeros y los últimos metros ---------- */
-  function trimM() { var n = parseInt(store('rg.priv.trim') || '0', 10); return n > 0 ? n : 0; }
+  function trimM() { var v = store('rg.priv.trim'), n = parseInt(v == null ? '300' : v, 10); return n > 0 ? n : 0; }      // sin tocar nada: 300 m
   function seg(a, b) { var x = (b[0] - a[0]) * Math.PI / 180 * Math.cos((a[1] + b[1]) * Math.PI / 360), y = (b[1] - a[1]) * Math.PI / 180; return Math.sqrt(x * x + y * y) * 6371000; }
   function trim(r) {
     var m = trimM(); if (!m || !r || !r.coords || r.coords.length < 4) return r;
@@ -230,5 +235,5 @@
     box.appendChild(d);
     $$('#privTrim button').forEach(function (b) { b.addEventListener('click', function () { store('rg.priv.trim', b.dataset.m); $$('#privTrim button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
   })();
-  window.RGShell = { trim: trim, pickPhoto: pickPhoto, upload: upload, clubs: clubs, mine: mine, esc: esc, ic: ic, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, plan: plan };
+  window.RGShell = { catalog: catalog, plan: plan, trim: trim, pickPhoto: pickPhoto, upload: upload, clubs: clubs, mine: mine, esc: esc, ic: ic, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, plan: plan };
 })();

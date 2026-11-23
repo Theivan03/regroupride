@@ -77,11 +77,19 @@
     $('#soShare', s).addEventListener('click', function (ev) { Cl.busy(ev.currentTarget, function () { return sendLink().then(draw); }).catch(function (e) { A.toast(Cl.msg(e), 'warn'); }); });
     if ($('#soEnd', s)) $('#soEnd', s).addEventListener('click', function () { endShare(); draw(); });
   }
-  // botón en el mapa en reposo
-  var idle = $('#idleCard .idle-actions'), btn = null;
-  if (idle) { btn = document.createElement('button'); btn.type = 'button'; btn.className = 'rg-solo-btn'; btn.id = 'btnSolo'; idle.parentNode.insertBefore(btn, idle); btn.addEventListener('click', open); }
-  function paintBtn() { if (!btn) return; var n = (S.contacts || []).length; btn.innerHTML = ic('eye') + '<span><b>Voy solo</b><small>' + (S.on ? (n ? 'Activado · ' + n + (n === 1 ? ' contacto' : ' contactos') : 'Activado · añade un contacto') : 'Aviso a tus contactos y enlace de seguimiento') + '</small></span><i class="' + (S.on ? 'on' : '') + '">' + (S.on ? 'Sí' : 'No') + '</i>'; }
-  paintBtn();
+  function paintBtn() {}
+  // Al iniciar una ruta sin grupo se pregunta si se va solo. Sin respuesta en 20 s, se queda como la última vez.
+  var askEl = null;
+  function askClose() { if (askEl) { clearTimeout(askEl._t); if (askEl.parentNode) askEl.parentNode.removeChild(askEl); askEl = null; } }
+  function startAsk() {
+    askClose(); var n = (S.contacts || []).length;
+    askEl = document.createElement('div'); askEl.className = 'rg-soloask';
+    askEl.innerHTML = '<b>¿Vas solo en esta ruta?</b><span>' + (n ? 'Si te paras de golpe y no contestas, aviso a ' + (n === 1 ? 'tu contacto' : 'tus ' + n + ' contactos') + '.' : 'Vigilo las paradas bruscas. Añade un contacto para que le llegue el aviso.') + '</span>' +
+      '<div><button class="btn small primary" data-s="1" type="button">Sí, voy solo</button><button class="btn small" data-s="0" type="button">No</button><button class="btn small" data-s="cfg" type="button">' + (n ? 'Contactos' : 'Añadir contacto') + '</button>' + (window.RGSocial ? '<button class="btn small" data-s="chk" type="button">Lista antes de salir</button>' : '') + '</div>';
+    document.body.appendChild(askEl);
+    askEl.addEventListener('click', function (ev) { var b = ev.target.closest('[data-s]'); if (!b) return; var v = b.dataset.s; askClose(); if (v === 'cfg') { open(); return; } if (v === 'chk') { RGSocial.checklist(null); return; } S.on = v === '1'; store('rg.solo', S.on ? '1' : '0'); if (S.on) A.toast('Aviso: voy solo activado' + ((S.contacts || []).length ? '.' : ', pero sin contactos a los que avisar.'), 'ok'); });
+    askEl._t = setTimeout(askClose, 20000);
+  }
   // en Ajustes → Privacidad
   var about = document.getElementById('about');
   if (about) { var box = document.createElement('div'); box.className = 'rg-maker'; box.dataset.sec = 'priv'; box.innerHTML = '<span class="label">Voy solo y seguimiento</span><p class="muted" style="margin:0">Contactos de emergencia, aviso si te paras de golpe y enlace para que tu familia vea por dónde vas.</p><button class="btn" id="soSet" type="button">Configurar</button>'; about.parentNode.insertBefore(box, about); box.querySelector('#soSet').addEventListener('click', open); }
@@ -118,8 +126,8 @@
   /* ---------- vigilancia: cada 3 s mientras se graba ---------- */
   function tick() {
     var rec = A.isRec && A.isRec(), now = Date.now();
-    if (!rec) { if (S.wasRec) { S.wasRec = false; S.buf = []; S.cand = null; S.alerted = false; if (S.share && !(S.ask && !S.ask.t)) endShare(); } return; }
-    if (!S.wasRec) { S.wasRec = true; S.buf = []; S.cand = null; S.alerted = false; loadContacts(false); }
+    if (!rec) { if (S.wasRec) { askClose(); S.wasRec = false; S.buf = []; S.cand = null; S.alerted = false; if (S.share && !(S.ask && !S.ask.t)) endShare(); } return; }
+    if (!S.wasRec) { S.wasRec = true; S.buf = []; S.cand = null; S.alerted = false; loadContacts(false).then(function () { if (A.isRec() && !inGroup() && !(A.isDemo && A.isDemo()) && !(A.isTrip && A.isTrip()) && Cl.user()) startAsk(); }); }
     var f = A.lastFix && A.lastFix(); if (!f || now - f.ts > 12000) return;
     ping(false);
     if (!S.on || (A.isDemo && A.isDemo()) || inGroup() || !Cl.user()) { S.cand = null; return; }

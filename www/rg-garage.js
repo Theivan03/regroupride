@@ -145,7 +145,8 @@
   }
   function stolenList() {
     if (!sb || !Cl.user()) { Cl.openAuth(false); return; }
-    var f = A.anyFix && A.anyFix(), s = Cl.sheet(head('Motos robadas') + '<p class="muted" style="margin:0;text-align:left">Avisos de moteros de tus comunidades y de tu zona. Si ves una, llama a su dueño o a la policía; no te la juegues.</p><div class="rd-list" id="stL"><div class="empty">Cargando…</div></div>');
+    var f = A.anyFix && A.anyFix(), s = Cl.sheet(head('Motos robadas') + '<p class="muted" style="margin:0;text-align:left">Avisos de moteros de tus comunidades y de tu zona. Si ves una, llama a su dueño o a la policía; no te la juegues.</p><button class="btn primary" id="stAdd" type="button">' + ic('warn') + 'Avisar de que me han robado la moto</button><div class="rd-list" id="stL"><div class="empty">Cargando…</div></div>');
+    $('#stAdd', s).addEventListener('click', stolenNew);
     $('#gxX', s).addEventListener('click', Cl.closeSheet);
     sb.rpc('stolen_near', { p_lat: f ? f.lat : null, p_lon: f ? f.lon : null }).then(function (r) {
       var el = $('#stL'); if (!el) return; var rows = r.error ? [] : (r.data || []);
@@ -157,8 +158,14 @@
       $$('.st-card img', el).forEach(function (im) { im.addEventListener('click', function () { var lb = $('#lightbox'), li = $('#lightboxImg'); if (lb && li) { li.src = im.src; lb.hidden = false; } }); });
     }, function () { var el = $('#stL'); if (el) el.innerHTML = '<div class="empty">No se ha podido cargar.</div>'; });
   }
-  // acceso a la lista desde la cabecera del garaje
-  var gh = $('#view-garage .head .right');
-  if (gh) { var b = document.createElement('button'); b.className = 'btn small'; b.type = 'button'; b.id = 'btnStolen'; b.innerHTML = ic('warn') + 'Robadas'; gh.insertBefore(b, gh.querySelector('#btnAddVehicle')); b.addEventListener('click', stolenList); }
+  // a la vista en el garaje: ver los avisos de la zona o avisar de un robo
+  var gs = $('#garageSummary');
+  if (gs) { var st = document.createElement('div'); st.className = 'st-bar'; st.innerHTML = '<span>' + ic('warn') + '<span><b>Motos robadas</b><small>Avisos de tu zona y de tus comunidades</small></span></span><div><button class="btn small" id="stSee" type="button">Ver avisos</button><button class="btn small danger" id="stNew" type="button">Me la han robado</button></div>'; gs.parentNode.insertBefore(st, gs.nextSibling); st.querySelector('#stSee').addEventListener('click', stolenList); st.querySelector('#stNew').addEventListener('click', stolenNew); }
+  function stolenNew() {
+    var vs = (A.vehicles() || []).filter(function (v) { return v.type !== 'coche'; });
+    if (vs.length <= 1) { stolenForm(vs[0] || {}); return; }
+    var s = Cl.sheet(head('¿Qué moto te han robado?') + vs.map(function (v, i) { return '<button class="club-card rg-pick" type="button" data-v="' + i + '">' + ic('bike') + '<span><b>' + esc(v.name || 'Moto') + '</b><span class="muted">' + esc([v.make, v.model].filter(Boolean).join(' ')) + '</span></span></button>'; }).join(''));
+    $('#gxX', s).addEventListener('click', Cl.closeSheet); $$('[data-v]', s).forEach(function (b) { b.addEventListener('click', function () { stolenForm(vs[+b.dataset.v]); }); });
+  }
   window.RGGarage = { stolen: stolenList, paint: paint };
 })();

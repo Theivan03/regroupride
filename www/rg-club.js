@@ -129,6 +129,8 @@
   /* ---------- pantalla ---------- */
   function render() {
     if (!box) return;
+    var vw = $('#view-club'), keepTop = vw ? vw.scrollTop : 0, oldPane = $('#clPane'), keepH = oldPane ? oldPane.offsetHeight : 0;
+    setTimeout(function () { var p = $('#clPane'); if (p && keepH) { p.style.minHeight = keepH + 'px'; setTimeout(function () { p.style.minHeight = ''; }, 1500); } if (vw && keepTop) vw.scrollTop = keepTop; }, 0);
     if (!sb) { box.innerHTML = '<div class="empty">No se ha podido conectar con el servidor.</div>'; return; }
     if (!S.user) { box.innerHTML = '<div class="club-card"><b>Tu comunidad, en un solo sitio</b><p class="muted">Salidas y rutas, avisos, normas y descuentos. Entra en tu cuenta para unirte con el código que te pase el organizador.</p><button class="btn big primary" id="clLogin" type="button">Entrar o crear cuenta</button></div>'; $('#clLogin').addEventListener('click', function () { Cl.openAuth(false); }); return; }
     if (!S.loaded) { box.innerHTML = '<div class="empty">Cargando…</div>'; return; }

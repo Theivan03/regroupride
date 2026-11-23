@@ -50,9 +50,6 @@
     $('#scX', s).addEventListener('click', Cl.closeSheet);
     $$('[data-c]', s).forEach(function (c) { c.addEventListener('change', function () { st.on[c.dataset.c] = c.checked; jset('rg.check', st); }); });
   }
-  var solo = $('#btnSolo') || $('#idleCard .idle-actions');
-  if (solo) { var b = document.createElement('button'); b.type = 'button'; b.className = 'link rg-check-link'; b.id = 'btnCheck'; b.innerHTML = ic('check') + 'Lista antes de salir'; solo.parentNode.insertBefore(b, solo.id === 'btnSolo' ? solo.nextSibling : solo); b.addEventListener('click', function () { checklist(null); }); }
-
   /* ---------- álbum de la salida ---------- */
   function album(e) {
     var x = e.extra || {}, s = Cl.sheet(head('Álbum') + '<p style="margin:0;text-align:left"><b>' + esc(e.title) + '</b><br><span class="muted">Las fotos de todos los que fueron, en un solo sitio.</span></p>' +

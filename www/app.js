@@ -3,14 +3,14 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.47.0';
+  var APP_VERSION = '0.48.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
   var IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   window.addEventListener('error', function (e) {
-    try { var n = document.getElementById('toast'); n.textContent = 'Error (v' + APP_VERSION + '): ' + (e.message || e); n.className = 'toast notice bad'; n.hidden = false; } catch (x) {}
+    try { var n = document.getElementById('toast'); n.textContent = 'Error (v' + APP_VERSION + '): ' + (e.message || e); n.className = 'toast notice bad'; n.hidden = false; clearTimeout(window.__rgErrT); window.__rgErrT = setTimeout(function () { if (/^Error \(v/.test(n.textContent)) n.hidden = true; }, 7000); n.onclick = function () { n.hidden = true; }; } catch (x) {}
   });
   if (typeof LeanCore === 'undefined' || typeof Platform === 'undefined' || typeof Geo === 'undefined' || typeof DB === 'undefined') throw new Error('faltan archivos de la app (versión antigua en caché)');
   var HAS_MAP = typeof maplibregl !== 'undefined';
@@ -381,16 +381,23 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     routeBetween(wps).then(function (r) { if (seq !== routeSeq) return; pl.coords = r.coords; pl.dist = r.dist; pl.dur = r.dur; pl.routed = r.routed; pl.steps = r.steps || []; pl.pending = false; drawPlan(); renderPlanInfo(); });
   }
   var routeOpt = { noHighway: LS.get('rg.route.nohw', false) === true };
-  function routeBetween(wps) {
+  function routeBetween(wps, opt) {
     var straight = function () { var d = 0; for (var i = 1; i < wps.length; i++) d += Geo.dist(wps[i - 1][0], wps[i - 1][1], wps[i][0], wps[i][1]); return { coords: wps.map(function (w) { return [w[1], w[0]]; }), dist: d / 1000, dur: d / 1000 / 60 * 3600, routed: false }; };
     if (typeof navigator.onLine === 'boolean' && !navigator.onLine) return Promise.resolve(straight());
     var base = 'https://router.project-osrm.org/route/v1/driving/' + wps.map(function (w) { return w[1].toFixed(5) + ',' + w[0].toFixed(5); }).join(';') + '?overview=full&geometries=geojson&steps=true';
-    var ask = function (url) {
-      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctrl) setTimeout(function () { ctrl.abort(); }, 8000);
-      return fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { return r.json(); }).then(function (j) { if (!j.routes || !j.routes[0]) throw new Error('sin ruta'); var rt = j.routes[0]; return { coords: rt.geometry.coordinates, dist: rt.distance / 1000, dur: rt.duration, routed: true, steps: RGLib.stepsFromOsrm(rt) }; });
+    var ask = function (excl) {
+      var url = base + (excl.length ? '&exclude=' + excl.join(',') : ''), ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctrl) setTimeout(function () { ctrl.abort(); }, 9000);
+      return fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { return r.json(); }).then(function (j) { if (!j.routes || !j.routes[0]) throw new Error('sin ruta'); var rt = j.routes[0];
+        var ferry = (rt.legs || []).some(function (l) { return (l.steps || []).some(function (st) { return st.mode === 'ferry'; }); });      // tramo en barco: quien la pida decide si la quiere
+        return { coords: rt.geometry.coordinates, dist: rt.distance / 1000, dur: rt.duration, routed: true, ferry: ferry, steps: RGLib.stepsFromOsrm(rt) }; });
     };
-    // «evitar autovías»: se pide sin autopistas; si el servidor no lo admite o no hay camino, se traza como siempre
-    return (routeOpt.noHighway ? ask(base + '&exclude=motorway').catch(function () { return ask(base); }) : ask(base)).catch(straight);
+    // «evitar autovías» y «sin barcos»: se pide con lo que haya que evitar y, si el servidor no lo admite o no hay camino, se va quitando
+    var noF = !!(opt && opt.noFerry), tries = [];
+    if (routeOpt.noHighway && noF) tries.push(['motorway', 'ferry']);
+    if (noF) tries.push(['ferry']); else if (routeOpt.noHighway) tries.push(['motorway']);
+    tries.push([]);
+    var run = function (n) { return ask(tries[n]).catch(function (e) { if (n + 1 < tries.length) return run(n + 1); throw e; }); };
+    return run(0).catch(straight);
   }
   function drawPlan() {
     if (!map || !mapReady || !map.getSource('plan')) return;
@@ -680,7 +687,8 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     setHTML('#totKm', Math.round(km) + '<span class="unit">km</span>'); setText('#totRides', String(rides.filter(function (r) { return !r.trip; }).length));
   }
   function renderRides() {
-    var list = $('#ridesList'); list.innerHTML = '';
+    var list = $('#ridesList'), vr = views.rides, keepTop = vr.scrollTop; if (keepTop) { list.style.minHeight = list.offsetHeight + 'px'; setTimeout(function () { vr.scrollTop = keepTop; setTimeout(function () { list.style.minHeight = ''; }, 1500); }, 0); }
+    list.innerHTML = '';
     var km = rides.reduce(function (s, r) { return s + (r.dist || 0); }, 0), year = new Date().getFullYear();
     var kmYear = rides.filter(function (r) { return new Date(r.start).getFullYear() === year; }).reduce(function (s, r) { return s + (r.dist || 0); }, 0);
     var hours = rides.reduce(function (s, r) { return s + (r.movingS || 0); }, 0) / 3600;
@@ -1333,7 +1341,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { askAndStart(); }, reloadProfile: reloadProfile, setProfileName: setProfileName, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
     plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); }, vehicles: function () { return vehicles.slice(); },
-    routeBetween: function (wps) { return routeBetween(wps); },   // [[lat, lon], …] → { coords, dist (km), dur (s), steps, routed }
+    routeBetween: function (wps, opt) { return routeBetween(wps, opt); },   // [[lat, lon], …] → { coords, dist (km), dur (s), steps, routed }
     previewPlan: function (p) { p.preview = true; showView('map'); followPlan(p, true); },
     // Lo que llevo medido en la ruta en marcha: km, segundos en movimiento e inclinación máxima de cada curva.
     recNow: function () { return rec ? { km: rec.dist || 0, movingS: rec.movingS || 0, peaks: rec.corners.map(function (c) { return Math.abs(c.peak || 0); }) } : null; },
