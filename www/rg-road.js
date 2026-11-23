@@ -112,6 +112,54 @@
     });
     F.shown = true;
   }
+  /* ---------- repostar en marcha: la más cercana o la que mejor viene en la ruta, en el propio mapa ---------- */
+  var FCARD = null;
+  function fuelPick() {
+    var f = (A.lastFix && A.lastFix()) || (A.anyFix && A.anyFix()); if (!f) { A.toast('Hace falta tu posición para buscar gasolineras.', 'warn'); return; }
+    if (!Cl.user()) { Cl.openAuth(false); return; }
+    var host = $('#view-map .map-bottom'); if (!host) return;
+    if (!FCARD) { FCARD = document.createElement('div'); FCARD.className = 'card slim rd-fcard'; host.insertBefore(FCARD, host.firstChild); }
+    FCARD.hidden = false; FCARD.innerHTML = '<div class="rd-fhead"><b>' + ic('fuel') + 'Repostar</b><button class="btn small icon" data-fc="x" type="button" title="Cerrar">' + ic('close') + '</button></div><span class="muted">Buscando gasolineras…</span>';
+    var p = plan(), v = (A.vehicles() || []).filter(function (x) { return x.principal; })[0], ahead = null;
+    if (p) { var bi = 0, bd = 1e12; for (var i = 0; i < p.coords.length; i += 2) { var d = dist(f.lat, f.lon, p.coords[i][1], p.coords[i][0]); if (d < bd) { bd = d; bi = i; } } ahead = bd < 3000 ? p.coords.slice(bi) : null; }
+    var near = fuelAround(f, 25).then(function (d) { return d.rows || []; }, function () { return []; });
+    var box = ahead && ahead.length > 1 ? (function () { var bb = bbox(ahead); return sb.rpc('fuel_box', { a_lat: bb[0], a_lon: bb[1], b_lat: bb[2], b_lon: bb[3] }).then(function (r) { return r.error ? [] : (r.data || []); }, function () { return []; }); })() : Promise.resolve([]);
+    Promise.all([near, box]).then(function (res) {
+      var k = F.kind, ok = function (x) { return x[k] != null; }, rows = res[0].filter(ok).sort(function (a, b) { return a.km - b.km; }), nearest = rows[0], best = null;
+      if (ahead) {
+        var seen = {}, cum = [0]; for (var i = 1; i < ahead.length; i++) cum.push(cum[i - 1] + dist(ahead[i - 1][1], ahead[i - 1][0], ahead[i][1], ahead[i][0]));
+        var lim = (v && v.range > 30 ? v.range * 0.5 : 80) * 1000;      // lo que queda por delante hasta donde llegue el depósito (o 80 km)
+        var cand = res[1].concat(res[0]).filter(ok).filter(function (x) { if (seen[x.id]) return false; seen[x.id] = 1; return true; }).map(function (x) {
+          var bi2 = -1, bd2 = 1500, st = Math.max(1, Math.floor(ahead.length / 1200)); for (var j = 0; j < ahead.length; j += st) { var dd = dist(x.lat, x.lon, ahead[j][1], ahead[j][0]); if (dd < bd2) { bd2 = dd; bi2 = j; } }
+          return bi2 < 0 || cum[bi2] > lim ? null : Object.assign({}, x, { along: cum[bi2] / 1000, off: bd2 });
+        }).filter(Boolean);
+        best = cand.sort(function (a, b) { return (a[k] - b[k]) || (a.along - b.along); })[0] || null;
+      }
+      if (!FCARD || FCARD.hidden) return;
+      var row = function (x, tag, sub) { return '<div class="rd-frow"><span class="rd-price">' + eur(x[k]) + '<small>€/l</small></span><span class="rd-txt"><b>' + esc(x.name) + '<i>' + tag + '</i></b><small>' + esc(x.town || '') + ' · ' + sub + '</small></span><button class="btn small primary" data-fc="' + x.id + '" type="button">Ir</button></div>'; };
+      var html = '', map = {};
+      if (best) { map[best.id] = best; html += row(best, 'en tu ruta', 'a ' + kmTxt(best.along) + ' km siguiendo la ruta' + (best.off > 200 ? ', ' + Math.round(best.off / 50) * 50 + ' m de desvío' : '')); }
+      if (nearest && (!best || nearest.id !== best.id)) { map[nearest.id] = nearest; html += row(nearest, 'la más cercana', 'a ' + kmTxt(nearest.km) + ' km de ti'); }
+      FCARD.innerHTML = '<div class="rd-fhead"><b>' + ic('fuel') + 'Repostar · gasolina ' + (k === 'g95' ? '95' : '98') + '</b><button class="btn small icon" data-fc="x" type="button" title="Cerrar">' + ic('close') + '</button></div>' + (html || '<span class="muted">No encuentro gasolineras con precio a menos de 25 km' + (p ? ' ni junto a tu ruta' : '') + '.</span>') + (p && !best && nearest ? '<span class="muted rg-small" style="text-align:left">No hay ninguna junto a lo que te queda de ruta dentro de tu autonomía.</span>' : '');
+      FCARD.onclick = function (ev) {
+        var b = ev.target.closest('[data-fc]'); if (!b) return; if (b.dataset.fc === 'x') { FCARD.hidden = true; return; }
+        var x = map[b.dataset.fc]; if (!x) return; FCARD.hidden = true; fuelGo(x);
+      };
+    });
+    FCARD.onclick = function (ev) { var b = ev.target.closest('[data-fc=x]'); if (b) FCARD.hidden = true; };
+  }
+  // la elegida queda marcada en el mapa (y en la ruta que se sigue); si está fuera del trazado, se abre el camino en Maps
+  function fuelGo(x) {
+    var p = plan(), label = x.name + ' · ' + eur(x[F.kind]) + ' €';
+    if (p) { p.pois = (p.pois || []).filter(function (q) { return !(q[3] === 'fuel' && q[4] === 'pick'); }).concat([[x.lat, x.lon, label, 'fuel', 'pick']]); if (window.RGNav && RGNav.redraw) RGNav.redraw(); }
+    else fuelMarks([x]);
+    var map = A.map && A.map(); if (map && !(A.isRec && A.isRec())) map.easeTo({ center: [x.lon, x.lat], zoom: 13 });
+    if (x.along != null && x.off <= 400) { A.toast('Aviso: gasolinera marcada en tu ruta, a ' + kmTxt(x.along) + ' km: ' + label + '.', 'ok'); say('Gasolinera marcada en tu ruta, a ' + Math.round(x.along) + ' kilómetros.'); }
+    else { var s = Cl.sheet(head(esc(x.name)) + '<p style="margin:0;text-align:left"><b class="rd-big">' + eur(x[F.kind]) + ' €/l</b><br><span class="muted">' + esc([x.addr, x.town].filter(Boolean).join(', ')) + '</span><br>Queda marcada en el mapa. Está fuera de tu ruta: al volver, la app te marca cómo recuperar el trazado.</p><div class="rg-row"><button class="btn primary" id="fgGo" type="button">' + ic('gmaps') + 'Cómo llegar</button></div>'); $('#rdX', s).addEventListener('click', Cl.closeSheet); $('#fgGo', s).addEventListener('click', function () { Cl.closeSheet(); gmaps(x.lat, x.lon); }); }
+  }
+  // accesos: botón en el menú del mapa, y al avisar de gasolina al grupo
+  (function () { var mc = $('#mapCtrls'); if (!mc) return; var b = document.createElement('button'); b.type = 'button'; b.id = 'btnFuel'; b.title = 'Repostar: gasolineras cerca y en tu ruta'; b.innerHTML = ic('fuel'); mc.appendChild(b); b.addEventListener('click', fuelPick); })();
+  document.addEventListener('click', function (ev) { var b = ev.target.closest && ev.target.closest('[data-av=gasolina]'); if (b) setTimeout(fuelPick, 600); });
   // aviso por autonomía: si la moto tiene autonomía apuntada y se acerca al 75 %, propone la gasolinera más barata cerca
   var RW = { ride: 0, told: false };
   function rangeWatch() {
@@ -121,6 +169,7 @@
     if (last) since += (A.rides() || []).filter(function (r) { return r.start > last.at && (r.vehicleId === v.id || !r.vehicleId); }).reduce(function (s, r) { return s + (r.dist || 0); }, 0);
     if (since < v.range * 0.75) return; RW.told = true;
     var f = A.lastFix && A.lastFix(); if (!f) return;
+    setTimeout(fuelPick, 400);
     fuelAround(f, 20).then(function (r) {
       var rows = (r.rows || []).filter(function (x) { return x[F.kind] != null; }).sort(function (a, b) { return a[F.kind] - b[F.kind]; }), x = rows[0];
       var msg = 'Llevas unos ' + Math.round(since) + ' km desde el último repostaje' + (x ? '. La más barata cerca: ' + x.name + ', a ' + kmTxt(x.km) + ' km (' + eur(x[F.kind]) + ' €)' : '') + '.';
@@ -206,5 +255,5 @@
   if (row) { [['exFuel', 'fuel', 'Gasolineras', fuelOpen], ['exInc', 'warn', 'Incidencias', incOpen]].forEach(function (x) { var b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.id = x[0]; b.innerHTML = ic(x[1]) + x[2]; row.appendChild(b); b.addEventListener('click', x[3]); }); }
   // cortes, accidentes, hielo… de la DGT y peligros avisados que caen sobre un trazado
   function badOn(coords) { return H.dgt.filter(function (x) { return dgtBad(x) && toLine(x.lat, x.lon, coords) <= 150; }).length + H.hz.filter(function (x) { return toLine(x.lat, x.lon, coords) <= 150; }).length; }
-  window.RGRoad = { badOn: badOn, fuel: fuelOpen, incidents: incOpen, hazard: hazard, state: H };
+  window.RGRoad = { pick: fuelPick, badOn: badOn, fuel: fuelOpen, incidents: incOpen, hazard: hazard, state: H };
 })();
