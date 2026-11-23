@@ -122,6 +122,9 @@
     var id = String(x.id || ''), cl = clubs().filter(function (c) { return c.name === x.community; })[0];
     Cl.closeSheet();
     if (x.event) { var e = mine().filter(function (m) { return m.id === x.event; })[0]; if (e && window.RGClub) { RGClub.chat(e); return; } }
+    if (/^solo-/.test(id) && x.token) { window.open('https://regroupride-eventos.netlify.app/seguir.html?s=' + x.token, '_blank'); return; }
+    if (/^oacc-/.test(id)) { if (window.RGOpen) RGOpen.open(); return; }
+    if (/^stl-/.test(id)) { if (window.RGGarage) RGGarage.stolen(); return; }
     if (/^fb/.test(id)) { Cl.openFeedback(); return; }
     if (/^ph/.test(id)) { if (window.RGPhoto) RGPhoto.open('spots'); return; }
     if (!window.RGClub) return;
@@ -182,5 +185,28 @@
   window.RGToday = window.RGToday || [];
   setTimeout(function () { photoCheck(); today(); }, 6000); setInterval(function () { if (document.visibilityState !== 'hidden') { photoCheck(); today(); } }, 60000);
 
-  window.RGShell = { catalog: catalog, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, plan: plan };
+  /* ---------- fotos: elegir, reducir y subir a la carpeta de cada uno ---------- */
+  function pickPhoto(max, multiple) {
+    return new Promise(function (res) {
+      var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; if (multiple) inp.multiple = true; inp.style.display = 'none'; document.body.appendChild(inp);
+      inp.addEventListener('change', function () {
+        var files = Array.prototype.slice.call(inp.files || [], 0, multiple ? 12 : 1); document.body.removeChild(inp);
+        Promise.all(files.map(function (f) { return shrink(f, max || 1600); })).then(function (bs) { bs = bs.filter(Boolean); res(multiple ? bs : bs[0] || null); });
+      });
+      inp.click();
+    });
+  }
+  function shrink(file, max) {
+    return new Promise(function (res) {
+      var im = new Image(), u = URL.createObjectURL(file);
+      im.onload = function () { var k = Math.min(1, max / Math.max(im.width, im.height)), cv = document.createElement('canvas'); cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k); cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height); URL.revokeObjectURL(u); cv.toBlob(function (b) { res(b); }, 'image/jpeg', 0.82); };
+      im.onerror = function () { URL.revokeObjectURL(u); res(null); }; im.src = u;
+    });
+  }
+  function upload(blob, tag) {
+    var u = Cl.user(); if (!u || !blob) return Promise.reject(new Error('Sin sesión'));
+    var path = u.id + '/' + (tag || 'f') + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + '.jpg';
+    return sb.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg', upsert: false }).then(function (r) { if (r.error) throw r.error; return sb.storage.from('covers').getPublicUrl(path).data.publicUrl; });
+  }
+  window.RGShell = { pickPhoto: pickPhoto, upload: upload, clubs: clubs, mine: mine, esc: esc, ic: ic, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, plan: plan };
 })();

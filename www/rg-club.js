@@ -135,7 +135,7 @@
     if (S.missing) { box.innerHTML = '<div class="notice">Las comunidades aún no están activadas en el servidor. Falta ejecutar el archivo 02_comunidades.sql en Supabase.</div>'; return; }
     var c = cur();
     if (!c) { renderJoin(); return; }
-    box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.zone || c.style ? '<span class="club-zone">' + icn('locate') + esc([c.zone, c.style].filter(Boolean).join(' · ')) + '</span>' : '') + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><div class="club-head-act">' + (isAdmin() ? '<button class="btn small" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '<button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button><button class="btn small" data-hm="groups" type="button" aria-pressed="' + (S.tab === 'groups') + '">' + icn('list') + 'Charlas</button><button class="btn small" data-hm="pages" type="button" aria-pressed="' + (S.tab === 'pages') + '">' + icn('info') + 'Info</button></div></div>' +
+    box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.zone || c.style ? '<span class="club-zone">' + icn('locate') + esc([c.zone, c.style].filter(Boolean).join(' · ')) + '</span>' : '') + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><div class="club-head-act">' + (isAdmin() ? '<button class="btn small" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '<button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button><button class="btn small" data-hm="groups" type="button" aria-pressed="' + (S.tab === 'groups') + '">' + icn('list') + 'Charlas</button><button class="btn small" data-hm="pages" type="button" aria-pressed="' + (S.tab === 'pages') + '">' + icn('info') + 'Info</button><button class="btn small" id="clRetos" type="button">' + icn('star') + 'Retos</button></div></div>' +
       '<div id="clMine"></div>' +
       '<div class="pills-wrap"><div class="pills" id="clPills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button></div><span class="pills-more" aria-hidden="true">›</span></div>' +
       '<div class="seg rg-wide" id="clTabs">' + [['events', 'Salidas'], ['routes', 'Rutas'], ['board', 'Tablón'], ['members', 'Gente']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
@@ -146,6 +146,7 @@
     var pl = $('#clPills'), more = function () { if (pl) pl.parentNode.classList.toggle('more', pl.scrollWidth - pl.clientWidth - pl.scrollLeft > 8); };
     if (pl) { pl.addEventListener('scroll', more, { passive: true }); setTimeout(more, 60); setTimeout(more, 600); var on = pl.querySelector('[aria-pressed=true]'); if (on && on.offsetLeft > pl.clientWidth - 80) pl.scrollLeft = on.offsetLeft - 16; }
     $$('[data-hm]', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.hm; render(); }); });
+    if ($('#clRetos')) $('#clRetos').addEventListener('click', function () { if (window.RGSocial) RGSocial.challenges(c, isAdmin()); });
     mineBlock();
     $$('[data-cid]', box).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); render(); }); });
     $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.t; render(); }); });
@@ -379,6 +380,7 @@
   }
   // Una sola petición para la pestaña: los eventos con sus apuntados y sus administradores. La ruta completa de cada
   // evento (decenas de KB) no se baja aquí: solo su nombre, sus km y dónde empieza; el resto, al pulsar «Cargar ruta».
+  var EVS = {};
   var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon,route_url,trip,open_near,extra',
     EV_ROUTE = ',route_name:route->>name,route_dist:route->dist,route_start:route->coords->0,route_wp0:route->wps->0', EV_EMBED = ',event_attendees(*),event_admins(user_id)';
   function fetchEvents(c) {
@@ -392,7 +394,7 @@
       // Si el servidor no acepta la consulta combinada (le falta algún archivo SQL), se hace como antes: todo y por separado.
       return r.error ? sb.from('events').select('*').eq('community_id', c.id).gte('starts_at', since).order('starts_at').limit(40) : r;
     }).then(function (r) {
-      var rows = ok(r), ids = rows.map(function (e) { return e.id; }), att = [], adm = {}, embedded = rows.length && rows[0].event_attendees !== undefined;
+      var rows = ok(r); rows.forEach(function (e) { EVS[e.id] = e; }); var ids = rows.map(function (e) { return e.id; }), att = [], adm = {}, embedded = rows.length && rows[0].event_attendees !== undefined;
       if (rows.length && rows[0].route !== undefined && !('capacity' in rows[0])) S.v6 = false;
       var evs = rows.map(function (e) {
         var o = {}, k; for (k in e) if (!/^(event_attendees|event_admins|route_name|route_dist|route_start|route_wp0)$/.test(k)) o[k] = e[k];
@@ -735,7 +737,7 @@
         '<p class="muted rg-small" style="text-align:left">En Google Maps: toca el sitio → Compartir → Copiar enlace. Si lo dejas vacío y la salida lleva ruta, el punto de encuentro es donde empieza la ruta.</p>' +
         '<label>Plazas (motos)<input id="evCap" type="number" inputmode="numeric" min="1" max="1000" value="' + (e && e.capacity ? e.capacity : '') + '" placeholder="Sin límite"></label>' +
         '<label class="rg-check ev-opencheck"><input type="checkbox" id="evOpenNear"' + (e && e.open_near ? ' checked' : '') + '><span><b>Salida abierta</b><small>Cualquier motero de la zona la verá en Explorar y podrá pedir sitio. Tú decides a quién aceptas.</small></span></label>' +
-        '<div id="evExtra"></div>' +
+        '<div id="evExtra">' + (window.RGEventExtra ? RGEventExtra.form(e) : '') + '</div>' +
         '<p class="muted rg-small" style="text-align:left">Con límite, quien se apunte cuando esté lleno queda en lista de espera. Si alguien se desapunta, la plaza se ofrece al siguiente y tiene que confirmar.</p>'
         : (isAdmin() ? '<p class="muted rg-small" style="text-align:left">Para poner límite de plazas, lista de espera y enlace de Maps de la salida falta ejecutar <b>supabase/06_plazas_y_salida.sql</b> en Supabase.</p>' : '')) +
       '<label>Descripción<textarea id="evDesc" maxlength="4000" placeholder="Paradas, nivel, normas, lo que quieras contar">' + esc(e ? e.description : '') + '</textarea></label>' +
@@ -1108,5 +1110,5 @@
     if (u) setTimeout(pushRegister, 2500);
     if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) { forgetReminders(); liveSync(); } else setTimeout(function () { nativePending(); inbox(true); if (!S.loaded) load().catch(function () {}); else liveSync(); }, 1500); if (!$('#view-club').hidden) show(); }
   });
-  window.RGClub = { newEvent: function () { var c = cur(); if (!c) { A.showView('club'); return false; } if (!isAdmin()) return false; S.tab = 'events'; A.showView('club'); eventForm(c, null); return true; }, catalog: function (cid, name) { catalogSheet(cid, name); }, goto: function (cid, tab) { if (cid) setCid(cid); if (tab) S.tab = tab; A.showView('club'); }, show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, api: { names: names, who: who, ava: ava, isAdmin: isAdmin, cur: cur, S: S }, ring: function (cid, m) { ring(cid, m); }, mine: function () { return IN.events.slice(); } };
+  window.RGClub = { ev: function (id) { return EVS[id]; }, newEvent: function () { var c = cur(); if (!c) { A.showView('club'); return false; } if (!isAdmin()) return false; S.tab = 'events'; A.showView('club'); eventForm(c, null); return true; }, catalog: function (cid, name) { catalogSheet(cid, name); }, goto: function (cid, tab) { if (cid) setCid(cid); if (tab) S.tab = tab; A.showView('club'); }, show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, api: { names: names, who: who, ava: ava, isAdmin: isAdmin, cur: cur, S: S }, ring: function (cid, m) { ring(cid, m); }, mine: function () { return IN.events.slice(); } };
 })();

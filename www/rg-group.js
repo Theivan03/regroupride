@@ -319,11 +319,13 @@
       return '<button class="btn ' + (small ? 'small' : 'big') + ' rg-av sos" data-av="sos" type="button"><svg><use href="#i-warn"/></svg>SOS · Necesito ayuda</button><button class="btn ' + (small ? 'small' : 'big') + ' rg-av averia" data-av="averia" type="button"><svg><use href="#i-wrench"/></svg>Avería</button>' +
         '<button class="btn ' + (small ? 'small' : 'big') + ' rg-av gasolina" data-av="gasolina" type="button"><svg><use href="#i-fuel"/></svg>' + (small ? 'Gasolina' : 'Gasolina · Necesito repostar') + '</button><a class="btn ' + (small ? 'small' : 'big') + ' rg-av" href="tel:112"><svg><use href="#i-phone"/></svg>Llamar al 112</a>';
     };
+    var HZ = window.RGRoad ? '<button class="btn big rg-av" id="avHz" type="button"><svg><use href="#i-warn"/></svg>Peligro en la carretera</button>' : '';
     Cl.sheet(head(cur ? 'Aviso enviado' : 'Avisar al grupo') + (cur ? '<div class="notice rg-nota-av">Aviso enviado: <b>' + esc(KIND[cur].t) + '</b>. ' + state + '</div>' +
         (who && who.phone ? '<a class="btn big rg-call" href="tel:' + tel(who.phone) + '"><svg><use href="#i-phone"/></svg>Llamar a ' + esc(who.name) + ' · ' + esc(who.phone) + '</a>' : '') + '<button class="btn rg-skip" id="avCancel" type="button">Cancelar el aviso</button>' +
-        '<span class="label">Enviar otro aviso</span><div class="rg-av-grid">' + btns(true) + '</div>'
-      : '<p class="muted">Le salta al administrador que esté más cerca de ti, con tu posición; el resto de administradores se enteran. SOS y avería suenan como una alarma.</p><div class="rg-av-col">' + btns(false) + '</div>'));
+        '<span class="label">Enviar otro aviso</span><div class="rg-av-grid">' + btns(true) + '</div>' + HZ
+      : '<p class="muted">Le salta al administrador que esté más cerca de ti, con tu posición; el resto de administradores se enteran. SOS y avería suenan como una alarma.</p><div class="rg-av-col">' + btns(false) + '</div>' + HZ));
     $('#grX').addEventListener('click', function () { Cl.closeSheet(); });
+    if ($('#avHz')) $('#avHz').addEventListener('click', function () { RGRoad.hazard(); });
     if ($('#avCancel')) $('#avCancel').addEventListener('click', function () { Cl.closeSheet(); sendAlert(null); });
     [].forEach.call(document.querySelectorAll('[data-av]'), function (b) { b.addEventListener('click', function () { Cl.closeSheet(); sendAlert(b.dataset.av); }); });
   }

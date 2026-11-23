@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.45.0';
+  var APP_VERSION = '0.46.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -592,7 +592,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   var toastTimer = null;
   // Los avisos de arriba se reservan para lo que importa: errores, cosas que faltan por hacer y lo que llega de otros
   // (avisos en ruta, novedades, fotógrafos cerca). Las confirmaciones de «hecho» o «guardado» ya no salen: se ve en pantalla.
-  var TOAST_KEEP = /Confirma el correo|enviado un correo|Solicitud enviada|[Aa]viso|ha iniciado la ruta|está a \d+ km|Nuevo evento: |Tablón: |Info: |Ruta terminada para todos|Reparto|no te llegarán avisos/;
+  var TOAST_KEEP = /Confirma el correo|enviado un correo|Solicitud enviada|[Aa]viso|ha iniciado la ruta|está a \d+ km|Nuevo evento: |Nueva salida: |Tablón: |Info: |Ruta terminada para todos|Reparto|no te llegarán avisos/;
   function toast(msg, kind) { if (kind === 'ok' && !TOAST_KEEP.test(String(msg))) return; var n = $('#toast'); n.textContent = msg; n.className = 'toast notice' + (kind ? ' ' + kind : ''); n.hidden = false; if (toastTimer) clearTimeout(toastTimer); toastTimer = setTimeout(function () { n.hidden = true; }, kind === 'bad' ? 9000 : 5000); }
   function showNotice(msg, kind) { var n = $('#notice'); n.textContent = msg; n.className = 'notice' + (kind ? ' ' + kind : ''); n.hidden = false; }
   function hideNotice() { $('#notice').hidden = true; }
@@ -1021,7 +1021,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
         '<div><span class="label">Odómetro · km</span><br><span class="odo">' + digits.slice(0, 5) + '<b>' + digits.slice(5) + '</b></span></div>' +
         '<div class="vstats">' + fig('Rutas', String(mine.length)) + fig('Horas', (vs / 3600).toFixed(0)) + fig('Km en la app', Math.round(vkm) + '') + '</div>' +
         '<div class="actions">' + (v.principal ? '' : '<button class="btn small" type="button" data-act="main">Hacer principal</button>') + '<button class="btn small" type="button" data-act="edit"><svg><use href="#i-edit"/></svg>Editar</button><button class="btn small danger" type="button" data-act="del">Quitar del garaje</button></div>' +
-        maintHtml(v, odo);
+        maintHtml(v, odo) + '<div class="v-x" data-vx="' + v.id + '" data-odo="' + odo + '"></div>';
       d.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () {
         if (b.dataset.act === 'main') { vehicles.forEach(function (x) { x.principal = x.id === v.id; }); Promise.all(vehicles.map(DB.putVehicle)).then(renderGarage); }
         if (b.dataset.act === 'edit') openVehicleForm(v);
@@ -1033,6 +1033,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       }); });
       box.appendChild(d);
     });
+    try { document.dispatchEvent(new CustomEvent('rg:garage')); } catch (e) {}
   }
   function reloadVehicles() { return DB.allVehicles().then(function (a) { vehicles = a; return a; }); }
 
@@ -1322,6 +1323,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, leanNow: function () { return est.state.ready && !sens.demo ? Math.abs(live.phi) : (sens.demo ? Math.abs(live.phi) : null); }, recInfo: function () { return rec ? { maxL: rec.maxL, maxR: rec.maxR } : null; }, anyFix: function () { return lastFix || (quickFix ? { lat: quickFix.lat, lon: quickFix.lon, acc: quickFix.acc, ts: Date.now(), approx: true } : (savedFix ? { lat: savedFix.lat, lon: savedFix.lon, acc: 5000, ts: savedFix.t, approx: true } : null)); }, activePlan: function () { return planMode ? null : activePlan; },
     maintDue: function () { return maintDueSummary(); },
+    saveVehicle: function (v) { return DB.putVehicle(v).then(reloadVehicles).then(function () { syncSoon(); if (currentView === 'garage') renderGarage(); }); },
     isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { askAndStart(); }, reloadProfile: reloadProfile, setProfileName: setProfileName, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
     plans: function () { return plans.slice(); }, rides: function () { return rides.slice(); }, vehicles: function () { return vehicles.slice(); },
