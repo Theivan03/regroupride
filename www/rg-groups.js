@@ -191,7 +191,7 @@
       ev.preventDefault();
       if (!picked || !picked.coords || picked.coords.length < 2) { A.toast('Elige una de tus rutas o importa un GPX.', 'warn'); return; }
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
-        return sb.from('group_messages').insert({ group_id: g.id, body: $('#srText').value.trim(), route: picked, route_name: String(picked.name || 'Ruta').slice(0, 80), route_km: Math.round((+picked.dist || 0) * 10) / 10 }).then(function (r) { ok(r); openGroup(c, g); });
+        return sb.from('group_messages').insert({ group_id: g.id, body: $('#srText').value.trim(), route: (window.RGShell ? RGShell.trim(picked) : picked), route_name: String(picked.name || 'Ruta').slice(0, 80), route_km: Math.round((+picked.dist || 0) * 10) / 10 }).then(function (r) { ok(r); openGroup(c, g); });
       });
     });
   }

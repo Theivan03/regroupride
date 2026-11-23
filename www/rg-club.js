@@ -251,7 +251,7 @@
       ev.preventDefault();
       if (!picked || !picked.coords || picked.coords.length < 2) { A.toast('Elige una de tus rutas o importa un GPX.', 'warn'); return; }
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
-        return sb.from('community_routes').insert({ community_id: c.id, name: $('#rtName').value.trim(), description: $('#rtDesc').value.trim(), kind: $('#rtKind').value.trim(), level: $('#rtLevel').value, start_name: $('#rtStart').value.trim(), warnings: $('#rtWarn').value.trim(), tips: $('#rtTips').value.trim(), dist: Math.round((+picked.dist || 0) * 10) / 10, dur: Math.round(+picked.dur || 0), route: picked, created_by: S.user.id }).then(function (r) {
+        return sb.from('community_routes').insert({ community_id: c.id, name: $('#rtName').value.trim(), description: $('#rtDesc').value.trim(), kind: $('#rtKind').value.trim(), level: $('#rtLevel').value, start_name: $('#rtStart').value.trim(), warnings: $('#rtWarn').value.trim(), tips: $('#rtTips').value.trim(), dist: Math.round((+picked.dist || 0) * 10) / 10, dur: Math.round(+picked.dur || 0), route: (window.RGShell ? RGShell.trim(picked) : picked), created_by: S.user.id }).then(function (r) {
           ok(r); Cl.closeSheet(); A.toast('Ruta añadida al catálogo.', 'ok'); return paneRoutes(c);
         });
       });

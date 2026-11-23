@@ -208,5 +208,27 @@
     var path = u.id + '/' + (tag || 'f') + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + '.jpg';
     return sb.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg', upsert: false }).then(function (r) { if (r.error) throw r.error; return sb.storage.from('covers').getPublicUrl(path).data.publicUrl; });
   }
-  window.RGShell = { pickPhoto: pickPhoto, upload: upload, clubs: clubs, mine: mine, esc: esc, ic: ic, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, plan: plan };
+  /* ---------- zona de privacidad: lo que publico sale sin los primeros y los últimos metros ---------- */
+  function trimM() { var n = parseInt(store('rg.priv.trim') || '0', 10); return n > 0 ? n : 0; }
+  function seg(a, b) { var x = (b[0] - a[0]) * Math.PI / 180 * Math.cos((a[1] + b[1]) * Math.PI / 360), y = (b[1] - a[1]) * Math.PI / 180; return Math.sqrt(x * x + y * y) * 6371000; }
+  function trim(r) {
+    var m = trimM(); if (!m || !r || !r.coords || r.coords.length < 4) return r;
+    var c = r.coords, tot = 0, i; for (i = 1; i < c.length; i++) tot += seg(c[i - 1], c[i]);
+    var cut = Math.min(m, tot * 0.2), acc = 0, a = 0, b = c.length - 1;
+    for (i = 1; i < c.length && acc < cut; i++) { acc += seg(c[i - 1], c[i]); a = i; }
+    for (acc = 0, i = c.length - 1; i > a && acc < cut; i--) { acc += seg(c[i], c[i - 1]); b = i - 1; }
+    if (b - a < 2) return r;
+    var out = Object.assign({}, r), cs = c.slice(a, b + 1), near = function (w) { return seg([w[1], w[0]], c[0]) < cut * 1.5 || seg([w[1], w[0]], c[c.length - 1]) < cut * 1.5; };
+    out.coords = cs;
+    if (r.wps && r.wps.length) { var mid = r.wps.slice(1, -1).filter(function (w) { return !near(Array.isArray(w) ? w : [w.lat, w.lon]); }), mk = function (p) { var w0 = r.wps[0]; return Array.isArray(w0) ? [p[1], p[0]] : Object.assign({}, w0, { lat: p[1], lon: p[0], name: undefined }); }; out.wps = [mk(cs[0])].concat(mid, [mk(cs[cs.length - 1])]); }
+    return out;
+  }
+  (function () {
+    var box = document.getElementById('rgPrivBox'); if (!box) return;
+    var d = document.createElement('div'); d.className = 'rg-priv-trim';
+    d.innerHTML = '<b>Zona de privacidad</b><span class="muted">Recorta el principio y el final de las rutas que publicas o compartes con tu comunidad, para que no se vea de dónde sales ni dónde acabas. Las salidas con punto de encuentro no se recortan.</span><div class="seg" id="privTrim">' + [[0, 'No'], [300, '300 m'], [500, '500 m'], [1000, '1 km']].map(function (x) { return '<button type="button" data-m="' + x[0] + '" aria-pressed="' + (trimM() === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
+    box.appendChild(d);
+    $$('#privTrim button').forEach(function (b) { b.addEventListener('click', function () { store('rg.priv.trim', b.dataset.m); $$('#privTrim button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
+  })();
+  window.RGShell = { trim: trim, pickPhoto: pickPhoto, upload: upload, clubs: clubs, mine: mine, esc: esc, ic: ic, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, plan: plan };
 })();

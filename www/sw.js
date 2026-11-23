@@ -1,10 +1,10 @@
 /* Inclina — service worker: deja la app disponible sin cobertura.
    Archivos propios: red primero y copia en caché (así las actualizaciones llegan al momento).
    Las fuentes van incluidas en fonts/. */
-var CACHE = 'regroupride-v0.46.0';
-var SHELL = ['./', './index.html', './app.js?v=0.46.0', './lean-core.js?v=0.46.0', './geo.js?v=0.46.0', './db.js?v=0.46.0', './achievements.js?v=0.46.0', './platform.js?v=0.46.0', './manifest.webmanifest?v=0.46.0',
+var CACHE = 'regroupride-v0.47.0';
+var SHELL = ['./', './index.html', './app.js?v=0.47.0', './lean-core.js?v=0.47.0', './geo.js?v=0.47.0', './db.js?v=0.47.0', './achievements.js?v=0.47.0', './platform.js?v=0.47.0', './manifest.webmanifest?v=0.47.0',
   './vendor/maplibre-gl.js', './vendor/maplibre-gl.css', './icon-192.png', './icon-512.png', './icon-512-maskable.png',
-  './fonts/outfit-latin-wght-normal.woff2', './fonts/manrope-latin-wght-normal.woff2', './rg-lib.js?v=0.46.0', './rg-mapstyle.js?v=0.46.0', './rg-app.js?v=0.46.0', './rg-extras.js?v=0.46.0', './rg-creador.js?v=0.46.0', './rg-art.js?v=0.46.0', './rg-crop.js?v=0.46.0', './rg-tour.js?v=0.46.0', './rg-trips.js?v=0.46.0', './rg-photo.js?v=0.46.0', './rg-lean.js?v=0.46.0', './rg-groups.js?v=0.46.0', './rg-shell.js?v=0.46.0', './rg-solo.js?v=0.46.0', './rg-open.js?v=0.46.0', './rg-road.js?v=0.46.0', './rg-garage.js?v=0.46.0', './rg-social.js?v=0.46.0', './creador.jpg', './creador-moto.jpg', './rg-thumbs.js?v=0.46.0', './rg-live.js?v=0.46.0', './rg-club.js?v=0.46.0', './rg-group.js?v=0.46.0', './rg-sync.js?v=0.46.0', './vendor/qrcode.js', './rg-theme.css?v=0.46.0', './rg-quedada.css?v=0.46.0', './simbolo.svg', './vendor/supabase.js'];
+  './fonts/outfit-latin-wght-normal.woff2', './fonts/manrope-latin-wght-normal.woff2', './rg-lib.js?v=0.47.0', './rg-mapstyle.js?v=0.47.0', './rg-app.js?v=0.47.0', './rg-extras.js?v=0.47.0', './rg-creador.js?v=0.47.0', './rg-art.js?v=0.47.0', './rg-crop.js?v=0.47.0', './rg-tour.js?v=0.47.0', './rg-trips.js?v=0.47.0', './rg-photo.js?v=0.47.0', './rg-lean.js?v=0.47.0', './rg-groups.js?v=0.47.0', './rg-shell.js?v=0.47.0', './rg-solo.js?v=0.47.0', './rg-open.js?v=0.47.0', './rg-road.js?v=0.47.0', './rg-garage.js?v=0.47.0', './rg-social.js?v=0.47.0', './rg-offline.js?v=0.47.0', './rg-oauth.js?v=0.47.0', './rg-routes.js?v=0.47.0', './creador.jpg', './creador-moto.jpg', './rg-thumbs.js?v=0.47.0', './rg-live.js?v=0.47.0', './rg-club.js?v=0.47.0', './rg-group.js?v=0.47.0', './rg-sync.js?v=0.47.0', './vendor/qrcode.js', './rg-theme.css?v=0.47.0', './rg-quedada.css?v=0.47.0', './simbolo.svg', './vendor/supabase.js'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));

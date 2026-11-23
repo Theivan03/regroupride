@@ -45,6 +45,7 @@
 
   /* ---- rutas planificadas ---- */
   function planRow(p) {
+    if (p.pub && window.RGShell) { var t = RGShell.trim(p); if (t !== p) p = Object.assign({}, p, { coords: t.coords, wps: t.wps }); }      // zona de privacidad: lo publicado va recortado
     return { owner_id: uid(), local_id: p.id, name: (p.name || 'Ruta').slice(0, 120), waypoints: p.wps || [], distance_m: Math.round((p.dist || 0) * 1000), duration_s: Math.round(p.dur || 0),
       visibility: p.pub ? 'public' : 'private', start_lat: p.coords[0][1], start_lon: p.coords[0][0],
       plan: { wps: p.wps || [], pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur, created: p.created || null, from: p.from || null, gpx: !!p.gpx } };

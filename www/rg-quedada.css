@@ -1384,3 +1384,15 @@ body.rg-tabs-min #tabsHandle{transform:none;opacity:1;pointer-events:auto}
 #view-garage .head .right{gap:6px}
 #view-garage .head .right .btn.small{padding:0 10px}
 #btnStolen{font-size:0;gap:0}#btnStolen svg{width:18px;height:18px}
+.rg-priv-trim{display:flex;flex-direction:column;gap:8px;margin-top:6px;padding-top:12px;border-top:1px solid var(--color-line,rgba(0,0,0,.08))}
+.rg-priv-trim .muted{font-size:13.5px}
+.rg-google-wrap{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.rg-or{text-align:center;font-size:13px;color:var(--color-text-2);position:relative}
+.rg-google{background:#fff;color:#1f1f1f;border:1px solid rgba(0,0,0,.14);justify-content:center;gap:10px}
+.plan-nohw{margin:2px 0}
+.of-row{grid-template-columns:1fr auto}
+#ofP{display:flex;flex-direction:column;gap:8px;margin:6px 0}
+#ofP .btn{align-self:flex-start}
+.rg-ex-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+.rg-ex-row .btn{font-size:14px;padding:0 8px;gap:7px;white-space:nowrap;overflow:hidden}
+.rg-ex-row .btn svg{flex:none;width:18px;height:18px}

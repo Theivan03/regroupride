@@ -18,6 +18,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Vuelta del acceso con Google: el navegador devuelve a la app con com.regroupride.app://auth -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.regroupride.app" android:host="auth" />
+            </intent-filter>
         </activity>
 
         <!-- Botones de los avisos del grupo (SOS, avería, gasolina), también con el teléfono bloqueado. -->

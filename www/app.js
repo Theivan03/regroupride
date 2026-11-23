@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.46.0';
+  var APP_VERSION = '0.47.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -202,7 +202,7 @@
     if (!HAS_MAP || map) return;
     loadStyle().then(function (st) {
       var c0 = lastFix || quickFix || savedFix;
-      map = new maplibregl.Map({ container: 'map', style: st, center: c0 ? [c0.lon, c0.lat] : [-3.7, 40.4], zoom: c0 ? (c0.acc && c0.acc > 300 ? 12 : 15) : 5, attributionControl: false, pitchWithRotate: false, touchPitch: false });
+      map = new maplibregl.Map({ container: 'map', style: st, center: c0 ? [c0.lon, c0.lat] : [-3.7, 40.4], zoom: c0 ? (c0.acc && c0.acc > 300 ? 12 : 15) : 5, attributionControl: false, pitchWithRotate: false, touchPitch: false, transformRequest: window.RGOffline ? RGOffline.transform : undefined });
       map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-left');
     // el crédito del mapa sale recogido (una «i» que se abre al tocarla) y fuera de la barra de pestañas
     function tidyAttrib() { var cr = document.querySelector('#map .maplibregl-ctrl-attrib'); if (cr) { cr.classList.remove('maplibregl-compact-show'); cr.removeAttribute('open'); } }
@@ -380,12 +380,17 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     if (wps.length < 2) { pl.coords = wps.map(function (w) { return [w[1], w[0]]; }); pl.dist = 0; pl.dur = 0; pl.routed = false; pl.pending = false; drawPlan(); renderPlanInfo(); return; }
     routeBetween(wps).then(function (r) { if (seq !== routeSeq) return; pl.coords = r.coords; pl.dist = r.dist; pl.dur = r.dur; pl.routed = r.routed; pl.steps = r.steps || []; pl.pending = false; drawPlan(); renderPlanInfo(); });
   }
+  var routeOpt = { noHighway: LS.get('rg.route.nohw', false) === true };
   function routeBetween(wps) {
     var straight = function () { var d = 0; for (var i = 1; i < wps.length; i++) d += Geo.dist(wps[i - 1][0], wps[i - 1][1], wps[i][0], wps[i][1]); return { coords: wps.map(function (w) { return [w[1], w[0]]; }), dist: d / 1000, dur: d / 1000 / 60 * 3600, routed: false }; };
     if (typeof navigator.onLine === 'boolean' && !navigator.onLine) return Promise.resolve(straight());
-    var url = 'https://router.project-osrm.org/route/v1/driving/' + wps.map(function (w) { return w[1].toFixed(5) + ',' + w[0].toFixed(5); }).join(';') + '?overview=full&geometries=geojson&steps=true';
-    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctrl) setTimeout(function () { ctrl.abort(); }, 8000);
-    return fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { return r.json(); }).then(function (j) { if (!j.routes || !j.routes[0]) throw new Error('sin ruta'); var rt = j.routes[0]; return { coords: rt.geometry.coordinates, dist: rt.distance / 1000, dur: rt.duration, routed: true, steps: RGLib.stepsFromOsrm(rt) }; }).catch(straight);
+    var base = 'https://router.project-osrm.org/route/v1/driving/' + wps.map(function (w) { return w[1].toFixed(5) + ',' + w[0].toFixed(5); }).join(';') + '?overview=full&geometries=geojson&steps=true';
+    var ask = function (url) {
+      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctrl) setTimeout(function () { ctrl.abort(); }, 8000);
+      return fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { return r.json(); }).then(function (j) { if (!j.routes || !j.routes[0]) throw new Error('sin ruta'); var rt = j.routes[0]; return { coords: rt.geometry.coordinates, dist: rt.distance / 1000, dur: rt.duration, routed: true, steps: RGLib.stepsFromOsrm(rt) }; });
+    };
+    // «evitar autovías»: se pide sin autopistas; si el servidor no lo admite o no hay camino, se traza como siempre
+    return (routeOpt.noHighway ? ask(base + '&exclude=motorway').catch(function () { return ask(base); }) : ask(base)).catch(straight);
   }
   function drawPlan() {
     if (!map || !mapReady || !map.getSource('plan')) return;
@@ -749,7 +754,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   function ensureDetailMap() {
     if (!HAS_MAP || dmap) return Promise.resolve(dmap);
     return loadStyle().then(function (st) {
-      dmap = new maplibregl.Map({ container: 'detailMap', style: st, center: [-3.7, 40.4], zoom: 5, attributionControl: { compact: true }, pitchWithRotate: false, touchPitch: false });
+      dmap = new maplibregl.Map({ container: 'detailMap', style: st, center: [-3.7, 40.4], zoom: 5, attributionControl: { compact: true }, pitchWithRotate: false, touchPitch: false, transformRequest: window.RGOffline ? RGOffline.transform : undefined });
       dmap.on('style.load', function () { addTrackLayers(dmap, 'd'); if (detailTrack.length) drawDetailTrack(); });
       dmap.on('error', function () {});
       var re = document.createElement('div'); re.className = 'replay-marker'; replayMarker = new maplibregl.Marker({ element: re });
@@ -1323,6 +1328,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
     map: function () { return mapReady ? map : null; }, lastFix: function () { return lastFix; }, leanNow: function () { return est.state.ready && !sens.demo ? Math.abs(live.phi) : (sens.demo ? Math.abs(live.phi) : null); }, recInfo: function () { return rec ? { maxL: rec.maxL, maxR: rec.maxR } : null; }, anyFix: function () { return lastFix || (quickFix ? { lat: quickFix.lat, lon: quickFix.lon, acc: quickFix.acc, ts: Date.now(), approx: true } : (savedFix ? { lat: savedFix.lat, lon: savedFix.lon, acc: 5000, ts: savedFix.t, approx: true } : null)); }, activePlan: function () { return planMode ? null : activePlan; },
     maintDue: function () { return maintDueSummary(); },
+    routeOpt: routeOpt, replan: function () { if (planMode) scheduleRoute(); },
     saveVehicle: function (v) { return DB.putVehicle(v).then(reloadVehicles).then(function () { syncSoon(); if (currentView === 'garage') renderGarage(); }); },
     isRec: function () { return !!rec; }, isTrip: function () { return !!(rec && rec.trip); }, isDemo: function () { return !!sens.demo; }, isPlanMode: function () { return planMode; },
     startRide: function () { askAndStart(); }, reloadProfile: reloadProfile, setProfileName: setProfileName, enterPlanMode: enterPlanMode, openLeanFull: function () { openLeanFull(); }, importRecordedGpx: importRecordedGpx,
