@@ -62,6 +62,12 @@
     }); });
     if ($('#trChat')) $('#trChat').addEventListener('click', function () { RGClub.chat(ev); });
     if ($('#trEdit')) $('#trEdit').addEventListener('click', edit);
+    if (T.admin) { var sh = document.querySelector('#rgSheet .rg-sheet-in') || document.getElementById('rgSheet'), del = document.createElement('button'); del.type = 'button'; del.className = 'link danger rg-center tr-del'; del.textContent = 'Borrar este viaje'; sh.appendChild(del);
+      del.addEventListener('click', function () {
+        if (!del.dataset.sure) { del.dataset.sure = 1; del.textContent = 'Se borra para todos, con sus etapas, gastos y chat. Toca otra vez para borrarlo'; setTimeout(function () { if (del.isConnected) { delete del.dataset.sure; del.textContent = 'Borrar este viaje'; } }, 6000); return; }
+        var id = T.ev.id; del.disabled = true;
+        sb.rpc('trip_delete', { p_event: id }).then(function (r) { if (r.error) throw r.error; A.toast('Aviso: viaje borrado.', 'ok'); if (window.RGClub && RGClub.inbox) RGClub.inbox(true); list(); }).catch(function (e) { del.disabled = false; A.toast(Cl.msg(e), 'warn'); });
+      }); }
     if ($('#trShare')) $('#trShare').addEventListener('click', function () {
       var text = 'Vente a «' + ev.title + '» (' + dstr(s) + '). En ReGroupRide entra en Comunidad → Mis viajes → «Tengo un código» y escribe ' + ev.communities.join_code + '.';
       if (navigator.share) navigator.share({ text: text }).catch(function () {}); else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { A.toast('Texto copiado.', 'ok'); });
@@ -276,7 +282,7 @@
     Cl.sheet(head('Mis viajes') + '<p class="muted">Cargando…</p>'); $('#trX').addEventListener('click', Cl.closeSheet);
     sb.rpc('my_trips').then(function (r) {
       var rows = ok(r) || [], now = Date.now();
-      Cl.sheet(head('Mis viajes') + '<p class="muted" style="text-align:left;margin:0">Escapadas de varios días: con tu comunidad o entre amigos.</p>' +
+      Cl.sheet(head('Mis viajes') + '<p class="muted" style="text-align:left;margin:0">Escapadas de varios días. Las puedes organizar entre amigos, con un código para invitar, o publicarlas en tu comunidad desde su botón «Crear».</p>' +
         (rows.length ? '<div class="tr-list">' + rows.map(function (x) {
           var s = new Date(x.starts_at), past = (x.ends_at || x.starts_at) < now - 864e5;
           return '<button class="tr-item' + (past ? ' past' : '') + '" data-id="' + x.id + '" type="button"><span class="tr-date"><b>' + s.getDate() + '</b>' + MON[s.getMonth()] + '</span><span class="tr-info"><b>' + esc(x.title) + '</b><small>' + (x.private ? 'Entre amigos' : esc(x.community)) + ' · ' + (x.days || 1) + (x.days === 1 ? ' día' : ' días') + ' · van ' + x.going + '</small></span>' + (x.mine === 'going' || x.mine === 'offered' ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>Vas</span>' : '') + '</button>';

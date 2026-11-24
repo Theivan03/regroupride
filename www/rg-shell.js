@@ -58,6 +58,7 @@
   function plan() { A.showView('map'); var b = $('#btnPlan'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); }
   if ($('#exPlan')) $('#exPlan').addEventListener('click', plan);
   if ($('#exPhoto')) $('#exPhoto').addEventListener('click', function () { if (window.RGPhoto) RGPhoto.open('spots'); });
+  if ($('#exTrips')) $('#exTrips').addEventListener('click', function () { if (window.RGTrips) RGTrips.list(); });
   // Un solo botón «Crear»: ruta, salida o viaje
   function plus(ev) {
     var fromClub = !!(ev && ev.currentTarget && ev.currentTarget.id === 'clPlus');
@@ -170,7 +171,7 @@
     var el = $('#rgToday'), tot = $('#idleTotals'); if (!el) return;
     var rows = [], ev = mine(), off = ev.filter(function (e) { return e.status === 'offered'; })[0], next = ev.filter(function (e) { return e.status === 'going' || e.status === 'waiting'; })[0];
     if (off) rows.push({ i: 'check', k: 'off', b: 'Tienes una plaza', t: off.title + ' · contesta cuanto antes', hot: 1 });
-    if (next) rows.push({ i: 'cal', k: 'ev', b: next.title, t: when(next.starts_at) + (next.meet_name ? ' · ' + next.meet_name : '') + (next.status === 'waiting' ? ' · en espera' : '') });
+    if (next) rows.push({ i: next.is_trip ? 'route' : 'cal', k: 'ev', go: next.is_trip ? function () { if (window.RGTrips) RGTrips.open(next.id); } : null, b: (next.is_trip ? 'Viaje: ' : 'Salida: ') + next.title, t: when(next.starts_at) + (next.meet_name ? ' · ' + next.meet_name : '') + (next.status === 'waiting' ? ' · en espera' : '') });
     var due = []; try { due = (A.maintDue ? A.maintDue() : []).filter(function (x) { return x.st === 'due'; }); } catch (e) {}
     if (due.length) rows.push({ i: 'wrench', k: 'mt', b: due.length === 1 ? 'Mantenimiento vencido' : due.length + ' mantenimientos vencidos', t: due[0].m.name + ' · ' + (due[0].v.name || 'tu moto'), hot: 1 });
     if (PH.n) rows.push({ i: 'camera', k: 'ph', b: PH.n === 1 ? 'Un fotógrafo cerca hoy' : PH.n + ' fotógrafos cerca hoy', t: PH.place });

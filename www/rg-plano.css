@@ -174,3 +174,10 @@ body.rg-tabs-min .map-bottom{bottom:0!important}
 .hud-time,#hudTime,.timer{color:var(--texto)!important;font-family:var(--font-cifra)!important}
 #btnHudInfo{box-shadow:inset 0 0 0 1px var(--linea)!important}
 .map-bottom .rg-warnbtn{margin-left:12px!important}
+.rg-kind{font-style:normal;font:700 11px/1 var(--font-texto);letter-spacing:.4px;text-transform:uppercase;color:var(--texto-2);margin-bottom:3px}
+.rg-kind.trip{color:var(--marca)}
+.rg-ex-trips{justify-content:flex-start!important;gap:12px!important;min-height:60px!important;text-align:left;padding:0 14px!important}
+.rg-ex-trips span{display:flex;flex-direction:column;flex:1;min-width:0}.rg-ex-trips b{font-size:17px}
+.rg-ex-trips small{font:500 12.5px/1.3 var(--font-texto);color:var(--texto-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rg-ex-trips svg:last-child{width:16px;height:16px;opacity:.6}
+.tr-del{margin-top:18px;display:block}
