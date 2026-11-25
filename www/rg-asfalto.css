@@ -615,3 +615,32 @@ div.as-row .btn.small{flex:none}
 .gx-year>div:first-child{border-left:0}.gx-year b{font:700 20px/1 var(--font-cifra)!important}.gx-year small{font:600 12px/1.2 var(--font-texto);color:var(--texto-2)}
 .gx-month{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:20px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--linea)}
 .gx-month b{font-size:18px}
+/* en marcha: cifras a la mitad, para que la tarjeta ocupe menos mapa */
+html body #hudCard{gap:6px!important;padding:8px 14px max(8px,env(safe-area-inset-bottom,0px))!important}
+html body #hudCard .as-hud{align-items:center!important;gap:6px!important}
+html body #hudCard .as-lean b,html body #hudMaxL,html body #hudMaxR{font-size:20px!important;line-height:1!important}
+html body #hudCard .as-lean i{font-size:13px}html body #hudCard .as-lean small{font-size:10px}
+html body #hudCard .as-speed{flex-direction:row;align-items:baseline;gap:4px}
+html body #hudCard .as-speed b,html body #hudSpeed{font-size:36px!important;line-height:1!important}
+html body #hudCard .as-speed small{font-size:11px;margin:0}
+html body #hudCard .as-km b,html body #hudCard .hud-time{font-size:20px!important}
+html body #hudCard .as-hud2 .btn.stop{min-height:48px!important;font-size:17px!important;padding:0 18px!important}
+/* Estadísticas › Metas: una tarjeta por bloque, sin cajas dentro de cajas */
+#view-stats .goals{background:var(--superficie)!important;border:1px solid var(--linea)!important;border-radius:12px!important;padding:4px 16px!important;display:block!important}
+#view-stats .goals:empty{display:none!important}
+#view-stats .goals .goal{border:0!important;border-radius:0!important;background:none!important;padding:12px 0!important;margin:0!important;border-top:1px solid var(--linea)!important}
+#view-stats .goals .goal:first-child{border-top:0!important}
+#view-stats .goals .goal .bar3{background:var(--superficie-2)}
+#view-stats #profileStreak{display:none!important}
+/* Logros: las seis categorías en tres columnas, sin salirse por el lado */
+#achCats{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;overflow:visible!important;width:100%;margin:0!important;padding:0!important}
+#achCats>*{min-width:0!important;width:auto!important;flex:none!important;padding:10px 4px!important;overflow:hidden}
+#achCats>* *{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#achCats .lbl,#achCats small,#achCats span{font-size:12px!important;letter-spacing:0!important}
+/* Ajustes › Avisos con la app cerrada: una sola tarjeta, con aire */
+#rgNoti{padding:14px 16px!important;display:flex;flex-direction:column;gap:10px}
+#rgNoti .card.rg-noti{background:none!important;border:0!important;padding:0!important;margin:0!important;gap:12px}
+#rgNoti .rg-nrow{gap:12px;padding-bottom:12px;border-bottom:1px solid var(--linea)}
+#rgNoti .rg-nrow span,#rgNoti .rg-nok{font:500 15px/1.4 var(--font-texto)}
+#rgNoti .rg-nok{align-items:flex-start}
+#rgNoti p{margin:0!important;text-align:left}

@@ -276,7 +276,12 @@
     });
   }
   var motoT = 0, vh = $('#vehicles');
-  if (vh && window.MutationObserver) new MutationObserver(function (m) { if (m.every(function (x) { return x.target.closest && x.target.closest('.as-gen'); })) return; clearTimeout(motoT); motoT = setTimeout(moto, 120); }).observe(vh, { childList: true, subtree: true });
+  if (vh && window.MutationObserver) new MutationObserver(function (m) {
+    // lo que pone y quita moto() (los bloques .as-gen) no cuenta: si contara, se repintaría sin parar
+    var gen = function (n) { return n.nodeType !== 1 || n.classList.contains('as-gen'); }, all = function (l) { return Array.prototype.every.call(l, gen); };
+    if (m.every(function (x) { return (x.target.closest && x.target.closest('.as-gen')) || (all(x.addedNodes) && all(x.removedNodes)); })) return;
+    clearTimeout(motoT); motoT = setTimeout(moto, 120);
+  }).observe(vh, { childList: true, subtree: true });
 
   /* ---------- Estadísticas: Cifras, Metas y Logros ---------- */
   var stTab = 'cifras';
@@ -331,7 +336,7 @@
     if (!nav.dataset.ok) {
       nav.dataset.ok = '1';
       var row = function (id, i, t, sub) { return '<button type="button" data-h="' + id + '">' + ic(i) + '<span><b>' + t + '</b><small>' + sub + '</small></span>' + ic('chev') + '</button>'; };
-      nav.innerHTML = row('tour', 'play', 'Cómo funciona', 'Repite el recorrido de diez pasos') + row('fb', 'chat', 'Sugerencias y fallos', 'Escríbele a quien hace la app') + row('diag', 'sens', 'Diagnóstico de sensores', 'GPS, movimiento e inclinómetro') + row('demo', 'route', 'Ruta simulada', 'Prueba la app sin moverte') + row('who', 'user', 'Quién hace la app', 'La página del creador');
+      nav.innerHTML = row('tour', 'play', 'Cómo funciona', 'Repite el recorrido de diez pasos') + row('fb', 'chat', 'Sugerencias y fallos', 'Escríbele a quien hace la app') + row('demo', 'route', 'Ruta simulada', 'Prueba la app sin moverte');
       $$('[data-h]', nav).forEach(function (b) { b.addEventListener('click', function () {
         var k = b.dataset.h;
         if (k === 'tour') { A.showView('map'); if (window.RGTour) RGTour.start(); }

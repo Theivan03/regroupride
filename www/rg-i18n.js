@@ -60,7 +60,7 @@
         hit = hit.replace(/(^|[^A-Za-zñáéíóú])(lun|mar|mié|jue|vie|sáb|dom)( \d{1,2} )/g, function (m, b, w, r) { return b + WD[w] + r; })
           .replace(/(\d{1,2}) (ene|feb|mar|abr|may|jun|jul|ago|sep|sept|oct|nov|dic)(?![A-Za-zñáéíóú])/g, function (m, d, mo) { return d + ' ' + MO[mo]; })
           .replace(/^Add (.+)$/, function (m, r) { return 'Add ' + (D[r] !== undefined ? D[r] : r); });
-        hit = hit.replace(/(\d+) de (\d+)\b/g, '$1 of $2').replace(/\bhace (\d+) (min|h|d)\b/g, '$1 $2 ago').replace(/^Hoy\b/, 'Today').replace(/\bNivel (\d+)/g, 'Level $1').replace(/\ba (\d[\d.,]*\s?(?:km|mi|m|ft))\b/g, '$1 away');
+        hit = hit.replace(/(\d+) de (\d+)\b/g, '$1 of $2').replace(/\bhace (\d+) (min|h|d)\b/g, '$1 $2 ago').replace(/^Hoy\b/, 'Today').replace(/(\d) días?\./, function (m, n) { return n + (n === '1' ? ' day.' : ' days.'); }).replace(/\bNivel (\d+)/g, 'Level $1').replace(/\ba (\d[\d.,]*\s?(?:km|mi|m|ft))\b/g, '$1 away');
       }
       if (Object.keys(cache).length < 6000) cache[core] = hit;
     }
@@ -100,7 +100,7 @@
     if (done) done.set(n, out);
     if (out !== v) n.data = out;
   }
-  var ATTRS = ['placeholder', 'title', 'aria-label'];
+  var ATTRS = ['placeholder', 'title', 'aria-label', 'label'];
   // campos que guardan kilómetros: en millas se enseñan y se escriben en millas, y se devuelven en km al guardar
   var KMIN = { vOdo: 1, mKm: 1, mLastKm: 1, fuO: 1, raN: 1 };
   function elem(el) {

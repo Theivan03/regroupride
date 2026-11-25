@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.54.0';
+  var APP_VERSION = '0.55.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -154,6 +154,7 @@
   /* ---------- GPS ---------- */
   var gpsStop = null, gpsMode = null, lastFix = null, autoStartSince = null;
   function onFix(pos) {
+    if (sens.demo) return;      // en la ruta simulada no entra el GPS de verdad: mezclaba las dos posiciones y el mapa saltaba
     var c = pos.coords, now = performance.now();
     sens.lastGps = now; sens.gpsError = null; sens.gpsAcc = c.accuracy;
     var v = c.speed;
@@ -1305,7 +1306,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     var tilt = 30 * Math.PI / 180, G = LeanCore.G, D2R = Math.PI / 180;
     var X = [0, -1, 0], Y = [Math.sin(tilt), 0, Math.cos(tilt)], Z = [-Math.cos(tilt), 0, Math.sin(tilt)], dot = LeanCore.v3.dot, toPhone = function (b) { return [dot(b, X), dot(b, Y), dot(b, Z)]; };
     var up = toPhone([0, 0, G]); calib = { up: up, bias: [0, 0, 0], at: Date.now(), demo: true }; est.setFrame(LeanCore.buildFrame(up), [0, 0, 0]);
-    sens.demo = true; lastMotionT = null; stopGps();
+    sens.demo = true; lastMotionT = null; stopGps(); mapFollow = true; firstFixCentered = false;
     // carretera de montaña simulada: 60 s, curvas alternas
     var plan = [[3, 0, 0], [4, 60, 0], [1.2, 60, -30], [4, 60, -30], [1.2, 60, 0], [3, 90, 0], [1, 70, 36], [3, 70, 36], [1, 70, 0], [2.5, 70, -20], [2.5, 70, 20], [3, 80, 0], [1.5, 65, -42], [3, 65, -42], [1.5, 65, 0], [4, 50, 0], [2, 0, 0]];
     var seg = 0, segT = 0, phi = 0, last = performance.now(), lat = lastFix ? lastFix.lat : 39.47, lon = lastFix ? lastFix.lon : -0.38, hdg = 20, tAcc = 0, lastFixAt = 0;

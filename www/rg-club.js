@@ -278,8 +278,11 @@
   }
   function routeForm(c) {
     var plans = A.plans ? A.plans() : [], picked = null;
-    Cl.sheet('<div class="head"><h1>Añadir ruta</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
-      '<form class="rg-form" id="rtForm"><label>La ruta<select id="rtPlan"><option value="">Elige una de tus rutas…</option>' + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
+    // también las rutas ya hechas (grabadas con trazado), no solo las planeadas
+    var done = (A.rides ? A.rides() : []).filter(function (r) { return r.hasTrack && !r.trip; }).sort(function (x, y) { return y.start - x.start; }).slice(0, 60);
+    var rname = function (r) { return r.name || new Date(r.start).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); };
+    Cl.sheet('<div class="head" data-full><h1>Añadir ruta</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      '<form class="rg-form" id="rtForm"><label>La ruta<select id="rtPlan"><option value="">Elige una de tus rutas…</option>' + (plans.length ? '<optgroup label="Planeadas">' + plans.map(function (p) { return '<option data-raw value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</optgroup>' : '') + (done.length ? '<optgroup label="Hechas">' + done.map(function (r) { return '<option value="r' + r.id + '">' + esc(rname(r)) + ' · ' + String(Math.round((r.dist || 0) * 10) / 10).replace('.', ',') + ' km</option>'; }).join('') + '</optgroup>' : '') + '</select></label>' +
       '<div class="tr-gpx"><button class="btn small" id="rtGpx" type="button">' + icn('download') + 'O importa un GPX</button><input type="file" id="rtFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden></div>' +
       '<label>Nombre<input id="rtName" required minlength="2" maxlength="80" placeholder="Vuelta a la Carrasqueta"></label>' +
       '<label>Descripción<textarea id="rtDesc" class="note" maxlength="600" placeholder="Cómo es, dónde parar a almorzar, tramos a tener en cuenta…"></textarea></label>' +
@@ -287,10 +290,20 @@
       '<label>Sale de<input id="rtStart" maxlength="80" placeholder="Gasolinera, plaza, pueblo…"></label>' +
       '<label>Advertencias: tramos complicados o con cuidado<textarea id="rtWarn" class="note" maxlength="600" placeholder="Gravilla en la bajada del puerto, km 12 con el firme roto, radar de tramo, mucho ciclista los domingos…"></textarea></label>' +
       '<label>Recomendaciones<textarea id="rtTips" class="note" maxlength="600" placeholder="Mejor por la mañana, repostar en el pueblo antes de subir, almuerzo en la venta, mirador para la foto…"></textarea></label>' +
-      '<button class="btn big primary" type="submit">Añadir al catálogo</button></form>');
-    $('#clX').addEventListener('click', Cl.closeSheet);
+      '<button class="btn big primary" type="submit">Añadir al catálogo</button><button class="btn big" id="rtCancel" type="button">Cancelar</button></form>');
+    $('#clX').addEventListener('click', Cl.closeSheet); $('#rtCancel').addEventListener('click', Cl.closeSheet);
     var take = function (r, name) { picked = r; if (!$('#rtName').value.trim()) $('#rtName').value = (name || r.name || '').slice(0, 80); };
-    $('#rtPlan').addEventListener('change', function () { var p = plans.filter(function (x) { return String(x.id) === $('#rtPlan').value; })[0]; if (p) take({ name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur }, p.name); else picked = null; });
+    $('#rtPlan').addEventListener('change', function () {
+      var val = $('#rtPlan').value; if (val.charAt(0) !== 'r') return;
+      var rd = done.filter(function (x) { return 'r' + x.id === val; })[0]; picked = null; if (!rd) return;
+      DB.getTrack(rd.id).then(function (t) {
+        if ($('#rtPlan').value !== val) return;
+        if (!t || t.length < 2) { A.toast('Esta ruta no tiene trazado.', 'warn'); return; }
+        var step = Math.max(1, Math.floor(t.length / 1500)), c = []; for (var i = 0; i < t.length; i += step) c.push([t[i][2], t[i][1]]); var z = t[t.length - 1]; c.push([z[2], z[1]]);
+        take({ name: rd.name || 'Ruta', wps: [[c[0][1], c[0][0]], [z[1], z[2]]], pois: [], coords: c, steps: [], dist: rd.dist || 0, dur: rd.movingS || 0 }, rd.name || '');
+      });
+    });
+    $('#rtPlan').addEventListener('change', function () { if ($('#rtPlan').value.charAt(0) === 'r') return; var p = plans.filter(function (x) { return String(x.id) === $('#rtPlan').value; })[0]; if (p) take({ name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur }, p.name); else picked = null; });
     $('#rtGpx').addEventListener('click', function () { $('#rtFile').value = ''; $('#rtFile').click(); });
     $('#rtFile').addEventListener('change', function () {
       var file = this.files && this.files[0], b = $('#rtGpx'); if (!file || !window.RGNav || !RGNav.gpxRoute) return;
@@ -576,7 +589,7 @@
     s.classList.add('as-evpage'); if (keepTop) $('.rg-sheet-in', s).scrollTop = keepTop;
     $('#evBack', s).addEventListener('click', function () { clearInterval(chatT); Cl.closeSheet(); });
     if ($('#evManage', s)) $('#evManage', s).addEventListener('click', function () { manageSheet(e); });
-    $$('#evTabs button', s).forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.t === 'gastos') { if (window.RGTrips) RGTrips.open(e.id, 'money'); return; } clearInterval(chatT); EVP.tab = b.dataset.t; eventPage(); }); });
+    $$('#evTabs button', s).forEach(function (b) { b.addEventListener('click', function () { clearInterval(chatT); EVP.tab = b.dataset.t; eventPage(); }); });
     var again = function () { inbox(true); return fetchEvent(e.id).then(function (d2) { EVP.e = d2.e; EVP.att = d2.att; var cc = cur(); if (cc && cc.id === e.community_id) paneEvents(cc).catch(function () {}); if ($('#evTabs')) eventPage(true); }); };
     var set = function (status, companion, bike) { return setStatus(e, mine, status, companion, bike).then(function (got) { ring(e.community_id, { kind: 'att', eid: e.id }); if (got === 'waiting' && st !== 'waiting') { A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn'); setTimeout(closedHelp, 1800); } return again(); }).catch(fail); };
     $$('#evFixed [data-f]', s).forEach(function (b) { b.addEventListener('click', function () {
@@ -590,6 +603,7 @@
     if (EVP.tab === 'chat') { pane.innerHTML = chatHtml(e); chatWire(e); }
     else if (EVP.tab === 'fotos') { if (window.RGSocial && RGSocial.albumPane) RGSocial.albumPane(e, pane); else pane.innerHTML = '<div class="empty"><b>Sin fotos</b></div>'; }
     else if (EVP.tab === 'gente') pane.innerHTML = goersHtml(e, att, c);
+    else if (EVP.tab === 'gastos') { if (window.RGTrips && RGTrips.embed) RGTrips.embed(e.id, 'money', pane, 'gastos'); }
     else {
       var x = e.extra || {}, row = function (act, icon, t, sub2, btn) { return '<' + (btn ? 'div' : 'button type="button"') + ' class="as-row" data-p="' + act + '">' + icn(icon) + '<span><b>' + t + '</b>' + (sub2 ? '<small>' + sub2 + '</small>' : '') + '</span>' + (btn ? '<button class="btn small" type="button" data-p="' + btn[0] + '">' + btn[1] + '</button>' : icn('chev')) + '</' + (btn ? 'div' : 'button') + '>'; };
       pane.innerHTML = (e.description ? '<p class="as-desc">' + esc(e.description) + '</p>' : '') + '<div class="as-rows">' +
@@ -597,7 +611,6 @@
         (m.lat != null ? '<div class="as-row as-wxrow">' + icn('weather') + '<span><b>Tiempo</b><small class="ev-wx" data-wx="' + m.lat + ',' + m.lon + ',' + d.getTime() + '">Previsión a la hora de salir, cuando falten menos de 15 días.</small></span></div>' : '') +
         (e.route ? row('route', 'route', 'Ruta', esc(e.route.name || 'Ruta') + (e.route.dist ? ' · ' + String(e.route.dist).replace('.', ',') + ' km' : '')) : '') +
         (/^https?:\/\//i.test(e.route_url || '') ? row('rurl', 'gmaps', 'Ruta en Google Maps', '') : '') +
-        (e.trip && window.RGTrips ? row('trip', 'map', 'Etapas y alojamiento', days ? days + ' días' : '') : '') +
         (window.RGSocial ? row('check', 'check', 'Antes de salir', (x.check && x.check.length ? x.check.length + ' del organizador y lo de siempre' : 'Calzado, guantes, documentación…')) : '') +
         (x.voice ? row('voice', 'phone', 'Canal de voz', 'Se abre fuera de la app') : '') +
         (e.luma_url ? row('luma', 'link', 'Apuntarse en Luma', '') : '') +
@@ -606,6 +619,7 @@
         row('share', 'share', 'Compartir', 'El enlace de la página pública') + '</div>' +
         (canRun && e.route ? '<button class="btn big" data-p="start" type="button">' + icn('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
         ((st === 'going' || st === 'offered') && e.route && !canRun ? '<button class="as-link" data-p="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '');
+      if (e.trip && window.RGTrips && RGTrips.embed) { var stg = document.createElement('div'); stg.className = 'as-stages'; pane.appendChild(document.createElement('span')).className = 'label'; pane.lastChild.textContent = 'Etapas y alojamiento'; pane.appendChild(stg); RGTrips.embed(e.id, 'plan', stg, 'plan'); }
       if (window.RGOpen && RGOpen.fill) RGOpen.fill(pane);
       if ($('#evComp', pane)) $('#evComp', pane).addEventListener('change', function (ev) { set('going', ev.target.checked); });
       $$('[data-p]', pane).forEach(function (b) { if (!b.dataset.p) return; b.addEventListener('click', function (ev) {

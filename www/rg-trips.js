@@ -25,10 +25,8 @@
   function going() { return T.att.filter(function (a) { return a.status === 'going' || a.status === 'offered'; }); }
 
   /* ---------- abrir un viaje ---------- */
-  function open(id, tab) {
-    if (!me()) { Cl.openAuth(false); return; }
-    Cl.sheet(head('Salida') + '<p class="muted">Cargando…</p>', 'full'); $('#trX').addEventListener('click', Cl.closeSheet);
-    Promise.all([
+  function load(id, tab) {
+    return Promise.all([
       sb.from('events').select('id,community_id,title,description,starts_at,ends_at,meet_name,meet_url,capacity,trip,communities(name,kind,join_code)').eq('id', id).maybeSingle(),
       sb.from('event_attendees').select('user_id,status,companion,bike,joined_at').eq('event_id', id),
       sb.rpc('can_run_event', { eid: id })
@@ -39,9 +37,29 @@
       T.trip.days = T.trip.days || []; T.trip.budget = T.trip.budget || [];
       var ids = att.map(function (a) { return a.user_id; });
       return ids.length ? sb.from('profiles').select('id,name,avatar_url,bike_brand,bike_model').in('id', ids).then(function (p) { (p.data || []).forEach(function (x) { T.names[x.id] = x; }); }) : null;
-    }).then(draw).catch(function (e) { Cl.sheet(head('Salida') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>', 'full'); $('#trX').addEventListener('click', Cl.closeSheet); });
+    });
   }
-  function reload(tab) { if (T) open(T.ev.id, tab || T.tab); }
+  function open(id, tab) {
+    if (!me()) { Cl.openAuth(false); return; }
+    Cl.sheet(head('Salida') + '<p class="muted">Cargando…</p>', 'full'); $('#trX').addEventListener('click', Cl.closeSheet);
+    load(id, tab).then(draw).catch(function (e) { Cl.sheet(head('Salida') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>', 'full'); $('#trX').addEventListener('click', Cl.closeSheet); });
+  }
+  // Dentro de la página de la salida (pestañas Plan y Gastos): las etapas o los gastos se pintan allí mismo, sin abrir otra página.
+  function embed(id, what, host, evTab) {
+    if (!host) return; host.innerHTML = '<p class="muted">Cargando…</p>';
+    load(id, what === 'money' ? 'money' : 'plan').then(function () {
+      if (!host.isConnected) return;
+      T.embed = evTab || 'plan'; var old = document.getElementById('trPane'); if (old && old !== host) old.removeAttribute('id');
+      host.innerHTML = ''; var box = document.createElement('div'); box.id = 'trPane'; host.appendChild(box);
+      if (what === 'money') paneMoney();
+      else {
+        box.innerHTML = planHtml(T.ev, T.trip) || '<div class="empty"><b>Sin etapas todavía</b>' + (T.admin ? 'Añade qué se hace cada día.' : 'El organizador aún no ha puesto el plan de cada día.') + '</div>';
+        wirePlan();
+        if (T.admin) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.innerHTML = '<svg><use href="#i-edit"/></svg>Editar etapas, alojamiento y gastos previstos'; box.appendChild(b); b.addEventListener('click', edit); }
+      }
+    }).catch(function (e) { host.innerHTML = '<div class="empty">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</div>'; });
+  }
+  function reload(tab) { if (!T) return; if (T.embed && window.RGClub && RGClub.openEvent) { RGClub.openEvent(T.ev.id, (tab || T.tab) === 'money' ? 'gastos' : T.embed); return; } open(T.ev.id, tab || T.tab); }
 
   function draw() {
     var ev = T.ev, t = T.trip, s = new Date(ev.starts_at), e = ev.ends_at ? new Date(ev.ends_at) : dayDate(ev, Math.max(0, t.days.length - 1)), mine = (T.att.filter(function (a) { return a.user_id === me(); })[0] || {}).status;
@@ -208,7 +226,8 @@
         '<label>Descripción<textarea data-b="desc" class="note" maxlength="2000" placeholder="De qué va el viaje, ritmo, a quién va dirigido…">' + esc(base.desc) + '</textarea></label>' +
         '<h2 class="tr-h">Etapas</h2>' + D.days.map(function (d, i) {
           d.stops = d.stops || []; d.stay = d.stay || {};
-          return '<fieldset class="tr-ed"><legend>Día ' + (i + 1) + '<button class="link danger" data-rm="days.' + i + '" type="button">Quitar día</button></legend>' +
+          var dd = new Date(base.date + 'T12:00'); dd.setDate(dd.getDate() + i);
+          return '<fieldset class="tr-ed"><legend>Día ' + (i + 1) + (isNaN(dd) ? '' : ' · ' + dstr(dd)) + '<button class="link danger" data-rm="days.' + i + '" type="button">Quitar día</button></legend>' +
             f('Título de la etapa', ['days', i, 'title'], 'maxlength="100" placeholder="Teulada → Cuenca"') +
             '<div class="tr-two">' + f('Hora de salida', ['days', i, 'start'], 'type="time"') + f('Kilómetros', ['days', i, 'km'], 'type="number" min="0" max="2000" inputmode="numeric"') + '</div>' +
             f('Sale de', ['days', i, 'from'], 'maxlength="100" placeholder="Hotel, gasolinera…"') +
@@ -252,8 +271,21 @@
           rd.readAsText(file);
         });
       });
-      $$('[data-add]').forEach(function (b) { b.addEventListener('click', function () { sync(); var p = b.dataset.add.split('.'), arr = get(D, p); if (!arr) { arr = []; set(D, p, arr); } arr.push(p.length === 1 && p[0] === 'days' ? { id: did(), stops: [], stay: {} } : p[0] === 'budget' ? { per: 'p' } : {}); var y = $('#rgSheet .rg-sheet-in') ? $('#rgSheet .rg-sheet-in').scrollTop : 0; paint(); var box = $('#rgSheet .rg-sheet-in'); if (box) box.scrollTop = y; }); });
-      $$('[data-rm]').forEach(function (b) { b.addEventListener('click', function () { sync(); var p = b.dataset.rm.split('.'), k = +p.pop(); get(D, p).splice(k, 1); var y = $('#rgSheet .rg-sheet-in') ? $('#rgSheet .rg-sheet-in').scrollTop : 0; paint(); var box = $('#rgSheet .rg-sheet-in'); if (box) box.scrollTop = y; }); });
+      // Los días del plan van con las fechas: al cambiar la salida o la vuelta se añaden o se quitan días por el final.
+      var nDays = function () { var a1 = new Date(base.date + 'T12:00'), b1 = new Date(base.end + 'T12:00'); return isNaN(a1) || isNaN(b1) ? 0 : Math.round((b1 - a1) / 864e5) + 1; };
+      $$('#trForm [data-b="date"],#trForm [data-b="end"]').forEach(function (inp) { inp.addEventListener('change', function () {
+        var before = base.date; sync();
+        if (inp.dataset.b === 'date' && base.date > base.end) { var mv = new Date(base.end + 'T12:00'); mv.setDate(mv.getDate() + Math.round((new Date(base.date + 'T12:00') - new Date(before + 'T12:00')) / 864e5)); base.end = ymd(mv); }
+        var n = nDays(); if (n < 1) { A.toast('La vuelta no puede ser antes de la salida.', 'warn'); return; }
+        n = Math.min(30, n); var was = D.days.length;
+        while (D.days.length < n) D.days.push({ id: did(), stops: [], stay: {} });
+        if (D.days.length > n) D.days.length = n;
+        if (D.days.length !== was) A.toast('El plan tiene ahora ' + n + (n === 1 ? ' día.' : ' días.'), 'ok');
+        repaint();
+      }); });
+      var fitEnd = function () { var e1 = new Date(base.date + 'T12:00'); if (isNaN(e1) || !D.days.length) return; e1.setDate(e1.getDate() + D.days.length - 1); base.end = ymd(e1); };
+      $$('[data-add]').forEach(function (b) { b.addEventListener('click', function () { sync(); var p = b.dataset.add.split('.'), arr = get(D, p); if (!arr) { arr = []; set(D, p, arr); } arr.push(p.length === 1 && p[0] === 'days' ? { id: did(), stops: [], stay: {} } : p[0] === 'budget' ? { per: 'p' } : {}); if (p.length === 1 && p[0] === 'days') fitEnd(); var y = $('#rgSheet .rg-sheet-in') ? $('#rgSheet .rg-sheet-in').scrollTop : 0; paint(); var box = $('#rgSheet .rg-sheet-in'); if (box) box.scrollTop = y; }); });
+      $$('[data-rm]').forEach(function (b) { b.addEventListener('click', function () { sync(); var p = b.dataset.rm.split('.'), k = +p.pop(); get(D, p).splice(k, 1); if (p.length === 1 && p[0] === 'days') fitEnd(); var y = $('#rgSheet .rg-sheet-in') ? $('#rgSheet .rg-sheet-in').scrollTop : 0; paint(); var box = $('#rgSheet .rg-sheet-in'); if (box) box.scrollTop = y; }); });
       $('#trForm').addEventListener('submit', function (evn) {
         evn.preventDefault(); sync();
         var st = new Date(base.date + 'T' + (base.time || '09:00')), en = new Date(base.end + 'T23:00');
@@ -327,5 +359,5 @@
       });
     });
   }
-  window.RGTrips = { open: open, list: list, create: create };
+  window.RGTrips = { open: open, list: list, create: create, embed: embed };
 })();
