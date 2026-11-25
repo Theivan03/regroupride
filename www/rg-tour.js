@@ -1,26 +1,26 @@
-/* ReGroupRide · recorrido de bienvenida: viñetas que van señalando cada parte de la app. Se puede saltar y repetir desde Ajustes. */
+/* ReGroupRide · recorrido de bienvenida: viñetas que van señalando cada parte de la app. Diez pasos sobre la navegación de cuatro pestañas. Se puede saltar y repetir desde Yo › Ayuda. */
 (function () {
   'use strict';
   var A = window.RGApp, Cl = window.RGCloud; if (!A) return;
   var $ = function (s) { return document.querySelector(s); };
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
   var STEPS = [
-    { t: '¡Bienvenido a ReGroupRide!', x: 'En medio minuto te enseño dónde está cada cosa. Puedes saltarlo cuando quieras y repetirlo desde Yo → Ajustes → Ayuda.' },
-    { s: '.tab[data-view=profile]', t: 'Yo', x: 'Empieza por aquí: pon tu nombre y tu foto. Dentro están también tus estadísticas, tus logros y los ajustes de la app.' },
-    { s: '#btnRide', v: 'map', t: 'Iniciar ruta', x: 'Empieza a grabar tu salida: recorrido, kilómetros, velocidad e inclinación en cada curva.' },
-    { s: '#btnTrip', v: 'map', t: 'Trayecto', x: 'Para un desplazamiento corto: mide tiempo y kilómetros sin guardar el recorrido.' },
-    { s: '#btnMore', v: 'map', t: 'Opciones del mapa', x: 'Centrar el mapa, rodar en un grupo en vivo, aparcar la moto, capas… todo lo del mapa está aquí.' },
-    { s: '#btnBell', v: 'map', t: 'Avisos y chats', x: 'La campana reúne todo lo que no has leído: novedades de tus comunidades, chats de tus salidas y charlas.' },
-    { s: '.tab[data-view=rides]', t: 'Explorar', x: 'Para buscar por dónde salir: planifica una ruta, mira las de otros moteros y las de tus comunidades, y encuentra fotógrafos.' },
-    { s: '.tab[data-view=club]', t: 'Comunidad', x: 'El corazón de la app: únete a tu grupo, apúntate a sus salidas, habla en el chat de cada una y rodad juntos sin perder a nadie.' },
-    { s: '.tab[data-view=garage]', t: 'Garaje', x: 'Tus motos y su mantenimiento. La moto que guardes aquí se usa al apuntarte a una salida.' },
-    { t: '¡Listo para rodar!', x: 'Lo primero: entra en Comunidad y únete a tu grupo con el código que te pase el organizador. Buena ruta.', end: true }
+    { s: '#btnRide', v: 'map', t: 'Iniciar ruta', x: 'Empieza a grabar: recorrido, kilómetros, velocidad e inclinación en cada curva. Debajo tienes «Solo medir», para un recado que no quieres guardar.' },
+    { s: '#asWho', v: 'map', t: '¿Con quién vas?', x: 'Es lo único que se pregunta antes de salir. Solo: la app vigila las paradas bruscas y avisa a tus contactos. En grupo: os veis todos en el mapa.' },
+    { s: '#btnNear', v: 'map', t: 'Cerca', x: 'Gasolineras con precio, peligros avisados, sitios moteros y fotógrafos, todo lo que tienes alrededor.' },
+    { s: '.tab[data-view=rides]', v: 'map', t: 'Rutas', x: 'Las que has hecho, las que planeas y las de otros. Dibuja una en el mapa, deja que la app te genere una vuelta o importa un GPX.' },
+    { s: '.tab[data-view=club]', v: 'map', t: 'Comunidad', x: 'Tu grupo: sus salidas, sus chats y su información. Tocando el nombre cambias de comunidad, buscas otra o creas la tuya.' },
+    { s: '#clubBody .as-ev, #clTabs [data-t=events], #clubBody', v: 'club', t: 'Una salida', x: 'Tócala para verla entera: el plan, el chat, las fotos y quién va. Un solo botón: «Apuntarme».' },
+    { s: '#clTabs [data-t=chats], #clubBody', v: 'club', t: 'Chats', x: 'Los avisos de la comunidad, los chats de tus salidas y los grupos, en un sitio. La campana ya solo trae avisos.' },
+    { s: '.tab[data-view=profile]', v: 'profile', t: 'Yo', x: 'Tu perfil y cinco accesos: tu moto, tus estadísticas y logros, la seguridad, los ajustes y la ayuda.' },
+    { s: '#yoNav [data-go=garage]', v: 'profile', t: 'Mi moto', x: 'El odómetro, el taller, los papeles con sus vencimientos y los gastos. La moto que guardes aquí se usa al apuntarte a una salida.' },
+    { s: '#yoNav [data-go=security]', v: 'profile', t: 'Seguridad', x: 'Tus contactos de emergencia, el enlace para que tu familia vea por dónde vas y la zona de privacidad de las rutas que publicas.', end: true }
   ];
   var el = null, i = 0, running = false;
-  function stop(done) { running = false; if (el) { el.classList.add('out'); var e = el; el = null; setTimeout(function () { e.remove(); }, 260); } window.removeEventListener('resize', place); if (done !== false) store('rg.tour', '1'); if (A.showView) A.showView('map'); }
+  function stop(done) { running = false; document.body.classList.remove('rg-touring'); if (el) { el.classList.add('out'); var e = el; el = null; setTimeout(function () { e.remove(); }, 260); } window.removeEventListener('resize', place); if (done !== false) store('rg.tour', '1'); if (A.showView) A.showView('map'); }
   function place() {
     if (!el) return;
-    var st = STEPS[i], hole = el.querySelector('.rg-tour-hole'), bub = el.querySelector('.rg-tour-bub'), t = st.s ? $(st.s) : null, r = t ? t.getBoundingClientRect() : null;
+    var st = STEPS[i], hole = el.querySelector('.rg-tour-hole'), bub = el.querySelector('.rg-tour-bub'), t = st.s ? st.s.split(', ').map($).filter(function (n) { return n && n.getBoundingClientRect().width; })[0] : null, r = t ? t.getBoundingClientRect() : null;
     var W = window.innerWidth, H = window.innerHeight;
     if (r && r.width && r.height) {
       var p = 8; hole.style.cssText = 'left:' + (r.left - p) + 'px;top:' + (r.top - p) + 'px;width:' + (r.width + 2 * p) + 'px;height:' + (r.height + 2 * p) + 'px;opacity:1';
@@ -40,12 +40,11 @@
     var bub = el.querySelector('.rg-tour-bub');
     bub.classList.remove('in');
     bub.innerHTML = '<span class="rg-tour-n">' + (i + 1) + ' de ' + STEPS.length + '</span><b>' + st.t + '</b><p>' + st.x + '</p>' +
-      '<div class="rg-tour-act">' + (st.end ? '' : '<button class="link" data-a="skip" type="button">Saltar</button>') + (i > 0 && !st.end ? '<button class="btn small" data-a="prev" type="button">Atrás</button>' : '') +
-      '<button class="btn small primary" data-a="next" type="button">' + (st.end ? '¡Vamos!' : (i === 0 ? 'Empezar' : 'Siguiente')) + '</button></div>';
-    setTimeout(function () { place(); void bub.offsetWidth; bub.classList.add('in'); }, 60);
+      '<div class="rg-tour-act">' + (st.end ? '' : '<button class="link" data-a="skip" type="button">Saltar</button>') + '<button class="btn small primary" data-a="next" type="button">' + (st.end ? 'Terminar' : (i === 0 ? 'Empezar' : 'Siguiente')) + '</button></div>';
+    setTimeout(function () { place(); void bub.offsetWidth; bub.classList.add('in'); }, st.v === 'club' ? 500 : 80);
   }
   function start() {
-    if (running) return; running = true; i = 0;
+    if (running) return; running = true; i = 0; document.body.classList.add('rg-touring');
     el = document.createElement('div'); el.className = 'rg-tour'; el.innerHTML = '<div class="rg-tour-hole"></div><div class="rg-tour-bub"></div>';
     document.body.appendChild(el);
     el.addEventListener('click', function (ev) {
@@ -61,7 +60,7 @@
   var calm = 0, auto = !navigator.webdriver || store('rg.test.tour') === '1';
   var timer = setInterval(function () {
     if (store('rg.tour') === '1' || !auto) { clearInterval(timer); return; }
-    var sh = $('#rgSheet'), ok = Cl && Cl.user && Cl.user() && sh && sh.hidden && !(A.isRec && A.isRec()) && document.visibilityState !== 'hidden' && !$('.rg-crop');
+    var sh = $('#rgSheet'), ok = Cl && Cl.user && Cl.user() && sh && sh.hidden && !(Cl.pageOpen && Cl.pageOpen()) && !(A.isRec && A.isRec()) && document.visibilityState !== 'hidden' && !$('.rg-crop');
     calm = ok ? calm + 1 : 0;
     if (calm >= 3) { clearInterval(timer); start(); }
   }, 1500);

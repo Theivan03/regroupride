@@ -597,3 +597,12 @@ div.as-row .btn.small{flex:none}
 #vehicles[data-tab="resumen"] .gx>.gx-figs>div:nth-child(n+3){display:none}
 .rg-sheet.rg-full[hidden]{display:none!important}
 #vehicles[data-tab="resumen"] .as-gen .gx-figs>div:nth-child(n+3){display:none}
+#rgAccount #rgFeedback{display:none!important}
+.rt-tag,.rt-tag.lv,.rt-tag.kind,.tr-dayn,.tr-day b:first-child{background:var(--superficie-2)!important;color:var(--texto)!important;border-radius:999px!important;font:700 11px/1 var(--font-texto)!important;letter-spacing:.03em;text-transform:uppercase}
+.tr-code{border:1px solid var(--linea)!important;background:var(--superficie)!important;border-radius:12px!important}
+.tr-code b{font:700 24px/1 var(--font-cifra)!important;letter-spacing:.08em;color:var(--texto)!important}
+.tr-kpis>div{background:var(--superficie)!important;border:1px solid var(--linea)!important;border-radius:12px!important}
+.tr-kpis b{font:700 28px/1 var(--font-cifra)!important;color:var(--texto)!important}
+.rg-sheet .club-card,.rg-sheet.rg-eq .club-card{background:var(--superficie)!important}
+.rg-sheet:not(.rg-full) .club-card{background:var(--fondo)!important}
+.as-cal-h{border-bottom:0!important;min-height:0!important;padding-bottom:0!important}

@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.51.0';
+  var APP_VERSION = '0.52.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -548,14 +548,14 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     startMotion().then(function (r) {
       if (r !== 'ok' && !sens.demo) toast('Sin acceso a los sensores: se grabará la ruta sin inclinación.', 'warn');
       if (!sens.demo) startGps('bg');
-      Platform.keepAwake(true);
+      Platform.keepAwake(settings.keepAwake !== false);
       resetLast(); rec = newRec(); if (trip) rec.trip = true; if (sens.demo) rec.demo = true; if (wx.data && Date.now() - wx.at < 30 * 60000) rec.weather = wx.data; det.setOptions({ minPeak: settings.minPeak }); liveFeatures = []; drawLiveTrack(true); pausedSince = null; lastSave = performance.now();
       LS.set('inclina.recording', rec.id);
       recTick = setInterval(render, 1000);
       setFollow(true);
       hideNotice(); render();
       if (window.RGNav) RGNav.sync();
-      if (auto) toast('Grabando ruta (inicio automático).', 'ok'); else if (trip) toast('Trayecto en marcha. Pulsa Parar al llegar.', 'ok');
+      if (auto) toast('Grabando ruta (inicio automático).', 'ok'); else if (trip) toast('Aviso: solo se mide tiempo y km. Pulsa Parar al llegar.', 'ok');
     });
   }
   function stopRide() {
@@ -573,23 +573,23 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     if (done.points.length < 2 && !done.corners.length) { toast('Ruta demasiado corta: no se ha guardado.', 'warn'); liveFeatures = []; drawLiveTrack(true); DB.deleteRide(done.id).catch(function () {}); render(); return; }
     if (done.trip) {
       // Trayecto: se queda con las cifras (tiempo, km, velocidades, inclinación) y suma los km a la moto. Ni trazado ni curvas.
-      meta.trip = true; meta.hasTrack = false; meta.thumb = null; meta.corners = []; meta.nPoints = 0; if (!meta.name) meta.name = 'Trayecto';
+      meta.trip = true; meta.hasTrack = false; meta.thumb = null; meta.corners = []; meta.nPoints = 0; if (!meta.name) meta.name = 'Solo medida';
       DB.putRide(meta).then(function () { return DB.delTrack(done.id); }).then(function () { return reloadRides(); }).then(function () { liveFeatures = []; drawLiveTrack(true); render(); tripSummary(meta); syncSoon(); return checkAchievements(); });
       return;
     }
     DB.putRide(meta).then(function () { return DB.putTrack(done.id, done.points); }).then(function () { return reloadRides(); }).then(function () { liveFeatures = []; drawLiveTrack(true); openDetail(done.id, true); if (window.RGStats) RGStats.rideSaved(); syncSoon(); return checkAchievements(); });
   }
   function tripSummary(m) {
-    if (!window.RGCloud) { toast('Trayecto guardado: ' + fmtKm(m.dist) + '.', 'ok'); return; }
+    if (!window.RGCloud) { toast('Medido: ' + fmtKm(m.dist) + '.', 'ok'); return; }
     var secs = m.movingS || Math.round(((m.end || Date.now()) - m.start) / 1000), avg = secs > 0 ? Math.round(m.dist / (secs / 3600)) : 0;
     var v = vehicles.filter(function (x) { return x.id === m.vehicleId; })[0];
     var f = function (l, val, cls) { return '<div class="fig' + (cls ? ' ' + cls : '') + '"><span class="label">' + l + '</span><span class="val cifra">' + val + '</span></div>'; };
-    RGCloud.sheet('<span class="rg-plaza"><i></i>Trayecto terminado</span><h1>' + fmtKm(m.dist) + ' · ' + fmtDur(secs * 1000) + '</h1>' +
+    RGCloud.sheet('<span class="rg-plaza"><i></i>Medido</span><h1>' + fmtKm(m.dist) + ' · ' + fmtDur(secs * 1000) + '</h1>' +
       '<div class="rg-trip">' + f('Velocidad máx', (m.vMax || 0) + '<span class="unit">km/h</span>') + f('Velocidad media', avg + '<span class="unit">km/h</span>') + f('Máx izquierda', Math.round(m.maxL) + '°', 'l') + f('Máx derecha', Math.round(m.maxR) + '°', 'r') + '</div>' +
-      '<p class="rg-small">' + (v ? 'Los km se han sumado a «' + esc(v.name) + '» para su mantenimiento. ' : '') + 'No se guarda por dónde has pasado. Lo tienes en Rutas, en «Trayectos».</p>' +
-      '<button class="btn big primary" id="tripOk" type="button"><svg><use href="#i-check"/></svg>Hecho</button><button class="btn rg-skip danger" id="tripDel" type="button">Borrar este trayecto</button>', 'win');
+      '<p class="rg-small">' + (v ? 'Los km se han sumado a «' + esc(v.name) + '» para su mantenimiento. ' : '') + 'No se guarda por dónde has pasado. Lo tienes en Rutas › Hechas › Solo medidas.</p>' +
+      '<button class="btn big primary" id="tripOk" type="button"><svg><use href="#i-check"/></svg>Hecho</button><button class="btn rg-skip danger" id="tripDel" type="button">Borrar esta medición</button>', 'win');
     $('#tripOk').addEventListener('click', RGCloud.closeSheet);
-    $('#tripDel').addEventListener('click', function () { RGCloud.closeSheet(); if (window.RGSync) RGSync.rideDeleted(m.id); DB.deleteRide(m.id).then(reloadRides).then(function () { toast('Trayecto borrado.', 'ok'); }); });
+    $('#tripDel').addEventListener('click', function () { RGCloud.closeSheet(); if (window.RGSync) RGSync.rideDeleted(m.id); DB.deleteRide(m.id).then(reloadRides).then(function () { toast('Borrado.', 'ok'); }); });
   }
   function recoverRide() {
     var id = LS.get('inclina.recording', null); if (!id) return Promise.resolve();
@@ -601,7 +601,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   // En una ruta en grupo, un administrador elige si la termina para todos o solo para él.
   $('#btnStop').addEventListener('click', function () { if (window.RGGroup && RGGroup.askStop && RGGroup.askStop(stopRide)) return; stopRide(); });
   window.addEventListener('pagehide', function () { if (rec) persistRec(); });
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && rec) Platform.keepAwake(true); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && rec) Platform.keepAwake(settings.keepAwake !== false); });
 
   /* ---------- render en vivo ---------- */
   var prev = {};
@@ -611,7 +611,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   var toastTimer = null;
   // Los avisos de arriba se reservan para lo que importa: errores, cosas que faltan por hacer y lo que llega de otros
   // (avisos en ruta, novedades, fotógrafos cerca). Las confirmaciones de «hecho» o «guardado» ya no salen: se ve en pantalla.
-  var TOAST_KEEP = /Confirma el correo|enviado un correo|Solicitud enviada|[Aa]viso|ha iniciado la ruta|está a \d+ km|Nuevo evento: |Nueva salida: |Tablón: |Info: |Ruta terminada para todos|Reparto|no te llegarán avisos/;
+  var TOAST_KEEP = /Confirma el correo|enviado un correo|Solicitud enviada|[Aa]viso|ha iniciado la ruta|está a \d+ km|Nuevo evento: |Nueva salida: |Avisos: |Info: |Ruta terminada para todos|Reparto|no te llegarán avisos/;
   function toast(msg, kind) { if (kind === 'ok' && !TOAST_KEEP.test(String(msg))) return; var n = $('#toast'); n.textContent = msg; n.className = 'toast notice' + (kind ? ' ' + kind : ''); n.hidden = false; if (toastTimer) clearTimeout(toastTimer); toastTimer = setTimeout(function () { n.hidden = true; }, kind === 'bad' ? 9000 : 5000); }
   function showNotice(msg, kind) { var n = $('#notice'); n.textContent = msg; n.className = 'notice' + (kind ? ' ' + kind : ''); n.hidden = false; }
   function hideNotice() { $('#notice').hidden = true; }
@@ -1247,7 +1247,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       var d = document.createElement('div'); d.className = 'ach ' + (on ? 'on' : 'locked');
       d.innerHTML = '<span class="ico"><svg><use href="#' + ({ rutas: 'i-map', distancia: 'i-chart', inclinacion: 'i-gauge', rachas: 'i-star', consistencia: 'i-list', exploracion: 'i-compass', especiales: 'i-star', app: 'i-sliders' }[a.cat] || 'i-star') + '"/></svg></span>' +
         '<div class="t">' + a.name + '</div><div class="d">' + a.desc + (on ? ' · ' + fmtDate(unlocked[a.id]) : (pr ? ' · ' + pr.text : '')) + '</div>' + (pr ? '<div class="prog"><i style="width:' + Math.round(pr.value / pr.target * 100) + '%"></i></div>' : '') +
-        '<span class="xp">' + (on ? '✓ ' : '+') + a.xp + ' XP</span>';
+        '<span class="xp">' + (on ? '' : '+') + a.xp + ' XP</span>';
       list.appendChild(d);
     });
     if (!items.length) list.innerHTML = '<div class="empty">Nada aquí todavía.</div>';
@@ -1263,6 +1263,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
 
   /* ---------- ajustes ---------- */
   function renderSettings() {
+    $('#setAwake').checked = settings.keepAwake !== false;
     $('#setVoice').checked = !!settings.voice; $('#setAutoPause').checked = !!settings.autoPause; $('#setAutoStart').checked = !!settings.autoStart; $('#setInvert').checked = !!settings.invert;
     $('#vminVal').innerHTML = settings.vMin + '<small>km/h</small>'; $('#peakVal').textContent = settings.minPeak + '°';
     $$('#themeSeg button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.theme === settings.theme)); });
@@ -1273,6 +1274,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   function applySettings() { saveSettings(); est.setInvert(settings.invert); det.setOptions({ minPeak: settings.minPeak }); applyTheme(); renderSettings(); }
   $('#setVoice').addEventListener('change', function (e) { settings.voice = e.target.checked; applySettings(); if (settings.voice) { Platform.speak('Voz activada'); setFlag('voice'); } });
   $('#setAutoPause').addEventListener('change', function (e) { settings.autoPause = e.target.checked; applySettings(); });
+  $('#setAwake').addEventListener('change', function (e) { settings.keepAwake = e.target.checked; applySettings(); if (rec) Platform.keepAwake(e.target.checked); });
   $('#setAutoStart').addEventListener('change', function (e) { settings.autoStart = e.target.checked; applySettings(); });
   $('#setInvert').addEventListener('change', function (e) { settings.invert = e.target.checked; applySettings(); });
   $('#vminDown').addEventListener('click', function () { settings.vMin = clamp(settings.vMin - 5, 0, 200); applySettings(); });

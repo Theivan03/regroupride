@@ -50,7 +50,7 @@ var Achievements = (function () {
     A('early', 'especiales', 'Madrugador', 'Una ruta que empiece antes de las 07:00.', 100, 'early', 1, null),
     A('h2', 'especiales', 'Sin bajarse', 'Más de 2 horas en marcha en una ruta.', 200, 'rideHoursMax', 2, function (v) { return v.toFixed(1).replace('.', ',') + ' h'; }),
     A('wk', 'especiales', 'Fin de semana completo', 'Ruta en sábado y en domingo de la misma semana.', 150, 'weekendBoth', 1, null),
-    A('v1', 'app', 'Garaje abierto', 'Añade tu primer vehículo.', 50, 'vehicles', 1, n),
+    A('v1', 'app', 'Moto en casa', 'Añade tu primer vehículo.', 50, 'vehicles', 1, n),
     A('gpx', 'app', 'Exportador', 'Exporta una ruta en GPX.', 50, 'flag:gpxExport', 1, null),
     A('imp', 'app', 'Importador', 'Importa una ruta GPX.', 50, 'flag:gpxImport', 1, null),
     A('ph', 'app', 'Recuerdo', 'Añade una foto a una ruta.', 50, 'flag:photo', 1, null),

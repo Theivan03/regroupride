@@ -108,7 +108,7 @@
     latest(c, k).then(function (it) {
       if (!it) return;
       var v = vis();
-      if (v) A.toast(c.name + ' · ' + (k === 'event' ? 'Nueva salida: ' : k === 'post' ? 'Tablón: ' : 'Info: ') + it.title, 'ok');
+      if (v) A.toast(c.name + ' · ' + (k === 'event' ? 'Nueva salida: ' : k === 'post' ? 'Avisos: ' : 'Info: ') + it.title, 'ok');
       if (RA && RA.newsNow) RA.newsNow({ items: [it], silent: v }).catch(function () {});
     });
   }
@@ -268,7 +268,7 @@
     });
   }
   function catalogSheet(cid, name) {
-    Cl.sheet('<div class="head"><h1>Rutas de ' + esc(name) + '</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><div id="rtCat"><p class="muted">Cargando…</p></div>');
+    Cl.sheet('<div class="head"><h1>Rutas de ' + esc(name || ((S.list.filter(function (x) { return x.id === cid; })[0] || {}).name) || 'la comunidad') + '</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><div id="rtCat"><p class="muted">Cargando…</p></div>');
     $('#clX').addEventListener('click', Cl.closeSheet);
     sb.from('community_routes').select(RT_COLS).eq('community_id', cid).order('created_at', { ascending: false }).then(function (r) {
       var rows = ok(r) || [], host = $('#rtCat'); if (!host) return;

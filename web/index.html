@@ -241,8 +241,8 @@ input:focus,textarea:focus,select:focus{transform:translateY(-2px);box-shadow:0 
 @font-face{font-family:"Barlow Semi Condensed";src:url(/barlow-semi-condensed-latin-700-normal.woff2) format("woff2");font-weight:700 900;font-display:swap}
 @font-face{font-family:"Barlow Condensed";src:url(/barlow-condensed-latin-600-normal.woff2) format("woff2");font-weight:500 600;font-display:swap}
 @font-face{font-family:"Barlow Condensed";src:url(/barlow-condensed-latin-700-normal.woff2) format("woff2");font-weight:700 900;font-display:swap}
-:root{--fondo:#F3F5F8;--sup:#FFFFFF;--sup2:#E9EDF2;--texto:#0E141B;--texto2:#55606E;--linea:#D9DEE5;--suave:#E9EDF2;--sombra:none;--negro:#0E141B}
-@media (prefers-color-scheme:dark){:root{--fondo:#0F0F12;--sup:#1A1A1F;--sup2:#26262C;--texto:#F4F4F6;--texto2:#A7A7B2;--linea:#34343B;--suave:#26262C;--sombra:none;--negro:#000000}}
+:root{--fondo:#F1EFEA;--sup:#FBFAF7;--sup2:#E6E3DC;--texto:#15140F;--texto2:#55524A;--linea:#D5D1C8;--suave:#E6E3DC;--sombra:none;--negro:#15140F;--marca:#5A2DB0;--sobre:#FFFFFF;--accion:#D9F21C;--sobreacc:#15140F;--filete:2px solid #15140F;--error:#A31919;--aviso:#6B4500}
+@media (prefers-color-scheme:dark){:root{--fondo:#0E0E0C;--sup:#1A1A17;--sup2:#262622;--texto:#EFEDE6;--texto2:#A9A69C;--linea:#36352F;--suave:#262622;--sombra:none;--negro:#000000;--marca:#B9A2FF;--sobre:#15140F;--filete:0 solid transparent;--error:#FF7A7A;--aviso:#FFC24A}}
 .bg{display:none!important}
 h1,h2,h3,button,.t,.btn,.logo{font-family:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif!important;letter-spacing:.1px}
 .ev h1,.hd1 h1,.auth h1{background:none!important;-webkit-text-fill-color:currentColor!important;color:var(--texto)!important;animation:none!important}
@@ -260,6 +260,20 @@ input,textarea,select{border-width:1px!important;border-radius:12px!important}
 .top .logo{color:#FFFFFF!important}.top .logo i{color:#B9A2FF}
 .top .btn{background:rgba(255,255,255,.14)!important;color:#FFFFFF!important}
 .top .btn.pri{background:var(--accion)!important;color:var(--sobreacc)!important}
+
+/* ===== estética B «Asfalto»: la misma que la app. Títulos y botones en Barlow Condensed en mayúsculas, lima con filete
+   negro en claro, cabecera negra con el logo, tarjetas con borde de 1 px y sin sombra. ===== */
+body{font-family:Manrope,system-ui,sans-serif!important;background:var(--fondo)!important;color:var(--texto)}
+h1,h2,h3,button,.t,.btn{font-family:"Barlow Condensed","Arial Narrow",sans-serif!important;font-weight:700!important;text-transform:uppercase;letter-spacing:.03em!important}
+.logo{font-family:"Barlow Semi Condensed","Arial Narrow",sans-serif!important;text-transform:none!important}
+.btn{min-height:52px;font-size:17px!important;background:var(--sup2);color:var(--texto);border:0}
+.btn.big,.btn.pri{min-height:60px;font-size:20px!important}
+.btn.pri{background:var(--accion)!important;color:var(--sobreacc)!important;border:var(--filete)!important}
+.card,.ev>div,.tile{background:var(--sup)!important;border:1px solid var(--linea)!important;border-radius:12px!important}
+input,textarea,select{min-height:52px;background:var(--sup)!important;border:1px solid var(--linea)!important;color:var(--texto)!important;font-family:Manrope,system-ui,sans-serif!important}
+a{color:var(--marca)}
+.top{background:var(--negro)!important}
+.kv b,.n,.num{font-family:"Barlow Condensed","Arial Narrow",sans-serif!important;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>

@@ -1,4 +1,4 @@
-/* ReGroupRide · grupos dentro de la comunidad (charla o rutas compartidas), reportes y «no ver más a alguien».
+/* ReGroupRide · grupos dentro de la comunidad (grupo o rutas compartidas), reportes y «no ver más a alguien».
    supabase/29_grupos_y_reportes.sql */
 (function () {
   'use strict';
@@ -54,7 +54,7 @@
           var d = g.last ? new Date(g.last.at) : null;
           return '<button class="as-row gr-item" data-id="' + g.id + '" type="button"><span class="as-ico">' + (g.kind === 'routes' ? '<svg><use href="#i-route"/></svg>' : '<svg><use href="#i-people"/></svg>') + '</span><span class="gr-info"><b>' + esc(g.name) + (g.is_private ? '<i class="as-tag">privado</i>' : '') + '</b>' +
             '<small>' + (g.last ? esc(g.last.name) + ': ' + esc(g.last.body) : (g.description ? esc(g.description) : 'Todavía no hay mensajes')) + '</small></span><span class="gr-side">' + (d ? '<time>' + (d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : d.getDate() + '/' + (d.getMonth() + 1)) + '</time>' : '') + (g.muted ? '<i class="gr-muted" title="Silenciado">' + BELL + '</i>' : '') + '</span></button>';
-        }).join('') + '</div>' : '<div class="empty small"><b>Aún no hay grupos</b>' + (P.isAdmin() ? 'Crea uno para charlar o para que la gente comparta sus rutas.' : 'Los administradores pueden crear grupos para hablar o compartir rutas.') + '</div>') + (P.isAdmin() ? '<button class="btn" id="grNew" type="button"><svg><use href="#i-plus"/></svg>Nuevo grupo</button>' : '');
+        }).join('') + '</div>' : '<div class="empty small"><b>Aún no hay grupos</b>' + (P.isAdmin() ? 'Crea uno para grupor o para que la gente comparta sus rutas.' : 'Los administradores pueden crear grupos para hablar o compartir rutas.') + '</div>') + (P.isAdmin() ? '<button class="btn" id="grNew" type="button"><svg><use href="#i-plus"/></svg>Nuevo grupo</button>' : '');
       if ($('#grNew')) $('#grNew').addEventListener('click', function () { form(c, null); });
       $$('.gr-item', host).forEach(function (b) { b.addEventListener('click', function () { openGroup(c, rows.filter(function (x) { return x.id === b.dataset.id; })[0]); }); });
     });
@@ -64,13 +64,13 @@
   function form(c, g) {
     var P = api();
     Cl.sheet('<div data-full></div>' + head(g ? 'Editar grupo' : 'Nuevo grupo') + '<form class="rg-form" id="gfForm">' +
-      (g ? '' : '<label>Tipo de charla<select id="gfKind"><option value="chat">Charla: mensajes de texto</option><option value="routes">Rutas: cada uno comparte las suyas</option></select></label>') +
+      (g ? '' : '<label>Tipo de grupo<select id="gfKind"><option value="chat">Chat: mensajes de texto</option><option value="routes">Rutas: cada uno comparte las suyas</option></select></label>') +
       '<label>Nombre<input id="gfName" required minlength="2" maxlength="50" placeholder="Quedadas entre semana" value="' + esc(g ? g.name : '') + '"></label>' +
       '<label>Descripción (opcional)<input id="gfDesc" maxlength="140" value="' + esc(g ? g.description : '') + '"></label>' +
       '<label>Quién puede escribir<select id="gfWrite">' + Object.keys(WRITE).map(function (k) { return '<option value="' + k + '"' + ((g ? g.can_write : 'all') === k ? ' selected' : '') + '>' + WRITE[k] + '</option>'; }).join('') + '</select></label>' +
-      '<label class="rg-check"><input type="checkbox" id="gfPriv"' + (g && g.is_private ? ' checked' : '') + '><span><b>Charla privada</b><small>Solo la ven los administradores y los miembros que elijas aquí abajo.</small></span></label>' +
-      '<div id="gfMembers" hidden><span class="label">Quién está en la charla</span><div class="tr-split" id="gfList"><span class="muted">Cargando…</span></div></div>' +
-      '<button class="btn big primary" type="submit">' + (g ? 'Guardar' : 'Crear charla') + '</button>' + (g ? '<button class="link danger rg-center" id="gfDel" type="button">Borrar esta charla y sus mensajes</button>' : '') + '</form>');
+      '<label class="rg-check"><input type="checkbox" id="gfPriv"' + (g && g.is_private ? ' checked' : '') + '><span><b>Grupo privada</b><small>Solo la ven los administradores y los miembros que elijas aquí abajo.</small></span></label>' +
+      '<div id="gfMembers" hidden><span class="label">Quién está en el grupo</span><div class="tr-split" id="gfList"><span class="muted">Cargando…</span></div></div>' +
+      '<button class="btn big primary" type="submit">' + (g ? 'Guardar' : 'Crear grupo') + '</button>' + (g ? '<button class="link danger rg-center" id="gfDel" type="button">Borrar este grupo y sus mensajes</button>' : '') + '</form>');
     var back = function () { if (g) openGroup(c, g); else Cl.closeSheet(); };
     $('#grX').addEventListener('click', back);
     var loaded = false, cur = {};
@@ -115,7 +115,7 @@
       '<div class="ev-chat" id="grList" data-g="' + g.id + '"><p class="muted">Cargando…</p></div>' +
       (g.writes ? (routes ? '<button class="btn big primary" id="grShare" type="button"><svg><use href="#i-route"/></svg>Compartir una ruta</button>'
         : '<form class="ev-chat-form" id="grForm"><input id="grIn" maxlength="1500" autocomplete="off" enterkeyhint="send" placeholder="Escribe un mensaje…" aria-label="Mensaje"><button class="ch-send" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></form>')
-        : '<p class="muted rg-small rg-center">En esta charla ' + (g.can_write === 'admins' ? 'solo escriben los administradores.' : 'solo escribe quien creó la comunidad.') + '</p>'));
+        : '<p class="muted rg-small rg-center">En este grupo ' + (g.can_write === 'admins' ? 'solo escriben los administradores.' : 'solo escribe quien creó la comunidad.') + '</p>'));
     $('#grX').addEventListener('click', function () { clearInterval(timer); Cl.closeSheet(); if (window.RGClub && RGClub.show) RGClub.show(); });
     var bellTx = function () { $('#grBell').setAttribute('aria-pressed', String(!muted)); $('#grBellTx').textContent = muted ? 'Avisos silenciados' : 'Avisos activados'; }; bellTx();
     $('#grBell').addEventListener('click', function () { muted = !muted; g.muted = muted; bellTx(); (muted ? sb.from('group_mutes').upsert({ group_id: g.id, user_id: me() }) : sb.from('group_mutes').delete().eq('group_id', g.id).eq('user_id', me())).then(ok).catch(function (e) { muted = !muted; g.muted = muted; bellTx(); fail(e); }); });

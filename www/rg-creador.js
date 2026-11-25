@@ -64,7 +64,7 @@
       '<p>No soy nadie especial: soy uno más de los que quedan el domingo para rodar. ReGroupRide nació porque en cada salida pasaba lo mismo: alguien se quedaba atrás, otro se perdía en un cruce y al final estábamos todos parados mirando el WhatsApp.</p>' +
       '<p>Pensé que hacía falta algo sencillo para rodar juntos sin perder a nadie y, como no lo encontré, me puse a hacerlo. La hago yo solo, en mis ratos libres, con la ayuda de la gente de <b>Ratone Bikes</b>, que la prueba en cada ruta y me dice sin filtros qué falla y qué falta.</p>' +
       '<p>Esta app es tan vuestra como mía. Si echas algo en falta o algo no va, escríbeme: lo leo yo y te contesto yo. Nos vemos en la carretera ✌️</p>' +
-      '<p>Ah, y estoy soltero, chicas 😜</p>' +
+      '<p>Ah, y estoy soltero, chicas</p>' +
       '<div class="rg-row"><button class="btn small primary" id="makerWrite" type="button">Escribirme</button><button class="btn small" id="makerTour" type="button">Ver el tutorial</button></div>';
     var syncBox = document.getElementById('rgSyncBox'); if (syncBox) syncBox.parentNode.insertBefore(box, syncBox); else about.parentNode.insertBefore(box, about);
     box.querySelector('#makerWrite').addEventListener('click', function () { Cl.openFeedback(); });
