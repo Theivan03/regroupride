@@ -32,10 +32,54 @@
     if (!job) { if (q.error_description && A) A.toast(q.error_description.replace(/\+/g, ' '), 'warn'); return !!q.error_description; }
     job.then(function (r) {
       if (r && r.error) { if (A) A.toast(Cl.msg ? Cl.msg(r.error) : 'No se ha podido entrar.', 'warn'); return; }
-      if (Cl.closeSheet) Cl.closeSheet(); if (A) A.toast('Has entrado con Google.', 'ok');
+      if (Cl.closeSheet && !asking) Cl.closeSheet(); if (A) A.toast('Has entrado con Google.', 'ok');
     }, function () { if (A) A.toast('No se ha podido entrar.', 'warn'); });
     return true;
   }
+  /* ---------- primera vez con Google: lo que Google no da (teléfono, nivel, idioma) y lo que sí da, para confirmarlo (nombre y foto) ---------- */
+  var asking = false, doneFor = '';
+  function isGoogle(u) { var m = (u && u.app_metadata) || {}; return m.provider === 'google' || (m.providers || []).indexOf('google') >= 0; }
+  function complete(u, tries) {
+    if (asking || !u || doneFor === u.id || !isGoogle(u) || !Cl.user() || Cl.user().id !== u.id) return;
+    var pr = Cl.profile && Cl.profile();
+    if (!pr) { if ((tries || 0) < 12) setTimeout(function () { complete(u, (tries || 0) + 1); }, 700); return; }
+    if (pr.level != null) return;                       // ya lo rellenó (o tiene cuenta de antes)
+    asking = true;
+    var md = u.user_metadata || {}, gpic = /^https:\/\//.test(md.avatar_url || md.picture || '') ? (md.avatar_url || md.picture) : '', pic = null, L = window.RGLib || {}, esc = Cl.esc;
+    var lv = ''; for (var i = 5; i >= 1; i--) lv += '<option value="' + i + '"' + (i === 3 ? ' selected' : '') + '>' + esc((L.LEVELS ? L.LEVELS[i] : i) + (L.LEVEL_HINT ? ' — ' + L.LEVEL_HINT[i] : '')) + '</option>';
+    var en = window.RGI18N && RGI18N.lang === 'en';
+    Cl.sheet('<div class="rg-logo" id="rgDoneBox"><h1>Completa tu perfil</h1></div><p class="muted">Ya has entrado con Google. Solo falta esto para que tu grupo te reconozca.</p>' +
+      '<form class="rg-form" id="rgDone">' +
+      '<button class="rg-pic" id="gdPic" type="button"><span class="rg-ava' + (gpic ? ' has' : '') + '" id="gdAva">' + (gpic ? '<img src="' + esc(gpic) + '" alt="" referrerpolicy="no-referrer">' : '<svg width="26" height="26"><use href="#i-camera"/></svg>') + '</span><span><b>Tu foto</b><small>' + (gpic ? 'Es la de tu cuenta de Google. Toca para cambiarla.' : 'Opcional. Es la que verá el grupo.') + '</small></span></button>' +
+      '<label>Tu nombre<input id="gdName" data-raw maxlength="60" required autocomplete="name" placeholder="Como te conoce la gente" value="' + esc(pr.name || md.full_name || md.name || '') + '"></label>' +
+      '<label>Teléfono<input id="gdTel" type="tel" inputmode="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" placeholder="600 000 000" title="Tu número, con 9 cifras o más"></label>' +
+      '<label>¿Cómo vas en moto?<select id="gdLevel">' + lv + '</select></label>' +
+      '<label data-raw>Idioma · Language<select id="gdLang"><option value="es"' + (en ? '' : ' selected') + '>Español</option><option value="en"' + (en ? ' selected' : '') + '>English</option></select></label>' +
+      '<button class="btn big primary" type="submit">Guardar y empezar</button></form>' +
+      '<p class="muted rg-small">El teléfono solo lo ven los administradores de tus rutas y quien pida ayuda. Necesitas tener al menos 16 años.</p>', 'page');
+    var $ = function (q) { return document.querySelector(q); };
+    $('#gdPic').addEventListener('click', function () { if (!window.RGCrop) return; RGCrop.pick().then(function (d) { if (!d) return; pic = d; var a = $('#gdAva'); a.classList.add('has'); a.innerHTML = '<img src="' + d + '" alt="">'; }); });
+    $('#rgDone').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var name = $('#gdName').value.trim(), tel = $('#gdTel').value.trim(), level = +$('#gdLevel').value || 3, lang = $('#gdLang').value;
+      Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
+        var up = { name: name, level: level }; if (!pic && gpic && !/^https:\/\//.test(pr.avatar_url || '')) up.avatar_url = gpic;
+        return sb.from('profiles').update(up).eq('id', u.id).then(function (r) {
+          if (r.error) throw r.error;
+          return Cl.savePhone(tel).catch(function () {});
+        }).then(function () {
+          if (pic && A && A.setAvatar) A.setAvatar(pic);
+          if (A && A.setProfileName) A.setProfileName(name);
+          return Cl.refresh ? Cl.refresh() : null;
+        }).then(function () {
+          asking = false; doneFor = u.id; Cl.closeSheet(); if (A) A.toast('¡Bienvenido, ' + name + '!', 'ok');
+          if (window.RGI18N && RGI18N.lang !== lang) setTimeout(function () { RGI18N.setLang(lang); }, 900);
+        });
+      });
+    });
+  }
+  window.RGOAuth = { complete: function () { asking = false; doneFor = ''; complete(Cl.user(), 0); } };
+  if (Cl.onChange) Cl.onChange(function (u) { if (u) setTimeout(function () { complete(u, 0); }, 1200); else asking = false; });
   var seen = '';
   function once(u) { if (!u || u === seen) return; seen = u; back(u); }
   if (native) {

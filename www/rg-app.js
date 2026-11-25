@@ -959,5 +959,5 @@
   sync();
   window.RGCloud = { sb: sb, cfg: { url: SB_URL, key: SB_KEY }, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profile: function () { return profile; }, openRider: openRider, saveName: saveName, signOut: signOut, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
     onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, closePages: closePages, sheetBack: sheetBack, pageOpen: function () { var p = $('#rgPage'); return !!(p && !p.hidden); }, ridePhone: function () { return ridePhone; },
-    savePhone: function (ph) { return sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id).then(function (b) { if (b.error) throw b.error; ridePhone = ph; renderAccount(); }); }, busy: busy, msg: msg, esc: esc };
+    savePhone: function (ph) { return sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id).then(function (b) { if (b.error) throw b.error; ridePhone = ph; renderAccount(); }); }, busy: busy, msg: msg, esc: esc, refresh: refresh };
 })();
