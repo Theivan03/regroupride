@@ -33,6 +33,7 @@
     job.then(function (r) {
       if (r && r.error) { if (A) A.toast(Cl.msg ? Cl.msg(r.error) : 'No se ha podido entrar.', 'warn'); return; }
       if (Cl.closeSheet && !asking) Cl.closeSheet(); if (A) A.toast('Has entrado con Google.', 'ok');
+      var done = function () { var u = Cl.user(); if (u) complete(u, 0); }; if (Cl.refresh) Promise.resolve(Cl.refresh()).then(done, done); else setTimeout(done, 1500);
     }, function () { if (A) A.toast('No se ha podido entrar.', 'warn'); });
     return true;
   }
@@ -42,7 +43,8 @@
   function complete(u, tries) {
     if (asking || !u || doneFor === u.id || !isGoogle(u) || !Cl.user() || Cl.user().id !== u.id) return;
     var pr = Cl.profile && Cl.profile();
-    if (!pr) { if ((tries || 0) < 12) setTimeout(function () { complete(u, (tries || 0) + 1); }, 700); return; }
+    // al volver de Google la sesión entra sin pasar por la carga del perfil: se pide aquí
+    if (!pr) { if ((tries || 0) % 4 === 1 && Cl.refresh) Cl.refresh(); if ((tries || 0) < 20) setTimeout(function () { complete(u, (tries || 0) + 1); }, 700); return; }
     if (pr.level != null) return;                       // ya lo rellenó (o tiene cuenta de antes)
     asking = true;
     var md = u.user_metadata || {}, gpic = /^https:\/\//.test(md.avatar_url || md.picture || '') ? (md.avatar_url || md.picture) : '', pic = null, L = window.RGLib || {}, esc = Cl.esc;
