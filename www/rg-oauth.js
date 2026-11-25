@@ -25,12 +25,26 @@
     });
   }
   if (window.MutationObserver) new MutationObserver(paint).observe(document.getElementById('rgSheet') || document.body, { childList: true, subtree: true });
-  // vuelta a la app
-  if (native && P.App && P.App.addListener) P.App.addListener('appUrlOpen', function (ev) {
-    var u = (ev && ev.url) || ''; if (u.indexOf(BACK) !== 0) return;
-    var q = {}; (u.split('#')[1] || '').split('&').concat(((u.split('?')[1] || '').split('#')[0]).split('&')).forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = decodeURIComponent(a[1] || ''); });
+  // Vuelta de Google: la dirección trae la sesión (#access_token…) o un código (?code=…). Vale para la app y para la web.
+  function back(u) {
+    var q = {}; (u.split('#')[1] || '').split('&').concat(((u.split('?')[1] || '').split('#')[0]).split('&')).forEach(function (kv) { var a = kv.split('='); if (a[0]) { try { q[a[0]] = decodeURIComponent(a[1] || ''); } catch (e) { q[a[0]] = a[1] || ''; } } });
     var job = q.access_token && q.refresh_token ? sb.auth.setSession({ access_token: q.access_token, refresh_token: q.refresh_token }) : q.code ? sb.auth.exchangeCodeForSession(q.code) : null;
-    if (!job) { if (q.error_description && A) A.toast(q.error_description.replace(/\+/g, ' '), 'warn'); return; }
-    job.then(function (r) { if (r && r.error && A) A.toast(Cl.msg ? Cl.msg(r.error) : 'No se ha podido entrar.', 'warn'); }, function () {});
-  });
+    if (!job) { if (q.error_description && A) A.toast(q.error_description.replace(/\+/g, ' '), 'warn'); return !!q.error_description; }
+    job.then(function (r) {
+      if (r && r.error) { if (A) A.toast(Cl.msg ? Cl.msg(r.error) : 'No se ha podido entrar.', 'warn'); return; }
+      if (Cl.closeSheet) Cl.closeSheet(); if (A) A.toast('Has entrado con Google.', 'ok');
+    }, function () { if (A) A.toast('No se ha podido entrar.', 'warn'); });
+    return true;
+  }
+  var seen = '';
+  function once(u) { if (!u || u === seen) return; seen = u; back(u); }
+  if (native) {
+    if (P.App && P.App.addListener) P.App.addListener('appUrlOpen', function (ev) { var u = (ev && ev.url) || ''; if (u.indexOf(BACK) === 0) once(u); });
+    // si Android cerró la app mientras estabas en Google, la dirección llega como «de arranque»
+    if (P.App && P.App.getLaunchUrl) P.App.getLaunchUrl().then(function (r) { var u = (r && r.url) || ''; if (u.indexOf(BACK) === 0) once(u); }, function () {});
+  } else if (/[#?&](access_token|code|error_description)=/.test(location.href)) {
+    // en la web Google devuelve a esta misma página: se recoge la sesión y se limpia la dirección
+    var href = location.href;
+    if (back(href)) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
+  }
 })();
