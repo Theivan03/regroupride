@@ -59,7 +59,7 @@
   var wasPlan = false, planBack = false, strip = null;
   function sync() {
     var rec = A.isRec(), p = A.activePlan && A.activePlan(), pm = !!(A.isPlanMode && A.isPlanMode()), b = document.body;
-    b.classList.toggle('as-rec', rec); b.classList.toggle('as-route', !!p && !rec && !pm); b.classList.toggle('as-plan', pm);
+    b.classList.toggle('as-rec', rec); b.classList.toggle('as-route', !!p && !rec && !pm); b.classList.toggle('as-drawing', pm);
     var rb = $('#asRideBtns'); if (rb) rb.hidden = !rec;
     var wt = $('#asWhoT'), rt = $('#asRouteT');
     if (wt) { var w = whoText(false); if (wt.innerHTML !== w) wt.innerHTML = w; }
@@ -81,7 +81,7 @@
   if ($('#asWho')) $('#asWho').addEventListener('click', function () { who(false); });
   if ($('#asRoute')) $('#asRoute').addEventListener('click', function () { A.showView('rides'); ruTab('plans'); });
   if ($('#btnNear')) $('#btnNear').addEventListener('click', function () { near('gasolina'); });
-  if ($('#btnAlert')) $('#btnAlert').addEventListener('click', function () { if (group() && window.RGGroup) RGGroup.openAlert(); else if (window.RGRoad) RGRoad.hazard(); });
+  if ($('#btnAvisar')) $('#btnAvisar').addEventListener('click', function () { if (group() && window.RGGroup) RGGroup.openAlert(); else if (window.RGRoad) RGRoad.hazard(); });
   if ($('#btnPlanBack')) $('#btnPlanBack').addEventListener('click', function () {
     var out = function () { planBack = true; A.exitPlanMode(); A.showView('rides'); };
     if (!A.planDirty || !A.planDirty()) { out(); return; }
