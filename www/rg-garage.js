@@ -110,12 +110,24 @@
     $('#gxX', s).addEventListener('click', Cl.closeSheet);
     $('#coF', s).addEventListener('submit', function (ev) { ev.preventDefault(); var e = parseFloat($('#coE').value); if (!(e >= 0)) return; v.costs = (v.costs || []).concat([{ id: uid(), at: new Date(($('#coD').value || ymd(Date.now())) + 'T12:00:00').getTime(), name: $('#coN').value.trim(), eur: e }]); save(v); });
   }
-  function logSheet(v) {
+  var MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  // Historial de gastos por años (pastillas) y, dentro del año, por meses con su total.
+  function logSheet(v, year) {
     var rows = (v.fuel || []).map(function (x) { return { at: x.at, id: x.id, k: 'fuel', t: 'Repostaje · ' + n1(x.l) + ' l' + (x.full ? '' : ' (parcial)'), s: (x.odo ? x.odo + ' km · ' : '') + (x.l ? (x.eur / x.l).toFixed(3) + ' €/l' : ''), e: x.eur }; }).concat((v.costs || []).map(function (x) { return { at: x.at, id: x.id, k: 'costs', t: x.name, s: '', e: x.eur }; })).sort(function (a, b) { return b.at - a.at; });
+    var sum = function (a) { return a.reduce(function (t, r) { return t + (r.e || 0); }, 0); };
+    var years = rows.map(function (r) { return new Date(r.at).getFullYear(); }).filter(function (y, i, a) { return a.indexOf(y) === i; });
+    var yr = years.indexOf(year) >= 0 ? year : years[0], inY = rows.filter(function (r) { return new Date(r.at).getFullYear() === yr; });
+    var months = inY.map(function (r) { return new Date(r.at).getMonth(); }).filter(function (m, i, a) { return a.indexOf(m) === i; });
     var st = stats(v), s = Cl.sheet(head('Repostajes y gastos') + '<p style="margin:0;text-align:left"><b>' + esc(v.name) + '</b><br><span class="muted">' + (st.l100 != null ? 'Consumo medio ' + n1(st.l100) + ' l/100 km · ' + n1(st.e100) + ' €/100 km' : 'Hacen falta dos repostajes a tope con el odómetro para calcular el consumo.') + '</span></p>' +
-      '<div class="rd-list">' + rows.map(function (r) { return '<div class="gx-log"><span><b>' + esc(r.t) + '</b><small>' + new Date(r.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) + (r.s ? ' · ' + esc(String(r.s).replace('.', ',')) : '') + '</small></span><b>' + eur(r.e) + '</b><button class="btn small icon" data-del="' + r.k + ':' + r.id + '" type="button" title="Borrar">' + ic('trash') + '</button></div>'; }).join('') + '</div>');
+      (years.length ? '<div class="pills gx-years">' + years.map(function (y) { return '<button class="pill" type="button" data-y="' + y + '" aria-pressed="' + (y === yr) + '">' + y + '</button>'; }).join('') + '</div>' +
+        '<div class="gx-figs gx-year"><div><b>' + eur(sum(inY)) + '</b><small>Total de ' + yr + '</small></div><div><b>' + eur(sum(inY.filter(function (r) { return r.k === 'fuel'; }))) + '</b><small>Gasolina</small></div><div><b>' + eur(sum(inY.filter(function (r) { return r.k !== 'fuel'; }))) + '</b><small>Otros gastos</small></div></div>' +
+        months.map(function (m) {
+          var rs = inY.filter(function (r) { return new Date(r.at).getMonth() === m; });
+          return '<div class="gx-month"><span class="label">' + MES[m] + ' <span class="muted">· ' + rs.length + (rs.length === 1 ? ' apunte' : ' apuntes') + '</span></span><b class="cifra">' + eur(sum(rs)) + '</b></div><div class="rd-list">' + rs.map(function (r) { return '<div class="gx-log"><span><b' + (r.k === 'costs' ? ' data-raw' : '') + '>' + esc(r.t) + '</b><small>' + new Date(r.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + (r.s ? ' · ' + esc(String(r.s).replace('.', ',')) : '') + '</small></span><b>' + eur(r.e) + '</b><button class="btn small icon" data-del="' + r.k + ':' + r.id + '" type="button" title="Borrar">' + ic('trash') + '</button></div>'; }).join('') + '</div>';
+        }).join('') : '<p class="muted rg-small" style="text-align:left">Todavía no has apuntado ningún gasto.</p>'));
+    $$('[data-y]', s).forEach(function (b) { b.addEventListener('click', function () { logSheet(v, +b.dataset.y); }); });
     $('#gxX', s).addEventListener('click', Cl.closeSheet);
-    $$('[data-del]', s).forEach(function (b) { b.addEventListener('click', function () { var a = b.dataset.del.split(':'); v[a[0]] = (v[a[0]] || []).filter(function (x) { return x.id !== a[1]; }); A.saveVehicle(v).then(function () { logSheet(v); }); }); });
+    $$('[data-del]', s).forEach(function (b) { b.addEventListener('click', function () { var a = b.dataset.del.split(':'); v[a[0]] = (v[a[0]] || []).filter(function (x) { return x.id !== a[1]; }); A.saveVehicle(v).then(function () { logSheet(v, yr); }); }); });
   }
   function rangeForm(v) {
     var s = Cl.sheet(head('Autonomía') + '<form class="rg-form" id="raF"><label>Kilómetros con un depósito<input id="raN" type="number" min="40" max="900" step="5" inputmode="numeric" value="' + (v.range || '') + '" placeholder="Por ejemplo, 280"></label><p class="muted rg-small" style="text-align:left">Rodando, cuando lleves tres cuartos de esa distancia desde el último repostaje apuntado, la app te avisa y te dice la gasolinera más barata que tienes cerca.</p><button class="btn big primary" type="submit">Guardar</button></form>');
