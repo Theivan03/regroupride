@@ -534,7 +534,7 @@
   /* Hojas y pantallas completas. Una hoja es una decisión corta; lo que lleva pestañas o listas va a pantalla completa
      con flecha de volver (kind 'full', o por su título). Las pantallas completas se apilan: al abrir otra, la anterior
      se guarda tal cual y vuelve al cerrar. Nunca hay una hoja sobre otra hoja. */
-  var FULL = /^(Chat|Fotos|Gestionar|Comunidades|Mis viajes|Viaje|Sugerencias|Normas|Descuentos|Retos|Sitios|Catálogo|Rutas de |Documentos|Papeles|Gastos|Me han robado|Motos robadas|Diagnóstico|Lista antes de salir|Nueva salida|Editar salida|Nueva comunidad|Editar comunidad|Nuevo viaje|Editar viaje|Mapas sin conexión|Fotógrafos|Soy fotógrafo|Proponer un sitio|Entrada QR|Control de entrada|Asistentes|Grupos|Organizar por grupos|Personas que no veo|Nueva página|Info)/;
+  var FULL = /^(Retos|Nuevo reto|Repostajes y gastos|Moto robada|Motos robadas|Reportar|Reporte enviado|Editar grupo|Nuevo grupo|Editar página|Editar sitio|Avisar de un robo|Administradores de esta ruta|Mi entrada|Chat|Fotos|Gestionar|Comunidades|Mis viajes|Viaje|Sugerencias|Normas|Descuentos|Retos|Sitios|Catálogo|Rutas de |Documentos|Papeles|Gastos|Me han robado|Motos robadas|Diagnóstico|Lista antes de salir|Nueva salida|Editar salida|Nueva comunidad|Editar comunidad|Nuevo viaje|Editar viaje|Mapas sin conexión|Fotógrafos|Soy fotógrafo|Proponer un sitio|Entrada QR|Control de entrada|Asistentes|Grupos|Organizar por grupos|Personas que no veo|Nueva página|Info)/;
   var pageStack = [];
   function titleOf(html) { var m = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html); return m ? m[1].replace(/<[^>]+>/g, '').trim() : ''; }
   function pageEl() { var p = $('#rgPage'); if (!p) { p = document.createElement('div'); p.id = 'rgPage'; p.className = 'rg-sheet rg-full'; p.hidden = true; var sh = $('#rgSheet'); sh.parentNode.insertBefore(p, sh); } return p; }
@@ -546,7 +546,7 @@
       var p = pageEl(), cur = p.firstChild, sh = $('#rgSheet'); if (!sh.hidden) { sh.hidden = true; sh.innerHTML = ''; }
       var at = -1; pageStack.forEach(function (x, i) { if (x.t === t) at = i; });
       if (at >= 0) pageStack.length = at;                                              // se vuelve a una pantalla que estaba debajo
-      else if (cur && !p.hidden && p.dataset.t !== t) pageStack.push({ t: p.dataset.t, el: cur, top: cur.scrollTop });   // otra pantalla encima
+      else if (cur && !p.hidden && p.dataset.t !== t && !(cur.children.length <= 2 && /Cargando…/.test(cur.textContent))) pageStack.push({ t: p.dataset.t, el: cur, top: cur.scrollTop });   // otra pantalla encima
       var keep = cur && !p.hidden && p.dataset.t === t ? cur.scrollTop : 0;
       var inn = document.createElement('div'); inn.className = 'rg-sheet-in'; inn.innerHTML = html.replace(/(<div class="head"[^>]*>)([\s\S]*?)(<button[^>]*class="btn small icon"[^>]*>)\s*<svg><use href="#i-close"\/><\/svg>\s*(<\/button>)/, function (m, a, mid, b, c) { return a + b.replace('title="Cerrar"', 'title="Volver"') + '<svg><use href="#i-back"/></svg>' + c + mid; });
       p.innerHTML = ''; p.appendChild(inn); p.dataset.t = t; p.className = 'rg-sheet rg-full' + (pageStack.length ? ' rg-deep' : ''); p.hidden = false; inn.scrollTop = keep;

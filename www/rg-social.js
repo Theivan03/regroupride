@@ -30,45 +30,34 @@
       return JSON.parse(JSON.stringify(x));
     }
   };
-  // en cada tarjeta de salida: voz, álbum y lista
-  function cards(root) {
-    $$('.ev-x[data-evx]', root).forEach(function (el) {
-      if (el.dataset.done) return; el.dataset.done = '1'; var e = window.RGClub && RGClub.ev(el.dataset.evx); if (!e) return; var x = e.extra || {};
-      el.innerHTML = (x.voice ? '<button class="btn small" data-x="voice" type="button">' + ic('phone') + 'Canal de voz</button>' : '') + '<button class="btn small" data-x="album" type="button">' + ic('image') + 'Álbum</button><button class="btn small" data-x="check" type="button">' + ic('check') + 'Antes de salir</button>';
-      el.addEventListener('click', function (ev) { var b = ev.target.closest('[data-x]'); if (!b) return; if (b.dataset.x === 'voice') window.open(x.voice, '_blank'); else if (b.dataset.x === 'album') album(e); else checklist(e); });
-    });
-  }
-  var cb = $('#clubBody'), deb = 0;
-  if (cb && window.MutationObserver) new MutationObserver(function () { clearTimeout(deb); deb = setTimeout(function () { cards(cb); }, 200); }).observe(cb, { childList: true, subtree: true });
-
   /* ---------- lista antes de salir ---------- */
   function checklist(e) {
     var own = (e && e.extra && e.extra.check) || [], day = new Date().toDateString(), st = jget('rg.check'); if (st.day !== day) st = { day: day, on: {} };
     var row = function (t, k) { return '<label class="rg-check"><input type="checkbox" data-c="' + esc(k) + '"' + (st.on[k] ? ' checked' : '') + '><span><b>' + esc(t) + '</b></span></label>'; };
-    var s = Cl.sheet(head('Antes de salir') + (own.length ? '<span class="label">Lo que pide el organizador' + (e ? ' · ' + esc(e.title) : '') + '</span>' + own.map(function (t, i) { return row(t, 'o' + (e ? e.id : '') + i); }).join('') : '') +
+    var s = Cl.sheet(head('Lista antes de salir') + (own.length ? '<span class="label">Lo que pide el organizador' + (e ? ' · ' + esc(e.title) : '') + '</span>' + own.map(function (t, i) { return row(t, 'o' + (e ? e.id : '') + i); }).join('') : '') +
       '<span class="label">Lo de siempre</span>' + BASE.map(function (t, i) { return row(t, 'b' + i); }).join('') + '<p class="muted rg-small" style="text-align:left">Desde el 1 de octubre de 2026 el calzado cerrado es obligatorio en cualquier vía y los guantes, en carretera. La lista se vacía cada día.</p>');
     $('#scX', s).addEventListener('click', Cl.closeSheet);
     $$('[data-c]', s).forEach(function (c) { c.addEventListener('change', function () { st.on[c.dataset.c] = c.checked; jset('rg.check', st); }); });
   }
   /* ---------- álbum de la salida ---------- */
-  function album(e) {
-    var x = e.extra || {}, s = Cl.sheet(head('Álbum') + '<p style="margin:0;text-align:left"><b>' + esc(e.title) + '</b><br><span class="muted">Las fotos de todos los que fueron, en un solo sitio.</span></p>' +
-      (x.gallery ? '<a class="btn" href="' + esc(x.gallery) + '" target="_blank" rel="noopener">' + ic('camera') + 'Galería del fotógrafo</a>' : '') +
-      '<button class="btn primary" id="alAdd" type="button">' + ic('plus') + 'Añadir fotos</button><div class="al-grid" id="alGrid"><div class="empty">Cargando…</div></div>');
-    $('#scX', s).addEventListener('click', Cl.closeSheet);
+  function album(e) { if (window.RGClub && RGClub.openEvent) RGClub.openEvent(e.id, 'fotos'); }
+  function albumPane(e, host) {
+    var x = e.extra || {};
+    host.innerHTML = '<div class="al-grid" id="alGrid"><div class="empty"><b>Cargando…</b></div></div><button class="btn big primary" id="alAdd" type="button">' + ic('plus') + 'Añadir fotos</button>' + (x.gallery ? '<a class="btn" href="' + esc(x.gallery) + '" target="_blank" rel="noopener">' + ic('camera') + 'Galería del fotógrafo</a>' : '');
     var load = function () {
       sb.from('event_photos').select('id,user_id,url,created_at').eq('event_id', e.id).order('created_at', { ascending: false }).limit(200).then(function (r) {
-        var el = $('#alGrid'); if (!el) return; var rows = r.error ? [] : (r.data || []);
-        el.innerHTML = rows.length ? rows.map(function (p) { return '<div class="al-ph"><img loading="lazy" alt="" src="' + esc(p.url) + '">' + (p.user_id === me() ? '<button class="al-del" data-del="' + p.id + '" type="button" title="Quitar">' + ic('trash') + '</button>' : '') + '</div>'; }).join('') : '<div class="empty">Todavía no hay fotos. Sube las tuyas después de la salida.</div>';
+        var el = $('#alGrid', host); if (!el) return; var rows = r.error ? [] : (r.data || []);
+        el.classList.toggle('none', !rows.length);
+        el.innerHTML = rows.length ? rows.map(function (p) { return '<div class="al-ph"><img loading="lazy" alt="" src="' + esc(p.url) + '">' + (p.user_id === me() ? '<button class="al-del" data-del="' + p.id + '" type="button" title="Quitar">' + ic('trash') + '</button>' : '') + '</div>'; }).join('') : '<div class="empty"><b>Aún no hay fotos</b>Sube las tuyas después de la salida: las ven todos los que fueron.</div>';
         $$('img', el).forEach(function (im) { im.addEventListener('click', function () { big(im.src); }); });
         $$('[data-del]', el).forEach(function (b) { b.addEventListener('click', function (ev) { ev.stopPropagation(); sb.from('event_photos').delete().eq('id', b.dataset.del).then(load); }); });
       });
     };
-    $('#alAdd', s).addEventListener('click', function (ev) {
+    $('#alAdd', host).addEventListener('click', function (ev) {
       var btn = ev.currentTarget; if (!window.RGShell) return;
       RGShell.pickPhoto(1600, true).then(function (bs) {
         if (!bs || !bs.length) return;
-        Cl.busy(btn, function () { return bs.reduce(function (p, b) { return p.then(function () { return RGShell.upload(b, 'album'); }).then(function (u) { return sb.from('event_photos').insert({ event_id: e.id, url: u }); }).then(function (r) { if (r.error) throw r.error; }); }, Promise.resolve()).then(load); }).catch(function (x) { A.toast(Cl.msg(x), 'warn'); load(); });
+        Cl.busy(btn, function () { return bs.reduce(function (p, b) { return p.then(function () { return RGShell.upload(b, 'album'); }).then(function (u) { return sb.from('event_photos').insert({ event_id: e.id, url: u }); }).then(function (r) { if (r.error) throw r.error; }); }, Promise.resolve()).then(load); }).catch(function (x2) { A.toast(Cl.msg(x2), 'warn'); load(); });
       });
     });
     load();
@@ -117,8 +106,6 @@
       Cl.busy(ev.submitter || $('#plF button[type=submit]'), function () { return (x ? sb.from('biker_places').update(row).eq('id', x.id) : sb.from('biker_places').insert(row)).then(function (r) { if (r.error) throw r.error; places(); }); }).catch(function (e) { A.toast(Cl.msg(e), 'warn'); });
     });
   }
-  var rowEx = $('#exRow');
-  if (rowEx) { var pb = document.createElement('button'); pb.className = 'btn'; pb.type = 'button'; pb.id = 'exPlaces'; pb.innerHTML = ic('star') + 'Sitios moteros'; rowEx.appendChild(pb); pb.addEventListener('click', places); }
 
   /* ---------- retos de comunidad ---------- */
   function ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -158,5 +145,5 @@
     $('#scX', s).addEventListener('click', function () { challenges(c, true); });
     $('#chF', s).addEventListener('submit', function (ev) { ev.preventDefault(); Cl.busy(ev.submitter || $('#chF button'), function () { return sb.from('challenges').insert({ community_id: c.id, title: $('#chT').value.trim(), kind: $('#chK').value, goal: parseInt($('#chG').value, 10) || null, starts_on: $('#chA').value, ends_on: $('#chB').value }).then(function (r) { if (r.error) throw r.error; challenges(c, true); }); }).catch(function (e) { A.toast(Cl.msg(e), 'warn'); }); });
   }
-  window.RGSocial = { placesPane: placesPane, challenges: challenges, places: places, album: album, checklist: checklist };
+  window.RGSocial = { albumPane: albumPane, placesPane: placesPane, challenges: challenges, places: places, album: album, checklist: checklist };
 })();

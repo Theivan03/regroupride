@@ -1041,12 +1041,12 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       d.innerHTML = '<div class="vhead"><div>' + (v.principal ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>principal</span>' : '<span class="label">' + (v.type === 'coche' ? 'Coche' : 'Moto') + '</span>') + '<div class="name">' + esc(v.name) + '</div><div class="muted">' + esc([[v.make, v.model].filter(Boolean).join(' '), v.leanLimit ? 'margen orientativo ' + v.leanLimit + '°' : ''].filter(Boolean).join(' · ')) + '</div></div></div>' +
         '<div><span class="label">Odómetro · km</span><br><span class="odo">' + digits.slice(0, 5) + '<b>' + digits.slice(5) + '</b></span></div>' +
         '<div class="vstats">' + fig('Rutas', String(mine.length)) + fig('Horas', (vs / 3600).toFixed(0)) + fig('Km en la app', Math.round(vkm) + '') + '</div>' +
-        '<div class="actions">' + (v.principal ? '' : '<button class="btn small" type="button" data-act="main">Hacer principal</button>') + '<button class="btn small" type="button" data-act="edit"><svg><use href="#i-edit"/></svg>Editar</button><button class="btn small danger" type="button" data-act="del">Quitar del garaje</button></div>' +
+        '<div class="actions">' + (v.principal ? '' : '<button class="btn small" type="button" data-act="main">Hacer principal</button>') + '<button class="btn small" type="button" data-act="edit"><svg><use href="#i-edit"/></svg>Editar</button><button class="btn small danger" type="button" data-act="del">Quitar esta moto</button></div>' +
         maintHtml(v, odo) + '<div class="v-x" data-vx="' + v.id + '" data-odo="' + odo + '"></div>';
       d.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () {
         if (b.dataset.act === 'main') { vehicles.forEach(function (x) { x.principal = x.id === v.id; }); Promise.all(vehicles.map(DB.putVehicle)).then(renderGarage); }
         if (b.dataset.act === 'edit') openVehicleForm(v);
-        if (b.dataset.act === 'del') armOrRun(b, 'Quitar del garaje', 'Toca otra vez para quitar', function () { DB.deleteVehicle(v.id).then(reloadVehicles).then(renderGarage); });
+        if (b.dataset.act === 'del') armOrRun(b, 'Quitar esta moto', 'Toca otra vez para quitar', function () { DB.deleteVehicle(v.id).then(reloadVehicles).then(renderGarage); });
         if (b.dataset.act === 'addm') openMaintForm(v, null, odo);
         if (b.dataset.act === 'preset') previewPreset(v, odo);
         if (b.dataset.act === 'mdone') markMaintDone(v, b.dataset.m, odo);
@@ -1088,7 +1088,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       rows += '<div class="mitem ' + s.st + '"><button class="edit" type="button" data-act="medit" data-m="' + m.id + '"><div class="mname">' + esc(m.name) + '</div><div class="msub">' + every + ' · ' + when.join(' · ') + (m.lastAt ? ' · última: ' + fmtDate(m.lastAt).toLowerCase() + (m.lastKm ? ' a ' + fmtInt(m.lastKm) + ' km' : '') : '') + '</div></button>' +
         '<span class="mstatus ' + s.st + '">' + ({ ok: '<svg><use href="#i-check"/></svg>al día', soon: '<svg><use href="#i-clock"/></svg>toca pronto', due: '<svg><use href="#i-warn"/></svg>pasada' })[s.st] + '</span><button class="btn small" type="button" data-act="mdone" data-m="' + m.id + '"><svg><use href="#i-check"/></svg>Hecho</button><div class="bar3"><i style="width:' + Math.round(s.frac * 100) + '%"></i></div></div>';
     });
-    return '<div class="maint"><div class="mhead"><span class="label">Mantenimiento</span>' + (items.length ? '<span class="mstatus ' + worst + '">' + ({ ok: '<svg><use href="#i-check"/></svg>todo al día', soon: '<svg><use href="#i-clock"/></svg>algo toca pronto', due: '<svg><use href="#i-warn"/></svg>hay algo pasado' })[worst] + '</span>' : '') + '</div>' +
+    return '<div class="maint"><div class="mhead"><span class="label">Taller</span>' + (items.length ? '<span class="mstatus ' + worst + '">' + ({ ok: '<svg><use href="#i-check"/></svg>todo al día', soon: '<svg><use href="#i-clock"/></svg>algo toca pronto', due: '<svg><use href="#i-warn"/></svg>hay algo pasado' })[worst] + '</span>' : '') + '</div>' +
       (items.length ? rows : '<div class="muted">Lleva el aceite, los filtros y el resto por km: te avisa cuando toca.</div>') +
       '<div class="actions" style="margin-top:var(--sp-2)"><button class="btn small" type="button" data-act="addm"><svg><use href="#i-plus"/></svg>Tarea</button><button class="btn small" type="button" data-act="preset"><svg><use href="#i-sliders"/></svg>' + (isZontes(v) ? 'Plan 703RR' : 'Plan genérico') + '</button></div></div>';
   }
@@ -1164,7 +1164,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   function maintStartupNotice() {
     var due = maintDueSummary().filter(function (x) { return x.st === 'due'; }); if (!due.length) return;
     var key = 'inclina.maintNotice', last = LS.get(key, 0); if (Date.now() - last < 86400000) return; LS.set(key, Date.now());
-    toast('Mantenimiento pendiente: ' + due.slice(0, 2).map(function (x) { return x.m.name + ' (' + x.v.name + ')'; }).join(', ') + (due.length > 2 ? ' y ' + (due.length - 2) + ' más' : '') + '. Míralo en el garaje.', 'warn');
+    toast('Taller pendiente: ' + due.slice(0, 2).map(function (x) { return x.m.name + ' (' + x.v.name + ')'; }).join(', ') + (due.length > 2 ? ' y ' + (due.length - 2) + ' más' : '') + '. Míralo en el garaje.', 'warn');
   }
   function openVehicleForm(v) {
     editingVehicle = v || null; vType = v ? v.type : 'moto';

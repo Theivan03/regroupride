@@ -50,12 +50,11 @@
     var P = api(); if (!P) return Promise.resolve();
     return sb.rpc('groups_list', { p_community: c.id }).then(function (r) {
       var rows = ok(r) || []; if (!host.isConnected) return;
-      host.innerHTML = (P.isAdmin() ? '<button class="btn big primary club-add" id="grNew" type="button"><svg><use href="#i-plus"/></svg>Nueva charla</button>' : '') +
-        (rows.length ? rows.map(function (g) {
+      host.innerHTML = (rows.length ? '<div class="as-rows">' + rows.map(function (g) {
           var d = g.last ? new Date(g.last.at) : null;
-          return '<button class="gr-item" data-id="' + g.id + '" type="button"><span class="gr-ico">' + (g.kind === 'routes' ? '<svg><use href="#i-route"/></svg>' : '<svg><use href="#i-people"/></svg>') + '</span><span class="gr-info"><b>' + esc(g.name) + (g.is_private ? ' <small class="rt-tag">Privado</small>' : '') + '</b>' +
+          return '<button class="as-row gr-item" data-id="' + g.id + '" type="button"><span class="as-ico">' + (g.kind === 'routes' ? '<svg><use href="#i-route"/></svg>' : '<svg><use href="#i-people"/></svg>') + '</span><span class="gr-info"><b>' + esc(g.name) + (g.is_private ? '<i class="as-tag">privado</i>' : '') + '</b>' +
             '<small>' + (g.last ? esc(g.last.name) + ': ' + esc(g.last.body) : (g.description ? esc(g.description) : 'Todavía no hay mensajes')) + '</small></span><span class="gr-side">' + (d ? '<time>' + (d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : d.getDate() + '/' + (d.getMonth() + 1)) + '</time>' : '') + (g.muted ? '<i class="gr-muted" title="Silenciado">' + BELL + '</i>' : '') + '</span></button>';
-        }).join('') : '<div class="empty">Todavía no hay charlas.' + (P.isAdmin() ? ' Crea uno para avisos, para charlar o para que la gente comparta sus rutas.' : ' Los administradores pueden crear charlas para hablar o compartir rutas.') + '</div>');
+        }).join('') + '</div>' : '<div class="empty small"><b>Aún no hay grupos</b>' + (P.isAdmin() ? 'Crea uno para charlar o para que la gente comparta sus rutas.' : 'Los administradores pueden crear grupos para hablar o compartir rutas.') + '</div>') + (P.isAdmin() ? '<button class="btn" id="grNew" type="button"><svg><use href="#i-plus"/></svg>Nuevo grupo</button>' : '');
       if ($('#grNew')) $('#grNew').addEventListener('click', function () { form(c, null); });
       $$('.gr-item', host).forEach(function (b) { b.addEventListener('click', function () { openGroup(c, rows.filter(function (x) { return x.id === b.dataset.id; })[0]); }); });
     });
@@ -64,7 +63,7 @@
   /* ---------- crear o editar un grupo ---------- */
   function form(c, g) {
     var P = api();
-    Cl.sheet(head(g ? 'Editar charla' : 'Nueva charla') + '<form class="rg-form" id="gfForm">' +
+    Cl.sheet('<div data-full></div>' + head(g ? 'Editar grupo' : 'Nuevo grupo') + '<form class="rg-form" id="gfForm">' +
       (g ? '' : '<label>Tipo de charla<select id="gfKind"><option value="chat">Charla: mensajes de texto</option><option value="routes">Rutas: cada uno comparte las suyas</option></select></label>') +
       '<label>Nombre<input id="gfName" required minlength="2" maxlength="50" placeholder="Quedadas entre semana" value="' + esc(g ? g.name : '') + '"></label>' +
       '<label>Descripción (opcional)<input id="gfDesc" maxlength="140" value="' + esc(g ? g.description : '') + '"></label>' +
@@ -110,8 +109,8 @@
   function openGroup(c, g) {
     var P = api(); clearInterval(timer);
     var routes = g.kind === 'routes', last = -1, muted = !!g.muted, bikes = {};
-    Cl.sheet(head(esc(g.name)) + '<p class="muted gr-sub">' + (routes ? 'Charla de rutas · ' : '') + WRITE[g.can_write] + (g.is_private ? ' · Privado' : '') + (g.description ? ' · ' + esc(g.description) : '') + '</p>' +
-      '<div class="gr-bar"><button class="ev-bell" id="grBell" type="button" aria-pressed="' + !muted + '" aria-label="Avisos de la charla">' + BELL + '</button><span class="muted rg-small" id="grBellTx"></span>' + (P.isAdmin() ? '<button class="btn small" id="grEdit" type="button"><svg><use href="#i-edit"/></svg>Editar</button>' : '') + '</div>' +
+    Cl.sheet('<div data-full></div>' + head(esc(g.name)) + '<p class="muted gr-sub">' + esc(c.name) + ' · ' + (routes ? 'grupo de rutas · ' : '') + WRITE[g.can_write] + (g.is_private ? ' · privado' : ' · público') + (g.count ? ' · ' + g.count + (g.count === 1 ? ' persona' : ' personas') : '') + (g.description ? ' · ' + esc(g.description) : '') + '</p>' +
+      '<div class="gr-bar"><button class="ev-bell" id="grBell" type="button" aria-pressed="' + !muted + '" aria-label="Avisos del grupo">' + BELL + '</button><span class="muted rg-small" id="grBellTx"></span>' + (P.isAdmin() ? '<button class="btn small" id="grEdit" type="button"><svg><use href="#i-edit"/></svg>Editar</button>' : '') + '</div>' +
       (g.pinned ? '<div class="rt-note tip gr-pin"><b>Fijado</b><p>' + esc(g.pinned) + '</p></div>' : '') +
       '<div class="ev-chat" id="grList" data-g="' + g.id + '"><p class="muted">Cargando…</p></div>' +
       (g.writes ? (routes ? '<button class="btn big primary" id="grShare" type="button"><svg><use href="#i-route"/></svg>Compartir una ruta</button>'
@@ -134,7 +133,7 @@
             if (k !== day) { day = k; sep = '<span class="ev-chat-day">' + d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) + '</span>'; }
             var rt = x.route_name ? '<div class="gr-route"><b><svg><use href="#i-route"/></svg>' + esc(x.route_name) + '</b><span>' + String(+x.route_km || 0).replace('.', ',') + ' km</span><div class="rt-acts"><button class="btn small primary" data-r="see" type="button">Ver en el mapa</button><button class="btn small" data-r="save" type="button">Guardar</button>' + (P.isAdmin() ? '<button class="btn small" data-r="cat" type="button">Al catálogo</button>' : '') + '</div></div>' : '';
             return sep + '<div class="ev-msg' + (mine ? ' me' : '') + '" data-id="' + x.id + '" data-u="' + x.user_id + '">' + (mine ? '' : P.ava(x.user_id)) + '<div><b>' + esc(P.who(x.user_id)) + (bikeOf(x.user_id) ? ' <small>· ' + esc(bikeOf(x.user_id)) + '</small>' : '') + '</b>' + rt + (x.body ? '<p>' + esc(x.body) + '</p>' : '') +
-              '<time>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '<button class="gr-more" data-m="1" type="button" aria-label="Más">⋯</button></time>' +
+              '<time>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '<button class="gr-more" data-m="1" type="button" aria-label="Más">···</button></time>' +
               '<div class="gr-acts" hidden>' + (mine || P.isAdmin() ? '<button class="link danger" data-m="del" type="button">Borrar</button>' : '') + (P.isAdmin() && x.body ? '<button class="link" data-m="pin" type="button">Fijar</button>' : '') + (mine ? '' : '<button class="link danger" data-m="rep" type="button">Reportar</button><button class="link" data-m="hide" type="button">No ver más</button>') + '</div></div></div>';
           }).join('') : '<p class="muted">' + (routes ? 'Nadie ha compartido una ruta todavía. Sé el primero.' : 'Todavía no ha escrito nadie.') + '</p>';
           if (stick) el.scrollTop = el.scrollHeight;

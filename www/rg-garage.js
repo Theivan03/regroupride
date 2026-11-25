@@ -86,7 +86,7 @@
       var th = x.n < 0 ? 0 : x.n <= 7 ? 7 : x.n <= 30 ? 30 : null, was = told[x.d.id];
       if (th != null && (was == null || was > th)) {
         told[x.d.id] = th; ch = true; var body = x.t + ' de ' + (x.v.name || 'tu moto') + (x.n < 0 ? ': venció el ' + dmy(x.d.date) + '.' : x.n === 0 ? ': vence hoy.' : ': vence en ' + x.n + ' días (' + dmy(x.d.date) + ').');
-        try { if (RA && RA.newsNow) RA.newsNow({ items: [{ kind: 'note', id: 'doc-' + x.d.id + '-' + th, community: 'Garaje', head: x.n < 0 ? 'Documento vencido' : 'Vencimiento cerca', title: body }], silent: false }).catch(function () {}); else A.toast('Aviso del garaje · ' + body, 'warn'); } catch (e) {}
+        try { if (RA && RA.newsNow) RA.newsNow({ items: [{ kind: 'note', id: 'doc-' + x.d.id + '-' + th, community: 'Mi moto', head: x.n < 0 ? 'Documento vencido' : 'Vencimiento cerca', title: body }], silent: false }).catch(function () {}); else A.toast('Aviso del garaje · ' + body, 'warn'); } catch (e) {}
       }
       [30, 7, 0].forEach(function (k) { var at = new Date(x.d.date + 'T10:00:00').getTime() - k * 864e5; if (at < Date.now() + 36e5) return; var h = 0, key = x.d.id + ':' + k + ':' + x.d.date; for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0; var id = 700000000 + Math.abs(h) % 90000000; next[id] = 1; if (!ids[id]) add.push({ id: id, title: k ? 'Vencimiento cerca' : 'Vence hoy', body: x.t + ' de ' + (x.v.name || 'tu moto') + (k ? ': vence en ' + k + ' días.' : ': vence hoy.'), schedule: { at: new Date(at), allowWhileIdle: true } }); });
     });

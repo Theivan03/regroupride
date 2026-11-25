@@ -27,19 +27,19 @@
   /* ---------- abrir un viaje ---------- */
   function open(id, tab) {
     if (!me()) { Cl.openAuth(false); return; }
-    Cl.sheet(head('Viaje') + '<p class="muted">Cargando…</p>'); $('#trX').addEventListener('click', Cl.closeSheet);
+    Cl.sheet(head('Salida') + '<p class="muted">Cargando…</p>', 'full'); $('#trX').addEventListener('click', Cl.closeSheet);
     Promise.all([
       sb.from('events').select('id,community_id,title,description,starts_at,ends_at,meet_name,meet_url,capacity,trip,communities(name,kind,join_code)').eq('id', id).maybeSingle(),
       sb.from('event_attendees').select('user_id,status,companion,bike,joined_at').eq('event_id', id),
       sb.rpc('can_run_event', { eid: id })
     ]).then(function (r) {
-      var ev = ok(r[0]); if (!ev) throw new Error('Ese viaje ya no existe o no tienes acceso.');
+      var ev = ok(r[0]); if (!ev) throw new Error('Esa salida ya no existe o no tienes acceso.');
       var att = ok(r[1]) || [];
       T = { ev: ev, trip: ev.trip || { days: [], budget: [] }, att: att, names: {}, admin: r[2].data === true, tab: tab || 'plan', exp: null, paid: null, guests: [] };
       T.trip.days = T.trip.days || []; T.trip.budget = T.trip.budget || [];
       var ids = att.map(function (a) { return a.user_id; });
       return ids.length ? sb.from('profiles').select('id,name,avatar_url,bike_brand,bike_model').in('id', ids).then(function (p) { (p.data || []).forEach(function (x) { T.names[x.id] = x; }); }) : null;
-    }).then(draw).catch(function (e) { Cl.sheet(head('Viaje') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>'); $('#trX').addEventListener('click', Cl.closeSheet); });
+    }).then(draw).catch(function (e) { Cl.sheet(head('Salida') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>', 'full'); $('#trX').addEventListener('click', Cl.closeSheet); });
   }
   function reload(tab) { if (T) open(T.ev.id, tab || T.tab); }
 
@@ -47,14 +47,14 @@
     var ev = T.ev, t = T.trip, s = new Date(ev.starts_at), e = ev.ends_at ? new Date(ev.ends_at) : dayDate(ev, Math.max(0, t.days.length - 1)), mine = (T.att.filter(function (a) { return a.user_id === me(); })[0] || {}).status;
     var km = t.days.reduce(function (n, d) { return n + num(d.km); }, 0), nights = t.days.filter(function (d) { return d.stay && d.stay.name; }).length, priv = ev.communities && ev.communities.kind === 'trip';
     var top = head(esc(ev.title)) +
-      '<p class="muted tr-sub">' + dstr(s) + (ymd(e) !== ymd(s) ? ' → ' + dstr(e) + ' ' + e.getFullYear() : ' ' + s.getFullYear()) + (priv ? ' · Viaje entre amigos' : ' · ' + esc(ev.communities ? ev.communities.name : '')) + '</p>' +
+      '<p class="muted tr-sub">' + dstr(s) + (ymd(e) !== ymd(s) ? ' → ' + dstr(e) + ' ' + e.getFullYear() : ' ' + s.getFullYear()) + (priv ? ' · Entre amigos' : ' · ' + esc(ev.communities ? ev.communities.name : '')) + '</p>' +
       '<div class="tr-kpis"><div><b>' + Math.max(t.days.length, 1) + '</b><span>' + (t.days.length === 1 ? 'día' : 'días') + '</span></div><div><b>' + Math.round(km) + '</b><span>km</span></div><div><b>' + nights + '</b><span>' + (nights === 1 ? 'noche' : 'noches') + '</span></div><div><b>' + going().length + (ev.capacity ? '<small>/' + ev.capacity + '</small>' : '') + '</b><span>van</span></div></div>' +
       '<div class="tr-me">' + (mine === 'going' || mine === 'offered' ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>Vas</span><button class="link danger" data-go="no" type="button">No puedo ir</button>' : mine === 'waiting' ? '<span class="mstatus soon">En lista de espera</span><button class="link danger" data-go="no" type="button">Quitarme</button>' : '<button class="btn primary" data-go="going" type="button">Apuntarme al viaje</button>') +
         (window.RGClub && RGClub.chat && (mine === 'going' || mine === 'waiting' || mine === 'offered' || T.admin) ? '<button class="btn small" id="trChat" type="button"><svg><use href="#i-people"/></svg>Chat</button>' : '') +
         (T.admin ? '<button class="btn small" id="trEdit" type="button"><svg><use href="#i-edit"/></svg>Editar</button>' : '') + '</div>' +
       (priv && T.admin ? '<div class="tr-code"><span>Código para invitar</span><b>' + esc(ev.communities.join_code) + '</b><button class="btn small" id="trShare" type="button"><svg><use href="#i-share"/></svg>Compartir</button></div>' : '') +
       '<div class="seg rg-wide" id="trTabs">' + [['plan', 'Plan'], ['money', 'Gastos'], ['people', 'Gente']].map(function (x) { return '<button type="button" data-t="' + x[0] + '" aria-pressed="' + (T.tab === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div><div id="trPane"></div>';
-    Cl.sheet(top);
+    Cl.sheet(top, 'full');
     $('#trX').addEventListener('click', Cl.closeSheet);
     $$('#trTabs button').forEach(function (b) { b.addEventListener('click', function () { T.tab = b.dataset.t; $$('#trTabs button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); pane(); }); });
     $$('[data-go]').forEach(function (b) { b.addEventListener('click', function () {
@@ -62,9 +62,9 @@
     }); });
     if ($('#trChat')) $('#trChat').addEventListener('click', function () { RGClub.chat(ev); });
     if ($('#trEdit')) $('#trEdit').addEventListener('click', edit);
-    if (T.admin) { var sh = document.querySelector('#rgSheet .rg-sheet-in') || document.getElementById('rgSheet'), del = document.createElement('button'); del.type = 'button'; del.className = 'link danger rg-center tr-del'; del.textContent = 'Borrar este viaje'; sh.appendChild(del);
+    if (T.admin) { var sh = document.querySelector('#rgSheet .rg-sheet-in') || document.getElementById('rgSheet'), del = document.createElement('button'); del.type = 'button'; del.className = 'link danger rg-center tr-del'; del.textContent = 'Borrar esta salida'; sh.appendChild(del);
       del.addEventListener('click', function () {
-        if (!del.dataset.sure) { del.dataset.sure = 1; del.textContent = 'Se borra para todos, con sus etapas, gastos y chat. Toca otra vez para borrarlo'; setTimeout(function () { if (del.isConnected) { delete del.dataset.sure; del.textContent = 'Borrar este viaje'; } }, 6000); return; }
+        if (!del.dataset.sure) { del.dataset.sure = 1; del.textContent = 'Se borra para todos, con sus etapas, gastos y chat. Toca otra vez para borrarlo'; setTimeout(function () { if (del.isConnected) { delete del.dataset.sure; del.textContent = 'Borrar esta salida'; } }, 6000); return; }
         var id = T.ev.id; del.disabled = true;
         sb.rpc('trip_delete', { p_event: id }).then(function (r) { if (r.error) throw r.error; A.toast('Aviso: viaje borrado.', 'ok'); if (window.RGClub && RGClub.inbox) RGClub.inbox(true); list(); }).catch(function (e) { del.disabled = false; A.toast(Cl.msg(e), 'warn'); });
       }); }
@@ -199,7 +199,7 @@
     function f(label, path, attrs, val) { var v = val !== undefined ? val : get(D, path); return '<label>' + label + '<input data-p="' + path.join('.') + '" value="' + esc(v == null ? '' : v) + '" ' + (attrs || '') + '></label>'; }
     function sync() { $$('#trForm [data-p]').forEach(function (el) { var p = el.dataset.p.split('.'); set(D, p, el.type === 'checkbox' ? el.checked : el.value); }); $$('#trForm [data-b]').forEach(function (el) { base[el.dataset.b] = el.value; }); }
     function paint() {
-      Cl.sheet(head('Editar viaje') + '<form class="rg-form" id="trForm">' +
+      Cl.sheet(head('Editar salida de varios días') + '<form class="rg-form" id="trForm">' +
         '<label>Nombre del viaje<input data-b="title" required minlength="2" maxlength="120" value="' + esc(base.title) + '"></label>' +
         '<div class="tr-two"><label>Sale el<input data-b="date" type="date" required value="' + base.date + '"></label><label>Hora<input data-b="time" type="time" required value="' + base.time + '"></label></div>' +
         '<div class="tr-two"><label>Vuelve el<input data-b="end" type="date" required value="' + base.end + '"></label><label>Plazas<input data-b="cap" type="number" min="1" max="500" inputmode="numeric" placeholder="Sin límite" value="' + esc(base.cap) + '"></label></div>' +
@@ -297,10 +297,22 @@
     }).catch(function (e) { Cl.sheet(head('Mis viajes') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>'); $('#trX').addEventListener('click', Cl.closeSheet); });
   }
   // cid: comunidad donde se crea (administradores). Sin cid: viaje entre amigos, con su grupo oculto y su código.
-  function create(cid) {
+  // Salida de varios días. Para quién: mi comunidad (si la administro) o entre amigos, con un código para invitar.
+  function create(cid, title0) {
     var d1 = new Date(Date.now() + 14 * 864e5), d2 = new Date(d1.getTime() + 2 * 864e5);
-    Cl.sheet(head(cid ? 'Nuevo viaje' : 'Viaje entre amigos') + '<p class="muted" style="text-align:left;margin:0">' + (cid ? 'Se publica en la comunidad como una salida de varios días.' : 'Solo lo ve quien tenga el código que tú le pases.') + ' Después añades las etapas, el alojamiento y los gastos.</p>' +
-      '<form class="rg-form" id="trNewF"><label>Nombre del viaje<input id="nT" required minlength="2" maxlength="120" placeholder="Pirineos en tres días"></label><div class="tr-two"><label>Sale el<input id="nA" type="date" required value="' + ymd(d1) + '"></label><label>Vuelve el<input id="nB" type="date" required value="' + ymd(d2) + '"></label></div><button class="btn big primary" type="submit">Crear viaje</button></form>');
+    var adm = (window.RGClub && RGClub.state.list || []).filter(function (c) { return c.role === 'admin'; }), com = cid ? adm.filter(function (c) { return c.id === cid; })[0] || adm[0] : null, who = com ? 'com' : 'priv';
+    Cl.sheet(head('Nueva salida') + '<form class="rg-form" id="trNewF"><label>Nombre<input id="nT" required minlength="2" maxlength="120" placeholder="Pirineos en tres días" value="' + esc(title0 || '') + '"></label>' +
+      '<span class="label">Duración</span><div class="seg" id="nDur"><button type="button" data-d="1" aria-pressed="false"' + (adm.length ? '' : ' disabled') + '>Un día</button><button type="button" data-d="n" aria-pressed="true">Varios días</button></div>' +
+      '<div class="tr-two"><label>Sale el<input id="nA" type="date" required value="' + ymd(d1) + '"></label><label>Vuelve el<input id="nB" type="date" required value="' + ymd(d2) + '"></label></div>' +
+      '<label>Punto de salida<input id="nM" maxlength="120" placeholder="Gasolinera de…"></label>' +
+      '<span class="label">Para quién</span><div class="seg" id="nWho"><button type="button" data-w="com" aria-pressed="' + (who === 'com') + '"' + (adm.length ? '' : ' disabled') + '>Mi comunidad</button><button type="button" data-w="priv" aria-pressed="' + (who === 'priv') + '">Entre amigos</button></div>' +
+      '<p class="muted rg-small" id="nWhoT" style="text-align:left;margin:0"></p>' +
+      '<label>Plazas<input id="nC" type="number" inputmode="numeric" min="1" max="1000" placeholder="Sin límite"></label>' +
+      '<p class="muted rg-small" style="text-align:left;margin:0">Al publicarla se abre para que pongas las etapas de cada día, las paradas, el alojamiento y el presupuesto.</p>' +
+      '<div class="as-fixed"><button class="btn big primary" type="submit">Publicar</button></div></form>', 'full');
+    var whoTx = function () { $('#nWhoT').textContent = who === 'com' ? 'Se publica en ' + (com ? com.name : 'tu comunidad') + ' y avisa a sus miembros.' : (adm.length ? '' : 'Las salidas de la comunidad las publica un administrador. ') + 'Entre amigos: genera un código para invitar y no avisa a ninguna comunidad.'; cid = who === 'com' && com ? com.id : null; }; whoTx();
+    $$('#nWho button').forEach(function (b) { b.addEventListener('click', function () { who = b.dataset.w; $$('#nWho button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); whoTx(); }); });
+    $$('#nDur button').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.d === '1') { Cl.closeSheet(); if (window.RGClub) RGClub.newEvent(); } }); });
     $('#trX').addEventListener('click', Cl.closeSheet);
     $('#trNewF').addEventListener('submit', function (ev) {
       ev.preventDefault();
@@ -308,9 +320,10 @@
       if (isNaN(st) || isNaN(en) || en < st) { A.toast('La vuelta no puede ser antes de la salida.', 'warn'); return; }
       var days = []; for (var i = 0, n = Math.min(30, Math.round((en - st) / 864e5) + 1); i < n; i++) days.push({ id: Math.random().toString(36).slice(2, 10).replace(/[^a-z0-9]/g, 'x').padEnd(8, 'x'), stops: [], stay: {} });
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
-        var job = cid ? sb.from('events').insert({ community_id: cid, title: title, description: '', starts_at: st.toISOString(), ends_at: en.toISOString(), created_by: me(), trip: { days: days, budget: [] } }).select('id').single().then(function (r) { return ok(r).id; })
-          : sb.rpc('trip_create_private', { p_title: title, p_starts: st.toISOString(), p_ends: en.toISOString() }).then(function (r) { var o = ok(r); return sb.from('events').update({ trip: { days: days, budget: [] } }).eq('id', o.event).then(function () { return o.event; }); });
-        return job.then(function (id) { A.toast('Viaje creado. Ahora ponle las etapas.', 'ok'); T = null; open(id); setTimeout(function () { if (T && T.admin && $('#trEdit')) edit(); }, 1500); });
+        var extra = { meet_name: $('#nM').value.trim() || null, capacity: parseInt($('#nC').value, 10) >= 1 ? parseInt($('#nC').value, 10) : null };
+        var job = cid ? sb.from('events').insert(Object.assign({ community_id: cid, title: title, description: '', starts_at: st.toISOString(), ends_at: en.toISOString(), created_by: me(), trip: { days: days, budget: [] } }, extra)).select('id').single().then(function (r) { return ok(r).id; })
+          : sb.rpc('trip_create_private', { p_title: title, p_starts: st.toISOString(), p_ends: en.toISOString() }).then(function (r) { var o = ok(r); return sb.from('events').update(Object.assign({ trip: { days: days, budget: [] } }, extra)).eq('id', o.event).then(function () { return o.event; }); });
+        return job.then(function (id) { Cl.closePages(); if (window.RGClub) { RGClub.inbox(true); RGClub.show(); } T = null; open(id); setTimeout(function () { if (T && T.admin && $('#trEdit')) edit(); }, 1500); });
       });
     });
   }

@@ -59,26 +59,31 @@
   function askForm(e) {
     if (!e) return; var u = Cl.user(), v = (A.vehicles() || []).filter(function (x) { return x.principal; })[0] || (A.vehicles() || [])[0];
     var bike = v ? [v.make, v.model].filter(Boolean).join(' ') || v.name || '' : '', ph = (Cl.ridePhone && Cl.ridePhone()) || '';
-    var s = Cl.sheet(head('Pedir sitio') + '<p style="margin:0;text-align:left"><b>' + esc(e.title) + '</b><br><span class="muted">' + esc(when(e.starts_at)) + ' · ' + esc(e.community) + '</span></p>' +
+    var left = e.capacity ? Math.max(0, e.capacity - (e.taken || 0)) : null, s = Cl.sheet(head('Pedir sitio') + '<p style="margin:0;text-align:left"><b>' + esc(e.title) + '</b><br><span class="muted">' + esc(when(e.starts_at)) + ' · ' + esc(e.community) + (left != null ? ' · ' + (left ? 'quedan ' + left + (left === 1 ? ' plaza' : ' plazas') : 'completa') : '') + '</span></p>' +
       '<form class="rg-form" id="opF"><label>Tu nombre<input id="opN" required minlength="2" maxlength="60" value="' + esc((Cl.profileName && Cl.profileName()) || '') + '"></label>' +
       '<label>Teléfono<input id="opP" type="tel" inputmode="tel" required maxlength="20" value="' + esc(ph) + '"></label>' +
-      '<label>Con qué moto vienes<input id="opB" required minlength="2" maxlength="80" value="' + esc(bike) + '" placeholder="Marca y modelo"></label>' +
+      '<label>Moto<input id="opB" required minlength="2" maxlength="80" value="' + esc(bike) + '" placeholder="Marca y modelo"></label>' +
       '<label class="rg-check"><input type="checkbox" id="opC"><span><b>Voy con acompañante</b></span></label>' +
       '<p class="muted rg-small" style="text-align:left">El organizador verá tu nombre, tu teléfono y tu moto para decidir. ' + (e.approval ? 'Te avisaremos aquí cuando conteste.' : '') + '</p>' +
       '<button class="btn big primary" type="submit">Enviar solicitud</button></form>');
-    $('#opX', s).addEventListener('click', open);
+    $('#opX', s).addEventListener('click', Cl.closeSheet);
     $('#opF', s).addEventListener('submit', function (ev) {
       ev.preventDefault(); var q = { name: $('#opN').value.trim(), phone: $('#opP').value.replace(/[^0-9+]/g, ''), bike: $('#opB').value.trim(), comp: $('#opC').checked };
       Cl.busy(ev.submitter || $('#opF button'), function () {
         return sb.rpc('event_register', { p_event: e.id, p_name: q.name, p_email: u.email, p_phone: q.phone, p_companion: q.comp, p_answers: {}, p_bike: q.bike }).then(function (r) {
           if (r.error) { if (/Falta contestar/i.test(r.error.message || '')) { A.toast('Esta salida pide más datos: se abre su página para apuntarte.', 'warn'); window.open('https://regroupride-eventos.netlify.app/?e=' + e.id, '_blank'); return; } throw r.error; }
-          q.status = r.data.status; q.code = r.data.code; var all = jget('rg.open.req'); all[e.id] = q; jset('rg.open.req', all); open();
+          q.status = r.data.status; q.code = r.data.code; var all = jget('rg.open.req'); all[e.id] = q; jset('rg.open.req', all); Cl.closeSheet(); A.toast('Solicitud enviada. Te avisaremos cuando el organizador conteste.', 'ok'); if (window.RGClub) RGClub.show();
         });
       }).catch(function (x) { A.toast(Cl.msg(x), 'warn'); });
     });
   }
-  var row = $('#exRow');
-  if (row) { var b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.id = 'exOpen'; b.innerHTML = ic('people') + 'Salidas cerca'; row.insertBefore(b, row.firstChild); b.addEventListener('click', open); }
+  var NEAR = { at: 0, p: null };
+  function near() {
+    var f = A.anyFix && A.anyFix(); if (!f || !Cl.user()) return Promise.resolve([]);
+    if (NEAR.p && Date.now() - NEAR.at < 120000) return NEAR.p;
+    NEAR.at = Date.now(); NEAR.p = sb.rpc('open_events_near', { p_lat: f.lat, p_lon: f.lon, p_km: 150 }).then(function (r) { if (r.error) { NEAR.at = 0; return []; } O.rows = r.data || []; refresh(); return O.rows; }, function () { NEAR.at = 0; return []; });
+    return NEAR.p;
+  }
 
   /* ---------- el tiempo de la salida ---------- */
   var WX = {};
@@ -116,13 +121,13 @@
     var told = jget('rg.wx.told'); soon = [];
     ev.forEach(function (e) {
       wxGet(e.meet_lat, e.meet_lon, e.starts_at).then(function (o) {
-        if (!o || !o.bad) return; soon.push({ e: e, o: o }); if (window.RGShell) RGShell.today();
+        if (!o || !o.bad) return; soon.push({ e: e, o: o });
         if (told[e.id]) return; told[e.id] = Date.now(); jset('rg.wx.told', told);
         try { if (RA && RA.newsNow) RA.newsNow({ items: [{ kind: 'note', id: 'wx-' + e.id, community: e.community || 'ReGroupRide', head: 'Previsión de ' + o.why + ' en «' + e.title + '»', title: 'Lluvia ' + o.prob + ' % y rachas de ' + o.gust + ' km/h a la hora de la salida. Prepara el equipo o háblalo en el chat.' }], silent: false }).catch(function () {}); } catch (x) {}
       });
     });
   }
-  (window.RGToday = window.RGToday || []).push(function () { var x = soon[0]; return x && x.e.starts_at > Date.now() ? { i: 'weather', hot: 1, b: 'Previsión de ' + x.o.why, t: x.e.title + ' · lluvia ' + x.o.prob + ' % · rachas ' + x.o.gust + ' km/h', go: function () { if (window.RGClub) RGClub.goto(x.e.community_id, 'events'); } } : null; });
+  (window.RGTodayOff = []).push(function () { var x = soon[0]; return x && x.e.starts_at > Date.now() ? { i: 'weather', hot: 1, b: 'Previsión de ' + x.o.why, t: x.e.title + ' · lluvia ' + x.o.prob + ' % · rachas ' + x.o.gust + ' km/h', go: function () { if (window.RGClub) RGClub.goto(x.e.community_id, 'events'); } } : null; });
   setTimeout(dayBefore, 15000); setInterval(function () { if (document.visibilityState !== 'hidden') dayBefore(); }, 30 * 60000);
-  window.RGOpen = { open: open, wx: wxGet, fill: wxFill };
+  window.RGOpen = { open: function () { if (window.RGClub) RGClub.goto(null, 'events'); }, near: near, ask: askForm, requests: function () { return jget('rg.open.req'); }, status: function (k) { return ST[k] || k; }, wx: wxGet, fill: wxFill };
 })();

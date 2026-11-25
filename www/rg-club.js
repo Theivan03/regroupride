@@ -73,6 +73,7 @@
   function repaint(cid) {
     var c = cur();
     if (!c || c.id !== cid || $('#view-club').hidden || !vis()) return;
+    if (S.top === 'chats' && !S.tab) { paneChats(c); return; }
     var f = ({ events: paneEvents, routes: paneRoutes, groups: paneGroups, board: paneBoard, pages: panePages, members: paneMembers })[S.tab];
     if (f) f(c, false).catch(function () {});
   }
@@ -126,56 +127,108 @@
     }, function (e) { if (!S.loaded) { S.loaded = true; render(); } fail(e); });
   }
 
-  /* ---------- pantalla ---------- */
+  /* ---------- pantalla: Salidas, Chats e Info ---------- */
+  S.top = 'events';
+  function mainPane() { return $('#clPane', box) || $('#clMain', box); }
+  function unreadOf(test) { var it = window.RGShell && RGShell.chatUnread ? RGShell.chatUnread() : []; return it.filter(test).length; }
+  function nTag(n) { return n ? '<i class="as-n">' + (n > 9 ? '9+' : n) + '</i>' : ''; }
+  function dateBlock(t) { var d = new Date(t); return '<span class="as-date"><b>' + d.getDate() + '</b><small>' + d.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '') + '</small></span>'; }
+  function hm2(t) { return new Date(t).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); }
   function render() {
     if (!box) return;
-    var vw = $('#view-club'), keepTop = vw ? vw.scrollTop : 0, oldPane = $('#clPane'), keepH = oldPane ? oldPane.offsetHeight : 0;
-    setTimeout(function () { var p = $('#clPane'); if (p && keepH) { p.style.minHeight = keepH + 'px'; setTimeout(function () { p.style.minHeight = ''; }, 1500); } if (vw && keepTop) vw.scrollTop = keepTop; }, 0);
-    if (!sb) { box.innerHTML = '<div class="empty">No se ha podido conectar con el servidor.</div>'; return; }
-    if (!S.user) { box.innerHTML = '<div class="club-card"><b>Tu comunidad, en un solo sitio</b><p class="muted">Salidas y rutas, avisos, normas y descuentos. Entra en tu cuenta para unirte con el código que te pase el organizador.</p><button class="btn big primary" id="clLogin" type="button">Entrar o crear cuenta</button></div>'; $('#clLogin').addEventListener('click', function () { Cl.openAuth(false); }); return; }
-    if (!S.loaded) { box.innerHTML = '<div class="empty">Cargando…</div>'; return; }
-    if (S.missing) { box.innerHTML = '<div class="notice">Las comunidades aún no están activadas en el servidor. Falta ejecutar el archivo 02_comunidades.sql en Supabase.</div>'; return; }
-    var c = cur();
-    if (!c) { renderJoin(); return; }
-    box.innerHTML = '<div class="club-head"><div class="club-title"><b>' + esc(c.name) + '</b>' + (c.zone || c.style ? '<span class="club-zone">' + icn('locate') + esc([c.zone, c.style].filter(Boolean).join(' · ')) + '</span>' : '') + (c.description ? '<span class="muted">' + esc(c.description) + '</span>' : '') + '</div><div class="club-head-act">' + (isAdmin() ? '<button class="btn small" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '<button class="btn small" id="clInvite" type="button"><svg><use href="#i-share"/></svg>Invitar</button><button class="btn small" data-hm="groups" type="button" aria-pressed="' + (S.tab === 'groups') + '">' + icn('list') + 'Charlas</button><button class="btn small" data-hm="pages" type="button" aria-pressed="' + (S.tab === 'pages') + '">' + icn('info') + 'Info</button><button class="btn small" id="clRetos" type="button">' + icn('star') + 'Retos</button></div></div>' +
-      '<div id="clMine"></div>' +
-      '<div class="pills-wrap"><div class="pills" id="clPills">' + S.list.map(function (x) { return '<button class="pill" type="button" data-cid="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '<button class="pill" type="button" id="clOther" aria-pressed="false">+ Otra comunidad</button></div><span class="pills-more" aria-hidden="true">›</span></div>' +
-      '<div class="seg rg-wide" id="clTabs">' + [['events', 'Salidas'], ['routes', 'Rutas'], ['board', 'Tablón'], ['members', 'Gente']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="clPane"><div class="empty">Cargando…</div></div>';
-    $('#clInvite').addEventListener('click', invite);
-    if ($('#clEdit')) $('#clEdit').addEventListener('click', function () { editCommunity(c); });
-    $('#clOther').addEventListener('click', renderJoin);
-    // la fila de arriba se desliza de lado: una flecha lo indica mientras quede algo por ver
-    var pl = $('#clPills'), more = function () { if (pl) pl.parentNode.classList.toggle('more', pl.scrollWidth - pl.clientWidth - pl.scrollLeft > 8); };
-    if (pl) { pl.addEventListener('scroll', more, { passive: true }); setTimeout(more, 60); setTimeout(more, 600); var on = pl.querySelector('[aria-pressed=true]'); if (on && on.offsetLeft > pl.clientWidth - 80) pl.scrollLeft = on.offsetLeft - 16; }
-    $$('[data-hm]', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.hm; render(); }); });
-    if ($('#clRetos')) $('#clRetos').addEventListener('click', function () { if (window.RGSocial) RGSocial.challenges(c, isAdmin()); });
-    mineBlock();
-    $$('[data-cid]', box).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); render(); }); });
-    $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.tab = b.dataset.t; render(); }); });
-    ({ events: paneEvents, routes: paneRoutes, groups: paneGroups, board: paneBoard, pages: panePages, members: paneMembers })[S.tab](c, true).catch(function (e) { var p = $('#clPane'); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; });
+    var vw = $('#view-club'), keepTop = vw ? vw.scrollTop : 0;
+    setTimeout(function () { if (vw && keepTop) vw.scrollTop = keepTop; }, 0);
+    var c = S.user && S.loaded ? cur() : null, nm = $('#clNameT'), plus = $('#clPlus');
+    if (nm) nm.textContent = c ? c.name : 'Comunidad';
+    if (plus) plus.hidden = !S.user;
+    if (!sb) { box.innerHTML = '<div class="empty"><b>Sin conexión</b>No se ha podido conectar con el servidor.</div>'; return; }
+    if (!S.user) { box.innerHTML = '<div class="empty"><b>Tu comunidad, en un solo sitio</b>Salidas, chats, normas y descuentos. Entra en tu cuenta para unirte con el código que te pase el organizador.</div><button class="btn big primary" id="clLogin" type="button">Entrar o crear cuenta</button>'; $('#clLogin').addEventListener('click', function () { Cl.openAuth(false); }); return; }
+    if (!S.loaded) { box.innerHTML = '<div class="empty"><b>Cargando…</b></div>'; return; }
+    if (S.missing) { box.innerHTML = '<div class="notice">Las comunidades aún no están activadas en el servidor.</div>'; return; }
+    if (!c) S.top = 'events';
+    S.tab = S.top === 'events' ? 'events' : '';
+    var cn = unreadOf(function () { return true; });
+    box.innerHTML = (c ? '<div class="as-tabs" id="clTabs">' + [['events', 'Salidas'], ['chats', 'Chats' + nTag(cn)], ['info', 'Info']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.top === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' : '') +
+      '<div id="' + (S.top === 'events' ? 'clPane' : 'clMain') + '" class="as-col"><div class="empty"><b>Cargando…</b></div></div>';
+    $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.top = b.dataset.t; render(); }); });
+    if (S.top === 'events') { if (c) paneEvents(c, true).catch(function (e) { var p = mainPane(); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; }); else drawEvents(null, [], []); }
+    else if (S.top === 'chats') paneChats(c);
+    else paneInfo(c);
   }
-  function mineBlock() {
-    var el = $('#clMine'); if (!el) return;
-    var ev = IN.events.filter(function (e) { return e.starts_at > Date.now() - 6 * 36e5; }).sort(function (a, b) { return a.starts_at - b.starts_at; }).slice(0, 3);
-    var kind = function (e) { var inClub = e.community_id && S.list.some(function (x) { return x.id === e.community_id; }); return e.is_trip ? (inClub ? 'Viaje · ' + (e.community || '') : 'Viaje entre amigos') : 'Salida · ' + (e.community || ''); };
-    el.innerHTML = ev.length ? '<div class="rg-mine"><span class="label">Estás apuntado a</span>' + ev.map(function (e) { return '<button class="rg-mine-row" type="button" data-me="' + e.id + '"><i class="rg-kind' + (e.is_trip ? ' trip' : '') + '">' + esc(kind(e)) + '</i><b>' + esc(e.title) + '</b><span class="muted">' + esc(fmtWhen(e.starts_at)) + (e.status === 'waiting' ? ' · en espera' : e.status === 'offered' ? ' · ¡tienes plaza!' : '') + '</span></button>'; }).join('') + '</div>' : '';
-    $$('[data-me]', el).forEach(function (b) { b.addEventListener('click', function () { var e = IN.events.filter(function (x) { return x.id === b.dataset.me; })[0]; if (!e) return; if (e.status === 'offered') { offerSheet(e); return; } if (e.is_trip && window.RGTrips) { RGTrips.open(e.id); return; } if (e.community_id && S.list.some(function (x) { return x.id === e.community_id; })) { setCid(e.community_id); S.tab = 'events'; render(); } else if (window.RGTrips) RGTrips.open(e.id); }); });
+  function plusTap() {
+    if (!S.user) { Cl.openAuth(false); return; }
+    var c = cur(); if (c && isAdmin()) { eventForm(c, null); return; }
+    if (window.RGTrips) RGTrips.create(null); else A.toast('Las salidas de la comunidad las crea un administrador.', 'warn');
   }
-  function renderJoin() {
-    box.innerHTML = (S.list.length ? '<button class="btn small" id="clBack" type="button" style="margin-bottom:10px">← Volver a ' + esc(cur().name) + '</button>' : '') + '<div class="club-card"><b>Buscar comunidades</b><p class="muted">Encuentra grupos por nombre o por zona y únete.</p><div class="club-find-box">' + icn('search') + '<input type="text" inputmode="search" enterkeyhint="search" id="clFind" maxlength="40" placeholder="Nombre, pueblo, provincia…" autocomplete="off"></div><div id="clFound" class="club-found"><p class="muted">Cargando…</p></div></div>' +
-      '<div class="club-card"><b>Viajes de varios días</b><p class="muted">Organiza una escapada con etapas, alojamiento y gastos, con tu comunidad o entre amigos.</p><button class="btn" id="clTrips2" type="button" style="width:100%">' + icn('route') + 'Mis viajes</button></div>' +
-      '<div class="club-card"><b>Fotógrafos en ruta</b><p class="muted">Mira qué fotógrafos están hoy en los puertos y dónde, para pasar por delante y llevarte tus fotos.</p><button class="btn" id="clPhoto2" type="button" style="width:100%">' + icn('camera') + 'Ver fotógrafos</button></div>' +
-      '<div class="club-card"><b>Tengo un código</b><p class="muted">Escribe el código que te ha pasado el organizador.</p><div class="plan-link"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn small primary" id="clJoin" type="button">Unirme</button></div></div>' +
-      '<div class="club-card"><b>Crear una comunidad</b><p class="muted">Serás su administrador: podrás crear salidas, publicar avisos e invitar a la gente.</p><input type="text" id="clName" maxlength="60" placeholder="Nombre de la comunidad"><button class="btn" id="clCreate" type="button" style="margin-top:10px;width:100%">Crear comunidad</button></div>';
-    if ($('#clBack')) $('#clBack').addEventListener('click', render);
-    $('#clTrips2').addEventListener('click', function () { if (window.RGTrips) RGTrips.list(); });
-    $('#clPhoto2').addEventListener('click', function () { if (window.RGPhoto) RGPhoto.open('spots'); });
-    var findT = 0; $('#clFind').addEventListener('input', function () { clearTimeout(findT); findT = setTimeout(findCommunities, 350); }); findCommunities();
-    $('#clJoin').addEventListener('click', function (ev) { var code = $('#clCode').value.trim(); if (code.length < 4) { A.toast('Escribe el código.', 'warn'); return; }
-      Cl.busy(ev.currentTarget, function () { return sb.rpc('join_community', { p_code: code }).then(function (r) { if (r.error) throw new Error(/no válido/i.test(r.error.message) ? 'Ese código no existe. Revísalo con el organizador.' : r.error.message); setCid(r.data); A.toast('¡Dentro!', 'ok'); return load().then(render); }); }); });
-    $('#clCreate').addEventListener('click', function (ev) { var name = $('#clName').value.trim(); if (name.length < 2) { A.toast('Ponle un nombre.', 'warn'); return; }
-      Cl.busy(ev.currentTarget, function () { return sb.rpc('create_community', { p_name: name, p_description: '' }).then(function (r) { setCid(ok(r)); A.toast('Comunidad creada. Invita a la gente con el código.', 'ok'); return load().then(render); }); }); });
+  (function () { var n = $('#clName'), pl = $('#clPlus'); if (n) n.addEventListener('click', function () { if (S.user) communities(); else Cl.openAuth(false); }); if (pl) pl.addEventListener('click', plusTap); })();
+  document.addEventListener('rg:page', function (e) { if (!e.detail) { S.tab = S.top === 'events' ? 'events' : ''; if ($('#view-club') && !$('#view-club').hidden) render(); } });
+  // Una pantalla completa con su flecha de volver; dentro, un #clPane para los paneles de siempre.
+  function sub(title, tab, extra) {
+    S.tab = tab;
+    var s = Cl.sheet('<div class="head"><h1>' + esc(title) + '</h1><button class="btn small icon" id="clX" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>' + (extra || '') + '<div id="clPane" class="as-col"><div class="empty"><b>Cargando…</b></div></div>', 'full');
+    $('#clX', s).addEventListener('click', Cl.closeSheet); return s;
   }
+
+  /* ---------- Chats: avisos, los de tus salidas y los grupos ---------- */
+  function paneChats(c) {
+    var host = mainPane(); if (!host) return;
+    var ev = IN.events.filter(function (e) { return e.starts_at > Date.now() - 2 * 864e5 && e.status !== 'offered'; }).sort(function (a, b) { return a.starts_at - b.starts_at; });
+    var row = function (attr, icon, t, sub2, n, ink) { return '<button class="as-row" type="button" ' + attr + '><span class="as-ico' + (ink ? ' ink' : '') + '">' + icn(icon) + '</span><span><b>' + esc(t) + '</b><small>' + esc(sub2) + '</small></span>' + nTag(n) + icn('chev') + '</button>'; };
+    host.innerHTML = '<div class="as-rows">' + row('data-ch="board"', 'bell', 'Avisos', 'Lo que publican los administradores de ' + c.name, unreadOf(function (x) { return x.kind === 'post' && x.community === c.name; }), true) + '</div>' +
+      (ev.length ? '<span class="label">De tus salidas</span><div class="as-rows">' + ev.map(function (e) { return row('data-ch="ev" data-id="' + e.id + '"', 'chat', e.title, fmtWhen(e.starts_at) + (e.community ? ' · ' + e.community : ''), unreadOf(function (x) { return x.event === e.id; })); }).join('') + '</div>' : '') +
+      '<span class="label">Grupos</span><div id="clGroups" class="as-col"><div class="empty small"><b>Cargando…</b></div></div>';
+    $('[data-ch=board]', host).addEventListener('click', function () { sub('Avisos', 'board'); paneBoard(c, true).catch(fail); });
+    $$('[data-ch=ev]', host).forEach(function (b) { b.addEventListener('click', function () { openEvent(b.dataset.id, 'chat'); }); });
+    if (window.RGGroups) RGGroups.pane(c, $('#clGroups', host)).catch(function () { var g = $('#clGroups'); if (g) g.innerHTML = '<div class="empty small"><b>No se ha podido cargar</b></div>'; });
+    if (window.RGShell && RGShell.chatSeen) setTimeout(function () { if (S.top === 'chats' && !$('#view-club').hidden) RGShell.chatSeen(true); }, 2500);
+  }
+
+  /* ---------- Info: la ficha y sus secciones fijas ---------- */
+  function paneInfo(c) {
+    var host = mainPane(); if (!host) return;
+    var paint = function (pages) {
+      if (!host.isConnected) return;
+      var row = function (attr, icon, t, sub2) { return '<button class="as-row" type="button" ' + attr + '>' + icn(icon) + '<span><b>' + esc(t) + '</b>' + (sub2 ? '<small>' + esc(sub2) + '</small>' : '') + '</span>' + icn('chev') + '</button>'; };
+      host.innerHTML = '<div class="as-card"><div class="as-card-h">' + icn('people') + '<span><b>' + esc(c.name) + '</b><small>' + esc([c.zone, c.style].filter(Boolean).join(' · ') || 'Sin zona indicada') + '</small></span></div>' + (c.description ? '<p>' + esc(c.description) + '</p>' : '') +
+        '<div class="as-card-b"><button class="btn" id="clInvite" type="button">' + icn('share') + 'Invitar</button>' + (isAdmin() ? '<button class="btn" id="clEdit" type="button">' + icn('edit') + 'Editar</button>' : '') + '</div></div>' +
+        '<div class="as-rows">' + pages.map(function (p) { return row('data-pg="' + p.id + '"', 'info', p.title, (p.body || '').slice(0, 70)); }).join('') +
+        row('data-in="members"', 'people', 'Gente', 'Quién está en la comunidad') + (window.RGSocial ? row('data-in="retos"', 'star', 'Retos', 'Kilómetros y salidas del periodo') : '') + row('data-in="routes"', 'route', 'Rutas del club', 'El catálogo de la comunidad') +
+        (isAdmin() ? row('data-in="newpage"', 'plus', 'Nueva página', 'Normas, descuentos, talleres…') : '') + '</div>';
+      $('#clInvite', host).addEventListener('click', invite);
+      if ($('#clEdit', host)) $('#clEdit', host).addEventListener('click', function () { editCommunity(c); });
+      $$('[data-pg]', host).forEach(function (b) { b.addEventListener('click', function () { pageView(c, pages.filter(function (p) { return p.id === b.dataset.pg; })[0]); }); });
+      $$('[data-in]', host).forEach(function (b) { b.addEventListener('click', function () {
+        var k = b.dataset.in;
+        if (k === 'members') { sub('Gente', 'members'); paneMembers(c, true).catch(fail); }
+        else if (k === 'retos') RGSocial.challenges(c, isAdmin());
+        else if (k === 'routes') { A.showView('rides'); if (window.RGUI) { RGUI.ruTab('others'); } }
+        else pageForm(c, null);
+      }); });
+    };
+    paint(PGS[c.id] || []);
+    sb.from('community_pages').select('*').eq('community_id', c.id).order('position').order('title').then(function (r) { if (!r.error) { PGS[c.id] = r.data || []; if (S.top === 'info' && cur() && cur().id === c.id) paint(r.data || []); } }, function () {});
+  }
+  var PGS = {};
+  function panePagesBack(c) { if (S.top === 'info' && !$('#view-club').hidden) paneInfo(c); return Promise.resolve(); }
+
+  /* ---------- Comunidades: cambiar, buscar, entrar con código o crear ---------- */
+  function communities() {
+    var c0 = cur();
+    var s = Cl.sheet('<div class="head"><h1>Comunidades</h1><button class="btn small icon" id="clX" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      (S.list.length ? '<span class="label">Las tuyas</span><div class="as-rows">' + S.list.map(function (x) { return '<button class="as-row" type="button" data-cid="' + x.id + '">' + icn('people') + '<span><b>' + esc(x.name) + '</b><small>' + esc([x.zone, x.role === 'admin' ? 'eres administrador' : ''].filter(Boolean).join(' · ')) + '</small></span>' + (c0 && x.id === c0.id ? '<i class="as-tag">activa</i>' : '') + '</button>'; }).join('') + '</div>' : '') +
+      '<span class="label">Buscar otra</span><div class="search">' + icn('search') + '<input type="search" inputmode="search" enterkeyhint="search" id="clFind" maxlength="40" placeholder="Nombre, pueblo, provincia…" autocomplete="off"></div><div id="clFound" class="as-col"></div>' +
+      '<span class="label">Tengo un código</span><div class="as-code"><input type="text" id="clCode" maxlength="8" placeholder="Código" autocapitalize="characters" autocomplete="off"><button class="btn as-ink" id="clJoin" type="button">Unirme</button></div>' +
+      '<button class="btn big" id="clCreate" type="button">' + icn('plus') + 'Crear una comunidad</button>', 'full');
+    $('#clX', s).addEventListener('click', Cl.closeSheet);
+    $$('[data-cid]', s).forEach(function (b) { b.addEventListener('click', function () { setCid(b.dataset.cid); S.top = 'events'; Cl.closeSheet(); render(); }); });
+    var findT = 0; $('#clFind', s).addEventListener('input', function () { clearTimeout(findT); findT = setTimeout(findCommunities, 350); }); findCommunities();
+    $('#clJoin', s).addEventListener('click', function (ev) { var code = $('#clCode').value.trim(); if (code.length < 4) { A.toast('Escribe el código.', 'warn'); return; }
+      Cl.busy(ev.currentTarget, function () { return sb.rpc('join_community', { p_code: code }).then(function (r) { if (r.error) throw new Error(/no válido/i.test(r.error.message) ? 'Ese código no existe. Revísalo con el organizador.' : r.error.message); setCid(r.data); return load().then(function () { Cl.closePages(); render(); }); }); }); });
+    $('#clCreate', s).addEventListener('click', function () { editCommunity(null); });
+  }
+  function renderJoin() { communities(); }
+  function mineBlock() {}
+
   /* ---------- catálogo de rutas de la comunidad: las suben los administradores y cualquiera puede cargarlas ---------- */
   var LEVELS = { facil: 'Fácil', media: 'Media', exigente: 'Exigente' }, RT_COLS = 'id,name,description,kind,level,start_name,dist,dur,created_at,warnings,tips';
   function hm(s) { var m = Math.round((s || 0) / 60), h = Math.floor(m / 60); return h ? h + ' h ' + ('0' + (m % 60)).slice(-2) + ' min' : m + ' min'; }
@@ -276,28 +329,31 @@
       $$('[data-j]', out).forEach(function (b) { b.addEventListener('click', function () {
         Cl.busy(b, function () { return sb.rpc('community_ask', { p_id: b.dataset.j, p_message: '' }).then(function (r2) {
           var res = ok(r2);
-          if (res === 'joined') { setCid(b.dataset.j); A.toast('¡Dentro!', 'ok'); return load().then(render); }
+          if (res === 'joined') { setCid(b.dataset.j); return load().then(function () { Cl.closePages(); render(); }); }
           A.toast('Solicitud enviada. Te aviso cuando un administrador la acepte.', 'ok'); findCommunities();
         }); });
       }); });
     }).catch(function (e) { if ($('#clFound')) $('#clFound').innerHTML = '<p class="muted">' + esc(Cl.msg(e)) + '</p>'; });
   }
   function editCommunity(c) {
-    Cl.sheet('<div class="head"><h1>Editar comunidad</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+    var isNew = !c; c = c || { name: '', description: '', zone: '', style: '', listed: true, mode: 'open' };
+    Cl.sheet('<div class="head"><h1>' + (isNew ? 'Nueva comunidad' : 'Editar comunidad') + '</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
       '<form class="rg-form" id="ceForm"><label>Nombre<input id="ceName" required minlength="2" maxlength="60" value="' + esc(c.name) + '"></label>' +
       '<label>Descripción<textarea id="ceDesc" class="note" maxlength="600" placeholder="Quiénes sois, cuándo soléis salir, qué tipo de rutas hacéis…">' + esc(c.description || '') + '</textarea></label>' +
       '<label>Zona<input id="ceZone" maxlength="60" placeholder="Marina Alta, Alicante" value="' + esc(c.zone) + '"></label>' +
       '<label>Estilo o tipo de motos<input id="ceStyle" maxlength="60" placeholder="Curvas tranquilas, naked y sport, trail…" value="' + esc(c.style) + '"></label>' +
-      '<label class="rg-check"><input type="checkbox" id="ceListed"' + (c.listed ? ' checked' : '') + '><span><b>Aparecer en el buscador de comunidades</b><small>Cualquiera con la app podrá encontraros por nombre o zona. Solo se ve esta ficha: el tablón, las salidas y los miembros siguen siendo solo para quien esté dentro.</small></span></label>' +
-      '<label>Cómo se entra desde el buscador<select id="ceMode">' + Object.keys(MODES).map(function (k) { return '<option value="' + k + '"' + (c.mode === k ? ' selected' : '') + '>' + MODES[k] + '</option>'; }).join('') + '</select></label>' +
-      '<button class="btn big primary" type="submit">Guardar</button></form>');
+      '<label class="rg-check"><input type="checkbox" id="ceListed"' + (c.listed ? ' checked' : '') + '><span><b>Aparecer en el buscador</b><small>Cualquiera con la app podrá encontraros por nombre o zona. Solo se ve esta ficha.</small></span></label>' +
+      '<label>Cómo se entra<select id="ceMode">' + Object.keys(MODES).map(function (k) { return '<option value="' + k + '"' + (c.mode === k ? ' selected' : '') + '>' + MODES[k] + '</option>'; }).join('') + '</select></label>' +
+      '<button class="btn big primary" type="submit">' + (isNew ? 'Crear comunidad' : 'Guardar') + '</button></form>', 'full');
     $('#clX').addEventListener('click', Cl.closeSheet);
     $('#ceForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
+        var vals = { name: $('#ceName').value.trim(), description: $('#ceDesc').value.trim(), zone: $('#ceZone').value.trim(), ride_style: $('#ceStyle').value.trim(), listed: $('#ceListed').checked, join_mode: $('#ceMode').value };
+        if (isNew) return sb.rpc('create_community', { p_name: vals.name, p_description: vals.description }).then(function (r) { var id = ok(r); setCid(id); return sb.from('communities').update(vals).eq('id', id); }).then(function () { listAt = 0; return load(); }).then(function () { Cl.closePages(); S.top = 'info'; render(); });
         return sb.from('communities').update({ name: $('#ceName').value.trim(), description: $('#ceDesc').value.trim(), zone: $('#ceZone').value.trim(), ride_style: $('#ceStyle').value.trim(), listed: $('#ceListed').checked, join_mode: $('#ceMode').value }).eq('id', c.id).select('id').then(function (r) {
           if (!ok(r).length) throw new Error('No se ha guardado: no eres administrador de esta comunidad.');
-          Cl.closeSheet(); A.toast('Comunidad guardada.', 'ok'); listAt = 0; return load().then(render);
+          Cl.closeSheet(); listAt = 0; return load().then(render);
         });
       });
     });
@@ -305,9 +361,8 @@
   function invite() {
     var c = cur(), text = 'Únete a «' + c.name + '» en ReGroupRide. En la app, entra en Comunidad y escribe el código ' + c.code + '.';
     Cl.sheet('<div class="head"><h1>Invitar</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">Pasa este código a quien quieras que entre en «' + esc(c.name) + '». Lo escribe en la pestaña Comunidad.</p><div class="club-code">' + esc(c.code) + '</div><button class="btn" id="clCopy" type="button"><svg><use href="#i-copy"/></svg>Copiar código</button><button class="btn big primary" id="clShare" type="button"><svg><use href="#i-share"/></svg>Compartir invitación</button>' +
-      '<button class="btn rg-skip" id="clNew" type="button">Unirme a otra comunidad o crear una</button>');
+      '');
     $('#clX').addEventListener('click', Cl.closeSheet); $('#clShare').addEventListener('click', function () { share(text); }); $('#clCopy').addEventListener('click', function () { copy(c.code, 'Código copiado'); });
-    $('#clNew').addEventListener('click', function () { Cl.closeSheet(); renderJoin(); });
   }
 
   /* ---------- eventos ---------- */
@@ -414,70 +469,165 @@
     return swr('ev:' + c.id, function () { return fetchEvents(c); }, function (d) { var now = cur(); if (!now || now.id !== c.id) return; S.evAdmins = d.adm || {}; drawEvents(c, d.evs, d.att); }, useCache);
   }
   function drawEvents(c, evs, att) {
-    var pane = $('#clPane'); if (!pane || S.tab !== 'events') return;
-    pane.innerHTML = (isAdmin() ? '<button class="btn big primary club-add" id="evNew" type="button"><svg><use href="#i-plus"/></svg>Nueva salida</button><button class="btn club-add" id="evTrip" type="button">' + icn('route') + 'Nuevo viaje de varios días</button>' : '') + (evs.length ? evs.map(function (e) {
-      var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
-      var taken = takenOf(att, e), queue = queueOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap;
-      var st = mine ? mine.status : 'no', iGo = st === 'going', people = going.length + going.filter(function (x) { return x.companion; }).length;
-      var routeAdm = (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0, canRun = isAdmin() || routeAdm, m = meetOf(e), pos = queue.map(function (x) { return x.user_id; }).indexOf(S.user.id) + 1, dl = deadlineOf(e, mine);
-      // Cuántos hay en lista de espera solo lo ven los administradores; los demás saben si están en ella, nada más.
-      var count = cap ? taken.length + ' de ' + cap + (cap === 1 ? ' plaza' : ' plazas') + (queue.length && canRun ? ' · ' + queue.length + ' en lista de espera' : '')
-        : (going.length ? going.length + (going.length === 1 ? ' moto' : ' motos') + (people > going.length ? ' · ' + people + ' personas' : '') : 'Nadie apuntado todavía');
-      // Tarjeta de evento de la guía: la franja de arriba dice el estado (color, icono y texto) y debajo va lo demás.
-      var ic = function (n) { return '<svg><use href="#i-' + n + '"/></svg>'; };
-      var strip = st === 'going' ? ['si', 'check', 'Estás apuntado'] : st === 'waiting' ? ['espera', 'clock', 'En lista de espera']
-        : st === 'offered' ? ['plaza', 'clock', 'Plaza libre por confirmar'] : ['no', 'info', 'No estás apuntado'];
-      var startBtn = canRun && e.route, mineHtml;
-      if (st === 'offered') mineHtml = '<div class="ev-offer"><b>Ha quedado una plaza libre para ti</b><span>Confirma si vienes' + (dl ? ' antes del ' + fmtWhen(dl).toLowerCase() : '') + '. Si no puedes, pasa al siguiente de la lista.</span><div class="ev-go"><button class="btn small primary" data-act="confirm" type="button">Sí, voy</button><button class="btn small" data-act="no" type="button">No puedo</button></div></div>';
-      else if (st === 'waiting') mineHtml = '<div class="ev-go"><button class="btn small" data-act="no" type="button">' + ic('exit') + 'Salir de la lista</button>';
-      else if (iGo) mineHtml = '<button class="btn small ev-ticket" data-act="ticket" type="button">' + ic('qr') + 'Mi entrada (QR)</button><div class="ev-go"><button class="btn small" data-act="comp" type="button" aria-pressed="' + !!mine.companion + '">Con acompañante</button><button class="btn small" data-act="no" type="button">No voy</button>';
-      else mineHtml = '<div class="ev-go"><button class="btn' + (startBtn ? ' small' : ' big primary') + '" data-act="go" type="button">' + ic('check') + (full ? 'Apuntarme a la lista de espera' : 'Voy') + '</button>';
-      if (st !== 'offered') mineHtml += (e.luma_url ? '<button class="btn small" data-act="luma" type="button">Apuntarse en Luma</button>' : '') + '</div>';
-      var countHtml = '<button class="link ev-count" data-act="who" type="button">' + count + '</button>';
-      return '<div class="club-card ev" data-ev="' + e.id + '"><div class="ev-cover" hidden><div class="ev-cover-img"></div><span class="ev-cover-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b></div><div class="ev-estado ev-estado--' + strip[0] + '">' + ic(strip[1]) + '<span>' + strip[2] + '</span></div><div class="ev-cuerpo">' +
-        '<span class="ev-when">' + fmtWhen(e.starts_at) + '</span><b>' + esc(e.title) + '</b>' +
-        (e.open_near ? '<span class="ev-open">' + ic('eye') + 'Abierta a moteros de fuera</span>' : '') +
-        (m.lat != null ? '<span class="ev-wx" data-wx="' + m.lat + ',' + m.lon + ',' + new Date(e.starts_at).getTime() + '" hidden></span>' : '') + '<div class="ev-x" data-evx="' + e.id + '"></div>' +
-        (m.url ? '<div class="ev-meet"><button class="link" data-act="meet" type="button">' + ic('gmaps') + '<span>Salida: ' + esc(m.name || 'ver en Maps') + '</span></button>' + (m.lat != null ? '<button class="btn small" data-act="gomeet" type="button">' + ic('compass') + 'Ir al punto de salida</button>' : '') + '</div>'
-          : (e.meet_name ? '<span class="muted">Salida: ' + esc(e.meet_name) + '</span>' : '')) + (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
-        (e.route ? '<div class="ev-route"><span>' + ic('route') + esc(e.route.name || 'Ruta') + ' · ' + String(e.route.dist || 0).replace('.', ',') + ' km</span><button class="btn small" data-act="route" type="button">Cargar ruta</button></div>' : '') +
-        (/^https?:\/\//i.test(e.route_url || '') ? '<div class="ev-route"><span>' + ic('gmaps') + 'Ruta en Google Maps</span><button class="btn small" data-act="rurl" type="button">Abrir</button></div>' : '') +
-        (routeAdm && !isAdmin() ? '<div class="ev-admin"><span class="muted rg-small">Eres administrador de esta ruta.</span><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button></div>' : '') +
-        (st === 'offered' ? mineHtml + countHtml : countHtml + mineHtml) +
-        (startBtn ? '<button class="btn big primary ev-start" data-act="start" type="button">' + ic('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
-        ((iGo || st === 'offered') && e.route && !canRun ? '<button class="link" data-act="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '') +
-        (iGo || st === 'waiting' || st === 'offered' || canRun ? '<div class="ev-chat-row"><button class="btn small ev-chat-btn" data-act="chat" type="button">' + ic('people') + 'Chat de los que van</button>' + bellHtml(e.id) + '</div>' : '') +
-        (e.trip ? '<button class="btn small primary ev-chat-btn" data-act="trip" type="button">' + ic('route') + 'Ver el viaje: etapas, alojamiento y gastos</button>' : '') +
-        (canRun ? '<button class="btn small" data-act="manage" type="button">' + ic('people') + 'Inscritos y llegada</button>' : '') +
-        (isAdmin() ? '<div class="ev-admin"><button class="link" data-act="admins" type="button">' + ic('people') + '<span>Administradores<br>de esta ruta' + ((S.evAdmins[e.id] || []).length ? ' (' + S.evAdmins[e.id].length + ')' : '') + '</span></button><button class="link" data-act="edit" type="button">' + ic('edit') + 'Editar</button><button class="link danger" data-act="del" type="button">Borrar</button></div>' : '') + '</div></div>';
-    }).join('') : '<div class="empty">No hay salidas próximas.' + (isAdmin() ? ' Pulsa «Crear» para publicar la primera.' : '') + '</div>');
-    if ($('#evNew')) $('#evNew').addEventListener('click', function () { eventForm(c, null); });
-        if ($('#evTrip')) $('#evTrip').addEventListener('click', function () { if (window.RGTrips) RGTrips.create(c.id); });
-    $$('.ev', pane).forEach(function (card) {
-      var e = evs.filter(function (x) { return x.id === card.dataset.ev; })[0], mine = att.filter(function (x) { return x.event_id === e.id && x.user_id === S.user.id; })[0];
-      var set = function (status, companion, said, bike) {
-        return setStatus(e, mine, status, companion, bike).then(function (got) {
-          ring(c.id, { kind: 'att', eid: e.id });
-          if (got === 'waiting' && (!mine || mine.status !== 'waiting')) { A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn'); setTimeout(closedHelp, 1800); }
-          else if (said) A.toast(said, 'ok');
-          inbox(true); return paneEvents(c);
-        }).catch(fail);
-      };
-      $$('[data-act]', card).forEach(function (b) { b.addEventListener('click', function () {
-        var act = b.dataset.act, st = mine ? mine.status : 'no';
-        if (act === 'go') askRideInfo(e, function (bike) { set('going', mine && mine.companion, st === 'going' ? '' : 'Apuntado. Te lo recordaré el día antes y una hora antes.', bike); });
-        else if (act === 'confirm') askRideInfo(e, function (bike) { set('going', mine && mine.companion, 'Confirmado: la plaza es tuya.', bike); }, mine && mine.bike);
-        else if (act === 'no') set('no', false, st === 'offered' ? 'Vale. La plaza pasa al siguiente de la lista.' : (st === 'waiting' ? 'Has salido de la lista de espera.' : 'Desapuntado.'));
-        else if (act === 'comp') set(st, !(mine && mine.companion));
-        else if (act === 'luma') openUrl(e.luma_url); else if (act === 'rurl') openUrl(e.route_url); else if (act === 'route') loadRoute(e);
-        else if (act === 'meet') openUrl(meetOf(e).url); else if (act === 'gomeet') goMeet(e, b);
-        else if (act === 'start') startEvent(e, b); else if (act === 'enter') enterEvent(e, b); else if (act === 'admins') eventAdmins(c, e);
-        else if (act === 'trip') { if (window.RGTrips) RGTrips.open(e.id); } else if (act === 'bell') toggleMute(e.id); else if (act === 'chat') chatSheet(e); else if (act === 'who') whoGoes(e, att); else if (act === 'ticket') ticketSheet(e); else if (act === 'manage') manageSheet(e);
-        else if (act === 'edit') eventForm(c, e); else if (act === 'del') armed(b, '¿Seguro? Toca otra vez', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); A.toast('Salida borrada.', 'ok'); inbox(true); return paneEvents(c); }).catch(fail); });
-      }); });
-    });
-    covers(c, evs);
+    var pane = $('#clPane', box); if (!pane || S.top !== 'events') return;
+    LASTEV = { c: c, evs: evs, att: att };
+    var uid = S.user.id, mineOf = function (e) { return att.filter(function (x) { return x.event_id === e.id && x.user_id === uid; })[0]; };
+    var going = IN.events.filter(function (e) { return e.starts_at > Date.now() - 12 * 36e5; }).sort(function (a, b) { return a.starts_at - b.starts_at; });
+    var goingIds = {}; going.forEach(function (e) { goingIds[e.id] = 1; });
+    var next = evs.filter(function (e) { var m = mineOf(e); return !goingIds[e.id] && !(m && /going|waiting|offered/.test(m.status)); });
+    var vas = going.map(function (e) {
+      var full = EVS[e.id], days = full && full.trip && full.trip.days ? full.trip.days.length : (e.is_trip ? 2 : 0), km = full && full.route ? full.route.dist : 0, n = unreadOf(function (x) { return x.event === e.id; });
+      var st = e.status === 'offered' ? '<i class="as-tag amber">Tienes plaza</i>' : e.status === 'waiting' ? '<i class="as-tag">En espera</i>' : '<i class="as-tag ink">Vas</i>';
+      return '<div class="as-ev" data-ev="' + e.id + '"><button class="as-ev-main" type="button" data-open="' + e.id + '"><span class="as-ev-cover" data-cover="' + e.id + '">' + dateBlock(e.starts_at) + '</span><span class="as-ev-t"><b>' + esc(e.title) + '</b><small>' + hm2(e.starts_at) + (e.meet_name ? ' · ' + esc(e.meet_name) : '') + '</small><small>' + [days > 1 ? days + ' días' : '', km ? Math.round(km) + ' km' : '', e.community || ''].filter(Boolean).map(esc).join(' · ') + '</small></span></button>' +
+        '<div class="as-ev-b">' + st + '<button class="btn small" type="button" data-chat="' + e.id + '">' + icn('chat') + 'Chat' + nTag(n) + '</button></div></div>';
+    }).join('');
+    var prox = next.map(function (e) {
+      var taken = takenOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap, m = meetOf(e);
+      return '<div class="as-ev" data-ev="' + e.id + '"><button class="as-ev-main" type="button" data-open="' + e.id + '">' + dateBlock(e.starts_at) + '<span class="as-ev-t"><b>' + esc(e.title) + '</b><small>' + hm2(e.starts_at) + (m.name ? ' · ' + esc(m.name) : '') + '</small>' + (cap ? '<small>' + taken.length + ' de ' + cap + ' plazas</small>' : '') + '</span></button>' +
+        (m.lat != null ? '<span class="ev-wx as-wx" data-wx="' + m.lat + ',' + m.lon + ',' + new Date(e.starts_at).getTime() + '" hidden></span>' : '') +
+        '<button class="btn" type="button" data-join="' + e.id + '">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button></div>';
+    }).join('');
+    pane.innerHTML = (vas ? '<span class="label">Vas a</span>' + vas : '') +
+      (c ? '<span class="label">Próximas</span>' + (prox || '<div class="empty small"><b>' + (vas ? 'No hay más salidas' : 'Sin salidas próximas') + '</b>' + (isAdmin() ? 'Pulsa «+» para publicar una.' : 'Cuando un administrador publique una, la verás aquí.') + '</div>') : '') +
+      '<span class="label">Abiertas cerca</span><div id="clOpen" class="as-col"><div class="empty small"><b>Buscando…</b></div></div>' +
+      (c ? '' : '<button class="btn big" id="clFindBtn" type="button">' + icn('search') + 'Buscar comunidad</button>');
+    if ($('#clFindBtn', pane)) $('#clFindBtn', pane).addEventListener('click', communities);
+    $$('[data-open]', pane).forEach(function (b) { b.addEventListener('click', function () { openEvent(b.dataset.open); }); });
+    $$('[data-chat]', pane).forEach(function (b) { b.addEventListener('click', function () { openEvent(b.dataset.chat, 'chat'); }); });
+    $$('[data-join]', pane).forEach(function (b) { b.addEventListener('click', function () { var e = evs.filter(function (x) { return x.id === b.dataset.join; })[0]; if (e) joinEvent(e, mineOf(e), b); }); });
+    if (window.RGOpen && RGOpen.fill) RGOpen.fill(pane);
+    openNear();
+    if (c) coverUrls(c);
   }
+  var LASTEV = null;
+  function joinEvent(e, mine, btn, after) {
+    askRideInfo(e, function (bike) {
+      setStatus(e, mine, 'going', mine && mine.companion, bike).then(function (got) {
+        ring(e.community_id, { kind: 'att', eid: e.id });
+        if (got === 'waiting') { A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn'); setTimeout(closedHelp, 1800); }
+        inbox(true); var c = cur(); return (c && c.id === e.community_id ? paneEvents(c) : Promise.resolve()).then(function () { if (after) after(); else openEvent(e.id); });
+      }).catch(fail);
+    }, mine && mine.bike);
+  }
+  // Salidas de otras comunidades abiertas a gente de fuera: comunidad, distancia y plazas. Abre «Pedir sitio».
+  function openNear() {
+    var host = $('#clOpen'); if (!host) return;
+    if (!window.RGOpen || !RGOpen.near) { host.innerHTML = ''; return; }
+    RGOpen.near().then(function (rows) {
+      var h = $('#clOpen'); if (!h) return; rows = (rows || []).filter(function (e) { return !e.mine; });
+      if (!rows.length) { h.innerHTML = '<div class="empty small"><b>Nada abierto cerca</b>Cuando una comunidad de la zona abra una salida a gente de fuera, saldrá aquí.</div>'; return; }
+      var req = RGOpen.requests();
+      h.innerHTML = rows.slice(0, 12).map(function (e, i) {
+        var left = e.capacity ? Math.max(0, e.capacity - (e.taken || 0)) : null, q = req[e.id], st = q && q.status && q.status !== 'no' ? RGOpen.status(q.status) : '';
+        return '<button class="as-ev as-ev-open" type="button" data-o="' + i + '"><span class="as-ev-main">' + dateBlock(e.starts_at) + '<span class="as-ev-t"><b>' + esc(e.title) + '</b><small>' + esc(e.community) + ' · a ' + e.km + ' km</small><small>' + (st ? esc(st) : left == null ? 'Sin límite de plazas' : left ? 'Quedan ' + left + (left === 1 ? ' plaza' : ' plazas') : 'Completa: lista de espera') + '</small></span>' + icn('chev') + '</span></button>';
+      }).join('');
+      $$('[data-o]', h).forEach(function (b) { b.addEventListener('click', function () { RGOpen.ask(rows[+b.dataset.o]); }); });
+    }, function () { var h = $('#clOpen'); if (h) h.innerHTML = ''; });
+  }
+  // Portadas: la foto que subió el organizador. Sin foto, el bloque de fecha sobre negro.
+  function coverUrls(c) {
+    var put = function () { $$('[data-cover]').forEach(function (el) { var u = COVERS[el.dataset.cover]; if (u && !el.dataset.done) { el.dataset.done = '1'; el.style.backgroundImage = 'url("' + u.replace(/"/g, '') + '")'; el.classList.add('has'); } }); };
+    put(); COVERS._at = COVERS._at || {};
+    if (S.v11 === false || Date.now() - (COVERS._at[c.id] || 0) < 60000) return; COVERS._at[c.id] = Date.now();
+    sb.from('events').select('id,cover_url').eq('community_id', c.id).then(function (r) { if (r.error) { S.v11 = false; return; } S.v11 = true; (r.data || []).forEach(function (x) { if (x.cover_url) COVERS[x.id] = x.cover_url; else delete COVERS[x.id]; }); put(); }, function () {});
+  }
+
+  /* ---------- una salida, a pantalla completa: Plan, Chat, Fotos y Gente (y Gastos si dura varios días) ---------- */
+  var EVP = { id: null, tab: 'plan', e: null, att: [] };
+  function fetchEvent(id) {
+    var q = function (cols) { return sb.from('events').select(cols).eq('id', id).single(); };
+    return q(EV_COLS + (S.v6 !== false ? EV_V6 : '') + ',cover_url' + EV_ROUTE + EV_EMBED).then(function (r) { return r.error ? q('*, event_attendees(*), event_admins(user_id)') : r; }).then(function (r) {
+      var e = ok(r), att = e.event_attendees || [], o = {}, k; for (k in e) if (!/^(event_attendees|event_admins|route_name|route_dist|route_start|route_wp0)$/.test(k)) o[k] = e[k];
+      if (e.route === undefined) o.route = (e.route_name != null || e.route_start) ? { name: e.route_name || '', dist: e.route_dist || 0, coords: e.route_start ? [e.route_start] : [], wps: e.route_wp0 ? [e.route_wp0] : [], lite: true } : null;
+      S.evAdmins[id] = (e.event_admins || []).map(function (a) { return a.user_id; }); if (e.cover_url) COVERS[id] = e.cover_url; EVS[id] = e;
+      return names(att.map(function (x) { return x.user_id; })).catch(function () {}).then(function () { return { e: o, att: att }; });
+    });
+  }
+  function openEvent(id, tab) {
+    if (!S.user) { Cl.openAuth(false); return; }
+    var inb = IN.events.filter(function (x) { return x.id === id; })[0];
+    if (inb && inb.status === 'offered' && !tab) { offerSheet(inb); return; }
+    EVP.tab = tab || 'plan';
+    var cached = LASTEV && LASTEV.evs.filter(function (x) { return x.id === id; })[0];
+    if (cached) { EVP.id = id; EVP.e = cached; EVP.att = LASTEV.att.filter(function (x) { return x.event_id === id; }); eventPage(); }
+    else if (EVP.id !== id || !EVP.e) { EVP.id = id; EVP.e = null; EVP.att = []; Cl.sheet('<div class="head"><h1>' + esc(inb ? inb.title : 'Salida') + '</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><div class="empty"><b>Cargando…</b></div>', 'full'); $('#clX').addEventListener('click', Cl.closeSheet); }
+    else eventPage();
+    fetchEvent(id).then(function (d) { if (EVP.id !== id) return; var was = !!EVP.e; EVP.e = d.e; EVP.att = d.att; var pg = $('#rgPage'); if (pg && !pg.hidden && (!was || $('#evTabs'))) eventPage(true); }).catch(function (x) { if (!EVP.e) { Cl.closeSheet(); fail(x); } });
+  }
+  function eventPage(keep) {
+    var e = EVP.e, att = EVP.att, uid = S.user.id; if (!e) return;
+    var c = S.list.filter(function (x) { return x.id === e.community_id; })[0] || null, admin = !!(c && c.role === 'admin'), routeAdm = (S.evAdmins[e.id] || []).indexOf(uid) >= 0, canRun = admin || routeAdm;
+    var mine = att.filter(function (x) { return x.user_id === uid; })[0], st = mine ? mine.status : 'no', going = att.filter(function (x) { return x.status === 'going'; });
+    var taken = takenOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap, m = meetOf(e), days = e.trip && e.trip.days ? e.trip.days.length : 0;
+    var d = new Date(e.starts_at), today = d.toDateString() === new Date().toDateString(), n = unreadOf(function (x) { return x.event === e.id; });
+    var tabs = [['plan', 'Plan'], ['chat', 'Chat' + nTag(n)], ['fotos', 'Fotos'], ['gente', 'Gente']]; if (days > 1 || e.trip) tabs.push(['gastos', 'Gastos']);
+    if (EVP.tab === 'chat' && !(st === 'going' || st === 'waiting' || st === 'offered' || canRun)) EVP.tab = 'plan';
+    var cover = COVERS[e.id];
+    var fixed;
+    if (st === 'offered') fixed = '<button class="btn big primary" data-f="confirm" type="button">Sí, voy</button><button class="btn" data-f="no" type="button">No puedo</button>';
+    else if (st === 'going') fixed = (today && m.lat != null ? '<button class="btn big primary" data-f="gomeet" type="button">' + icn('compass') + 'Ir al punto de salida</button>' : '') + '<div class="as-vas"><span>' + icn('check') + 'Vas' + (mine.companion ? ' · con acompañante' : '') + '</span><button class="btn small" data-f="no" type="button">Borrarme</button></div>';
+    else if (st === 'waiting') fixed = '<div class="as-vas"><span>' + icn('clock') + 'En lista de espera</span><button class="btn small" data-f="no" type="button">Salir de la lista</button></div>';
+    else fixed = '<button class="btn big primary" data-f="go" type="button">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button>';
+    var keepTop = keep && $('#rgPage .rg-sheet-in') ? $('#rgPage .rg-sheet-in').scrollTop : 0;
+    var s = Cl.sheet('<div class="as-hero' + (cover ? ' has' : '') + '"' + (cover ? ' style="background-image:url(&quot;' + esc(cover) + '&quot;)"' : '') + '><button class="as-hero-b" id="evBack" type="button" title="Volver">' + icn('back') + '</button>' + (canRun ? '<button class="as-hero-b txt" id="evManage" type="button">' + icn('sliders') + 'Gestionar</button>' : '') + '</div>' +
+      '<div class="as-evhead"><span class="as-evwhen">' + esc(fmtWhen(e.starts_at)) + (days > 1 ? ' · ' + days + ' días' : '') + '</span><h1>' + esc(e.title) + '</h1><small>' + esc((c ? c.name : (EVS[e.id] && EVS[e.id].communities && EVS[e.id].communities.name) || 'Entre amigos') + (e.open_near ? ' · abierta a moteros de fuera' : '')) + '</small></div>' +
+      '<div class="as-tabs" id="evTabs">' + tabs.map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (EVP.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+      '<div id="evPane" class="as-col"></div>' + (EVP.tab === 'plan' || EVP.tab === 'gente' ? '<div class="as-fixed" id="evFixed">' + fixed + '</div>' : ''), 'full');
+    s.classList.add('as-evpage'); if (keepTop) $('.rg-sheet-in', s).scrollTop = keepTop;
+    $('#evBack', s).addEventListener('click', function () { clearInterval(chatT); Cl.closeSheet(); });
+    if ($('#evManage', s)) $('#evManage', s).addEventListener('click', function () { manageSheet(e); });
+    $$('#evTabs button', s).forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.t === 'gastos') { if (window.RGTrips) RGTrips.open(e.id, 'money'); return; } clearInterval(chatT); EVP.tab = b.dataset.t; eventPage(); }); });
+    var again = function () { inbox(true); return fetchEvent(e.id).then(function (d2) { EVP.e = d2.e; EVP.att = d2.att; var cc = cur(); if (cc && cc.id === e.community_id) paneEvents(cc).catch(function () {}); if ($('#evTabs')) eventPage(true); }); };
+    var set = function (status, companion, bike) { return setStatus(e, mine, status, companion, bike).then(function (got) { ring(e.community_id, { kind: 'att', eid: e.id }); if (got === 'waiting' && st !== 'waiting') { A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn'); setTimeout(closedHelp, 1800); } return again(); }).catch(fail); };
+    $$('#evFixed [data-f]', s).forEach(function (b) { b.addEventListener('click', function () {
+      var f = b.dataset.f;
+      if (f === 'go') askRideInfo(e, function (bike) { set('going', false, bike); });
+      else if (f === 'confirm') askRideInfo(e, function (bike) { set('going', mine && mine.companion, bike); }, mine && mine.bike);
+      else if (f === 'gomeet') { Cl.closePages(); goMeet(e, b); }
+      else if (f === 'no') armed(b, '¿Seguro? Toca otra vez', function () { set('no', false); });
+    }); });
+    var pane = $('#evPane', s);
+    if (EVP.tab === 'chat') { pane.innerHTML = chatHtml(e); chatWire(e); }
+    else if (EVP.tab === 'fotos') { if (window.RGSocial && RGSocial.albumPane) RGSocial.albumPane(e, pane); else pane.innerHTML = '<div class="empty"><b>Sin fotos</b></div>'; }
+    else if (EVP.tab === 'gente') pane.innerHTML = goersHtml(e, att, c);
+    else {
+      var x = e.extra || {}, row = function (act, icon, t, sub2, btn) { return '<' + (btn ? 'div' : 'button type="button"') + ' class="as-row" data-p="' + act + '">' + icn(icon) + '<span><b>' + t + '</b>' + (sub2 ? '<small>' + sub2 + '</small>' : '') + '</span>' + (btn ? '<button class="btn small" type="button" data-p="' + btn[0] + '">' + btn[1] + '</button>' : icn('chev')) + '</' + (btn ? 'div' : 'button') + '>'; };
+      pane.innerHTML = (e.description ? '<p class="as-desc">' + esc(e.description) + '</p>' : '') + '<div class="as-rows">' +
+        (m.name || m.url ? row('', 'gmaps', 'Punto de salida', esc(m.name || 'Ver en el mapa'), m.lat != null ? ['gomeet', 'Ir'] : m.url ? ['meet', 'Abrir'] : null) : '') +
+        (m.lat != null ? '<div class="as-row as-wxrow">' + icn('weather') + '<span><b>Tiempo</b><small class="ev-wx" data-wx="' + m.lat + ',' + m.lon + ',' + d.getTime() + '">Previsión a la hora de salir, cuando falten menos de 15 días.</small></span></div>' : '') +
+        (e.route ? row('route', 'route', 'Ruta', esc(e.route.name || 'Ruta') + (e.route.dist ? ' · ' + String(e.route.dist).replace('.', ',') + ' km' : '')) : '') +
+        (/^https?:\/\//i.test(e.route_url || '') ? row('rurl', 'gmaps', 'Ruta en Google Maps', '') : '') +
+        (e.trip && window.RGTrips ? row('trip', 'map', 'Etapas y alojamiento', days ? days + ' días' : '') : '') +
+        (window.RGSocial ? row('check', 'check', 'Antes de salir', (x.check && x.check.length ? x.check.length + ' del organizador y lo de siempre' : 'Calzado, guantes, documentación…')) : '') +
+        (x.voice ? row('voice', 'phone', 'Canal de voz', 'Se abre fuera de la app') : '') +
+        (e.luma_url ? row('luma', 'link', 'Apuntarse en Luma', '') : '') +
+        (st === 'going' ? row('ticket', 'qr', 'Mi entrada', 'El QR que se enseña al llegar') : '') +
+        (st === 'going' ? '<label class="as-row as-switch-row"><span><b>Voy con acompañante</b></span><span class="switch"><input type="checkbox" id="evComp"' + (mine.companion ? ' checked' : '') + '><span></span></span></label>' : '') +
+        row('share', 'share', 'Compartir', 'El enlace de la página pública') + '</div>' +
+        (canRun && e.route ? '<button class="btn big" data-p="start" type="button">' + icn('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
+        ((st === 'going' || st === 'offered') && e.route && !canRun ? '<button class="as-link" data-p="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '');
+      if (window.RGOpen && RGOpen.fill) RGOpen.fill(pane);
+      if ($('#evComp', pane)) $('#evComp', pane).addEventListener('change', function (ev) { set('going', ev.target.checked); });
+      $$('[data-p]', pane).forEach(function (b) { if (!b.dataset.p) return; b.addEventListener('click', function (ev) {
+        var a = b.dataset.p; if (b.tagName === 'DIV') return; ev.stopPropagation();
+        if (a === 'gomeet') { Cl.closePages(); goMeet(e, b); } else if (a === 'meet') openUrl(m.url);
+        else if (a === 'route') { Cl.closePages(); loadRoute(e); } else if (a === 'rurl') openUrl(e.route_url);
+        else if (a === 'trip') RGTrips.open(e.id); else if (a === 'check') RGSocial.checklist(e); else if (a === 'voice') openUrl(x.voice); else if (a === 'luma') openUrl(e.luma_url);
+        else if (a === 'ticket') ticketSheet(e, mine);
+        else if (a === 'share') { var u = WEB + '/?e=' + e.id; if (P.Share) P.Share.share({ title: e.title, url: u }).catch(function () {}); else if (navigator.share) navigator.share({ title: e.title, url: u }).catch(function () {}); else copy(u, 'Enlace copiado'); }
+        else if (a === 'start') startEvent(e, b); else if (a === 'enter') enterEvent(e, b);
+      }); });
+    }
+  }
+  function goersHtml(e, att, c) {
+    var going = att.filter(function (x) { return x.status === 'going'; }), off = att.filter(function (x) { return x.status === 'offered'; }), evAd = S.evAdmins[e.id] || [], org = e.created_by;
+    var person = function (uid, tag, comp) { return '<div class="as-row">' + ava(uid) + '<span><b>' + esc(who(uid)) + (tag ? '<i class="as-tag">' + tag + '</i>' : '') + (comp ? '<i class="as-tag">+1</i>' : '') + '</b><small>' + esc(bike(uid)) + '</small></span></div>'; };
+    var people = going.length + going.filter(function (x) { return x.companion; }).length;
+    return (org ? '<span class="label">Organiza</span><div class="as-rows">' + person(org, 'admin') + '</div>' : '') +
+      '<span class="label">Van · ' + going.length + (e.capacity ? ' de ' + e.capacity + ' plazas' : going.length === 1 ? ' moto' : ' motos') + (people > going.length ? ' · ' + people + ' personas' : '') + '</span>' +
+      (going.length || off.length ? '<div class="as-rows">' + going.map(function (g) { return person(g.user_id, evAd.indexOf(g.user_id) >= 0 ? 'admin' : '', g.companion); }).join('') + off.map(function (g) { return person(g.user_id, 'por confirmar', g.companion); }).join('') + '</div>' : '<div class="empty small"><b>Nadie apuntado todavía</b>Sé el primero.</div>');
+  }
+
   // «Ir al punto de salida»: lo pone en el mapa de la app con el camino desde donde estás. «Iniciar ruta» te guía hasta allí.
   function goMeet(e, btn) {
     var m = meetOf(e), label = (m.name || 'Punto de salida').split(',')[0];
@@ -525,9 +675,9 @@
         var cur = S.evAdmins[e.id] || [];
         Cl.sheet('<div class="head"><h1>Administradores de esta ruta</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">' + esc(e.title) + '. Quien marques podrá iniciar esta ruta, recibirá los avisos de SOS, avería y gasolina y podrá repartir los grupos. No será administrador de la comunidad ni de otras rutas.</p><div class="rg-list">' +
           ms.map(function (m) { var on = cur.indexOf(m.user_id) >= 0; return '<div class="club-person" data-u="' + m.user_id + '">' + ava(m.user_id) + '<div><b>' + esc(who(m.user_id)) + '</b><span class="muted">' + (m.role === 'admin' ? 'Administrador de la comunidad' : esc(bike(m.user_id))) + '</span></div>' +
-            (m.role === 'admin' ? '<span class="mstatus ok">Ya puede</span>' : '<button class="btn small' + (on ? ' primary' : '') + '" type="button">' + (on ? 'Admin de la ruta ✓' : 'Hacer admin') + '</button>') + '</div>'; }).join('') + '</div>');
-        $('#clX').addEventListener('click', function () { Cl.closeSheet(); paneEvents(c); });
-        $$('#rgSheet [data-u] .btn').forEach(function (b) { b.addEventListener('click', function () {
+            (m.role === 'admin' ? '<span class="mstatus ok">Ya puede</span>' : '<button class="btn small' + (on ? ' as-ink' : '') + '" type="button">' + (on ? 'Admin de la ruta' : 'Hacer admin') + '</button>') + '</div>'; }).join('') + '</div>');
+        $('#clX').addEventListener('click', function () { Cl.closeSheet(); });
+        $$('#rgPage [data-u] .btn, #rgSheet [data-u] .btn').forEach(function (b) { b.addEventListener('click', function () {
           var uid = b.parentNode.dataset.u, on = (S.evAdmins[e.id] || []).indexOf(uid) >= 0;
           (on ? sb.from('event_admins').delete().eq('event_id', e.id).eq('user_id', uid) : sb.from('event_admins').insert({ event_id: e.id, user_id: uid })).then(function (q) {
             ok(q); S.evAdmins[e.id] = (S.evAdmins[e.id] || []).filter(function (x) { return x !== uid; }); if (!on) S.evAdmins[e.id].push(uid); eventAdmins(c, e);
@@ -560,7 +710,7 @@
     Cl.sheet('<div class="head"><h1>Apuntarme</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p class="muted" style="text-align:left;margin:0">' + esc(e.title) + '</p><form class="rg-form" id="riForm">' +
       (already ? '' : motos.length > 1 ? '<label>¿Con qué moto vienes?<select id="riBike">' + motos.map(function (v) { return '<option' + (v === main ? ' selected' : '') + '>' + esc(name(v)) + '</option>'; }).join('') + '</select></label>'
         : motos.length === 1 ? '<p style="text-align:left;margin:0">Moto: <b>' + esc(name(motos[0])) + '</b></p>'
-        : '<label>¿Con qué moto vienes?<input id="riBikeTxt" required minlength="2" maxlength="80" placeholder="Marca y modelo, p. ej. Zontes 703 RR"></label><p class="muted rg-small" style="text-align:left">Si la añades en Garaje, la próxima vez no te lo pregunto.</p>') +
+        : '<label>¿Con qué moto vienes?<input id="riBikeTxt" required minlength="2" maxlength="80" placeholder="Marca y modelo, p. ej. Zontes 703 RR"></label><p class="muted rg-small" style="text-align:left">Si la añades en Yo › Mi moto, la próxima vez no te lo pregunto.</p>') +
       (needPhone ? '<label>Tu teléfono<input id="riPhone" type="tel" inputmode="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" placeholder="600 000 000"></label><p class="muted rg-small" style="text-align:left">Solo lo ven los administradores de la ruta, para llamarte si no apareces a la salida.</p>' : '') +
       '<button class="btn big primary" type="submit">Apuntarme</button></form>');
     $('#clX').addEventListener('click', Cl.closeSheet);
@@ -576,44 +726,56 @@
   function rpcOk(fn, args) { return sb.rpc(fn, args).then(function (r) { if (r.error) throw r.error; return r.data; }); }
   // Inscritos y llegada (administradores): apuntados de la app y de la web, aprobar, marcar la llegada y leer las entradas.
   var MST = { going: 'Con plaza', offered: 'Plaza ofrecida', waiting: 'En espera', pending: 'Por aprobar', declined: 'Rechazado' }, MORD = ['pending', 'going', 'offered', 'waiting', 'declined'];
-  function manageSheet(e, find) {
-    find = find || '';
+  var MG = { tab: 'att' };
+  function manageSheet(e, tab) {
+    if (tab) MG.tab = tab;
+    var c = S.list.filter(function (x) { return x.id === e.community_id; })[0] || cur(), admin = !!(c && c.role === 'admin');
     var shell = function (body) {
-      Cl.sheet('<div class="head"><h1>Inscritos</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p class="muted" style="text-align:left;margin:0">' + esc(e.title) + '</p>' + body);
-      $('#clX').addEventListener('click', Cl.closeSheet);
+      var s = Cl.sheet('<div class="head"><h1>Gestionar</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p class="muted" style="text-align:left;margin:0">' + esc(e.title) + '</p>' +
+        '<div class="as-tabs" id="mgTabs">' + [['att', 'Asistentes'], ['wait', 'En espera'], ['qr', 'Entrada QR']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (MG.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div id="mgPane" class="as-col">' + body + '</div>', 'full');
+      $('#clX', s).addEventListener('click', Cl.closeSheet);
+      $$('#mgTabs button', s).forEach(function (b) { b.addEventListener('click', function () { manageSheet(e, b.dataset.t); }); });
     };
-    if ($('#rgSheet').hidden) shell('<p class="muted">Cargando…</p>');
+    if (!$('#mgPane')) shell('<div class="empty"><b>Cargando…</b></div>');
     rpcOk('event_manage', { p_event: e.id }).then(function (d) {
       var rows = d.members.map(function (m) { m.kind = 'm'; return m; }).concat(d.guests.map(function (g) { g.kind = 'g'; return g; }));
       rows.sort(function (a, b) { return MORD.indexOf(a.status) - MORD.indexOf(b.status) || a.joined_at - b.joined_at; });
-      var n = function (f) { return rows.filter(f).length; }, again = function () { manageSheet(e, find); };
-      shell('<div class="rg-mstats"><div><b>' + n(function (x) { return x.status === 'going' || x.status === 'offered'; }) + (e.capacity ? '<small> / ' + e.capacity + '</small>' : '') + '</b><span>Con plaza</span></div><div><b>' + n(function (x) { return x.status === 'waiting'; }) + '</b><span>En espera</span></div><div><b>' + n(function (x) { return x.status === 'pending'; }) + '</b><span>Por aprobar</span></div><div><b>' + n(function (x) { return x.checked_in; }) + '</b><span>Han llegado</span></div></div>' +
-        '<button class="btn big primary" id="mgScan" type="button">' + icn('qr') + 'Leer entradas (QR)</button>' +
-        '<div class="rg-form"><input id="mgFind" placeholder="Buscar por nombre, moto o teléfono" value="' + esc(find) + '" autocomplete="off"></div>' +
-        '<div class="rg-list" id="mgList"></div><button class="btn small" id="mgWeb" type="button">' + icn('share') + 'Abrir en la web (respuestas y descarga)</button>');
-      var list = function () {
-        var f = find.toLowerCase(), vis = rows.filter(function (x) { return !f || (x.name + ' ' + (x.phone || '') + ' ' + (x.email || '') + ' ' + (x.bike || '')).toLowerCase().indexOf(f) >= 0; });
-        $('#mgList').innerHTML = vis.length ? vis.map(function (x) {
-          var b = '';
-          if (x.status === 'pending') b = '<button class="btn small primary" data-a="approve" type="button">Aprobar</button><button class="btn small" data-a="decline" type="button">Rechazar</button>';
-          else if (x.status === 'going') b = '<button class="btn small' + (x.checked_in ? '' : ' primary') + '" data-a="' + (x.checked_in ? 'uncheck' : 'checkin') + '" type="button">' + (x.checked_in ? 'Quitar llegada' : 'Ha llegado') + '</button>';
-          else if (x.kind === 'g') b = '<button class="btn small" data-a="approve" type="button">' + (x.status === 'declined' ? 'Aprobar' : 'Dar plaza') + '</button>';
-          return '<div class="club-person rg-mrow" data-i="' + rows.indexOf(x) + '"><span class="rg-ava ' + (x.checked_in ? 'rol-admin' : 'rol-comp') + '">' + esc((x.name || '?').charAt(0).toUpperCase()) + '</span><div><b>' + esc(x.name) + (x.companion ? ' <span class="mstatus">+1</span>' : '') + '</b>' +
-            '<span class="muted rg-small">' + MST[x.status] + ' · ' + (x.kind === 'm' ? 'App' : 'Web') + (x.checked_in ? ' · <b>ha llegado</b>' : '') + '</span>' +
-            '<span class="rg-small rg-mbike">' + icn('bike') + (x.bike ? esc(x.bike) : '<span class="muted">Moto sin indicar</span>') + '</span>' +
-            '<div class="rg-row">' + (x.phone ? '<a class="btn small rg-call" href="tel:' + esc(String(x.phone).replace(/[^0-9+]/g, '')) + '">' + icn('phone') + 'Llamar · ' + esc(x.phone) + '</a>' : '<span class="muted rg-small">Sin teléfono</span>') + b + '</div></div></div>';
-        }).join('') : '<div class="empty">' + (rows.length ? 'Nadie coincide con la búsqueda.' : 'Todavía no se ha apuntado nadie.') + '</div>';
-        $$('#mgList [data-a]').forEach(function (bt) {
-          bt.addEventListener('click', function () {
-            var x = rows[+bt.closest('.rg-mrow').dataset.i], a = bt.dataset.a;
-            Cl.busy(bt, function () { return (x.kind === 'g' ? rpcOk('guest_set', { p_guest: x.id, p_action: a }) : rpcOk('member_checkin', { p_event: e.id, p_user: x.id, p_on: a === 'checkin' })).then(again); });
-          });
-        });
-      };
-      list();
-      $('#mgFind').addEventListener('input', function () { find = this.value.trim(); list(); });
-      $('#mgWeb').addEventListener('click', function () { openUrl(WEB + '/?m=' + e.id); });
-      $('#mgScan').addEventListener('click', function () { scanTickets(e, again); });
+      var again = function () { manageSheet(e); }, of = function (f) { return rows.filter(f); };
+      var act = function (x, a, bt) { Cl.busy(bt, function () { return (x.kind === 'g' ? rpcOk('guest_set', { p_guest: x.id, p_action: a }) : a === 'kick' ? sb.from('event_attendees').update({ status: 'no' }).eq('event_id', e.id).eq('user_id', x.id).then(ok) : rpcOk('member_checkin', { p_event: e.id, p_user: x.id, p_on: a === 'checkin' })).then(again); }); };
+      var who2 = function (x) { return '<span><b>' + esc(x.name) + (x.kind === 'g' ? '<i class="as-tag">web</i>' : '') + (x.companion ? '<i class="as-tag">+1</i>' : '') + '</b><small>' + esc(x.bike || 'Moto sin indicar') + (x.phone ? ' · ' + esc(x.phone) : '') + '</small></span>'; };
+      var body;
+      if (MG.tab === 'att') {
+        var pend = of(function (x) { return x.status === 'pending'; }), go = of(function (x) { return x.status === 'going' || x.status === 'offered'; });
+        body = (pend.length ? '<span class="label">Pide sitio · ' + pend.length + '</span><div class="as-rows">' + pend.map(function (x) { return '<div class="as-row as-req" data-i="' + rows.indexOf(x) + '">' + who2(x) + '<span class="as-req-b"><button class="btn small as-ink" data-a="approve" type="button">Aceptar</button><button class="btn small" data-a="decline" type="button">No esta vez</button></span></div>'; }).join('') + '</div>' : '') +
+          '<span class="label">Apuntados · ' + go.length + (e.capacity ? ' de ' + e.capacity : '') + '</span>' + (go.length ? '<div class="as-rows">' + go.map(function (x) { return '<div class="as-row" data-i="' + rows.indexOf(x) + '">' + who2(x) + '<button class="as-x" data-more="1" type="button" title="Más">' + icn('more') + '</button></div>'; }).join('') + '</div>' : '<div class="empty small"><b>Nadie apuntado todavía</b>Comparte la salida para que se apunten.</div>') +
+          '<div class="as-two"><button class="btn" id="mgEdit" type="button">' + icn('edit') + 'Editar salida</button><button class="btn" id="mgChat" type="button">' + icn('chat') + 'Escribirles</button></div>' +
+          (admin ? '<div class="as-rows"><button class="as-row" id="mgAdmins" type="button">' + icn('people') + '<span><b>Administradores de esta ruta</b><small>Quién puede iniciarla y recibe los avisos</small></span>' + icn('chev') + '</button><button class="as-row danger" id="mgDel" type="button">' + icn('trash') + '<span><b>Borrar la salida</b></span></button></div>' : '') +
+          '<p class="muted rg-small" style="text-align:left;margin:0">Las preguntas a los inscritos, la aprobación y la descarga de la lista se configuran en la web.</p><button class="as-link" id="mgWeb" type="button">Abrir en la web</button>';
+      } else if (MG.tab === 'wait') {
+        var q = of(function (x) { return x.status === 'waiting'; });
+        body = q.length ? '<span class="label">En orden de llegada</span><div class="as-rows">' + q.map(function (x) { return '<div class="as-row" data-i="' + rows.indexOf(x) + '">' + who2(x) + (x.kind === 'g' ? '<button class="btn small" data-a="approve" type="button">Ofrecer plaza</button>' : '') + '</div>'; }).join('') + '</div><p class="muted rg-small" style="text-align:left;margin:0">Si alguien se borra, la plaza se ofrece sola al siguiente, que debe confirmar.</p>'
+          : '<div class="empty"><b>' + (e.capacity ? 'Nadie en espera' : 'Esta salida no tiene límite') + '</b>' + (e.capacity ? 'Cuando se llene, quien se apunte quedará aquí en orden de llegada.' : 'Con un límite de plazas, quien se apunte cuando esté llena queda en lista de espera.') + '</div>' + (e.capacity ? '' : '<button class="btn big" id="mgCap" type="button">Poner límite de plazas</button>');
+      } else {
+        var g2 = of(function (x) { return x.status === 'going'; }), inN = g2.filter(function (x) { return x.checked_in; }).length;
+        body = '<div class="as-figs one"><div><b class="cifra">' + inN + '<small>de ' + g2.length + '</small></b><span>Han llegado</span></div></div>' + (g2.length ? '<div class="as-rows">' + g2.map(function (x) { return '<div class="as-row" data-i="' + rows.indexOf(x) + '">' + who2(x) + '<button class="as-tagbtn' + (x.checked_in ? ' on' : '') + '" data-a="' + (x.checked_in ? 'uncheck' : 'checkin') + '" type="button">' + (x.checked_in ? 'Ha llegado' : 'Sin llegar') + '</button></div>'; }).join('') + '</div>' : '<div class="empty small"><b>Nadie apuntado todavía</b></div>') +
+          '<div class="as-fixed"><button class="btn big primary" id="mgScan" type="button">' + icn('qr') + 'Escanear entrada</button></div>';
+      }
+      shell(body);
+      $$('#mgPane [data-a]').forEach(function (bt) { bt.addEventListener('click', function () { act(rows[+bt.closest('[data-i]').dataset.i], bt.dataset.a, bt); }); });
+      $$('#mgPane [data-more]').forEach(function (bt) { bt.addEventListener('click', function () {
+        var x = rows[+bt.closest('[data-i]').dataset.i];
+        var sh = Cl.sheet('<div class="head"><h1>' + esc(x.name) + '</h1><button class="btn small icon" id="mmX" type="button"><svg><use href="#i-close"/></svg></button></div><div class="as-rows">' + (x.phone ? '<a class="as-row" href="tel:' + esc(String(x.phone).replace(/[^0-9+]/g, '')) + '">' + icn('phone') + '<span><b>Llamar</b><small>' + esc(x.phone) + '</small></span></a>' : '') +
+          '<button class="as-row" data-m="kick" type="button">' + icn('exit') + '<span><b>Quitar de la salida</b></span></button>' + (x.kind === 'm' && window.RGGroups ? '<button class="as-row danger" data-m="rep" type="button">' + icn('warn') + '<span><b>Reportar</b></span></button>' : '') + '</div>');
+        $('#mmX', sh).addEventListener('click', Cl.closeSheet);
+        $$('[data-m]', sh).forEach(function (b2) { b2.addEventListener('click', function () { Cl.closeSheet(); if (b2.dataset.m === 'rep') RGGroups.report({ target: x.id, name: x.name, kind: 'persona', place: e.title, back: function () { Cl.closeSheet(); } }); else (x.kind === 'g' ? rpcOk('guest_set', { p_guest: x.id, p_action: 'decline' }) : sb.from('event_attendees').update({ status: 'no' }).eq('event_id', e.id).eq('user_id', x.id).then(ok)).then(again, fail); }); });
+      }); });
+      if ($('#mgEdit')) $('#mgEdit').addEventListener('click', function () { eventForm(c, EVS[e.id] && EVS[e.id].title ? e : e); });
+      if ($('#mgChat')) $('#mgChat').addEventListener('click', function () { Cl.closeSheet(); openEvent(e.id, 'chat'); });
+      if ($('#mgAdmins')) $('#mgAdmins').addEventListener('click', function () { eventAdmins(c, e); });
+      if ($('#mgDel')) $('#mgDel').addEventListener('click', function (ev) { armed(ev.currentTarget, 'Toca otra vez para borrarla', function () { sb.from('events').delete().eq('id', e.id).then(function (r) { ok(r); Cl.closePages(); inbox(true); render(); }).catch(fail); }); });
+      if ($('#mgWeb')) $('#mgWeb').addEventListener('click', function () { openUrl(WEB + '/?m=' + e.id); });
+      if ($('#mgCap')) $('#mgCap').addEventListener('click', function () { eventForm(c, e, 'cap'); });
+      if ($('#mgScan')) $('#mgScan').addEventListener('click', function () { scanTickets(e, again); });
     }).catch(function (x) { shell('<div class="notice">' + esc(Cl.msg ? Cl.msg(x) : (x && x.message) || 'No se ha podido cargar la lista.') + '</div>'); });
   }
   // Lector de entradas: la cámara lee el QR y el servidor marca la llegada. Si no hay cámara, se escribe el código.
@@ -665,15 +827,15 @@
   }
   setTimeout(loadMutes, 2500); setInterval(function () { if (MUTES === null) loadMutes(); }, 6000);
   var chatT = 0;
-  function chatSheet(e) {
-    clearInterval(chatT);
-    Cl.sheet('<div class="head"><h1>Chat de la salida</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
-      '<p class="muted" style="text-align:left;margin:0">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + '. Solo lo ven quienes van y los administradores.</p>' +
-      '<div class="ev-chat" id="chList"><p class="muted">Cargando…</p></div>' +
+  function chatSheet(e) { openEvent(e.id, 'chat'); }
+  function chatHtml(e) {
+    return '<div class="ev-chat" id="chList"><p class="muted">Cargando…</p></div>' +
       '<form class="ev-chat-form" id="chForm"><input id="chIn" maxlength="1000" autocomplete="off" enterkeyhint="send" placeholder="Escribe un mensaje…" aria-label="Mensaje"><button class="ch-send" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></form>' +
-      '<div class="ch-mute"><span id="chMuteTx" data-ev="' + e.id + '"></span>' + bellHtml(e.id).replace(' data-act="bell"', '') + '</div>');
-    $('#rgSheet [data-bell]').addEventListener('click', function () { toggleMute(e.id); }); paintBells(); if (MUTES === null) loadMutes();
-    $('#clX').addEventListener('click', function () { clearInterval(chatT); Cl.closeSheet(); });
+      '<label class="as-switch-row"><span><b>Avisarme de este chat</b><small>Solo lo ven quienes van y los administradores.</small></span><span class="switch"><input type="checkbox" id="chMute"' + (muted(e.id) ? '' : ' checked') + '><span></span></span></label>';
+  }
+  function chatWire(e) {
+    clearInterval(chatT);
+    $('#chMute').addEventListener('change', function () { toggleMute(e.id); }); if (MUTES === null) loadMutes();
     var last = -1, BK = {};
     sb.from('event_attendees').select('user_id,bike').eq('event_id', e.id).then(function (r) { (r.data || []).forEach(function (x) { if (x.bike) BK[x.user_id] = x.bike; }); last = -1; load(true); }, function () {});
     function bikeOf(id) { var p = S.names[id]; return BK[id] || (p ? [p.bike_brand, p.bike_model].filter(Boolean).join(' ') : ''); }
@@ -688,8 +850,8 @@
           el.innerHTML = rows.length ? rows.map(function (x) {
             var d = new Date(x.created_at), k = d.toDateString(), me = x.user_id === S.user.id, sep = '';
             if (k !== day) { day = k; sep = '<span class="ev-chat-day">' + d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) + '</span>'; }
-            return sep + '<div class="ev-msg' + (me ? ' me' : '') + '">' + (me ? '' : ava(x.user_id)) + '<div><b>' + esc(who(x.user_id)) + (bikeOf(x.user_id) ? ' <small>· ' + esc(bikeOf(x.user_id)) + '</small>' : '') + '</b><p>' + esc(x.body) + '</p><time>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + (me ? '' : '<button class="gr-more" data-crep="' + x.id + '" type="button" aria-label="Reportar">⋯</button>') + '</time></div></div>';
-          }).join('') : '<p class="muted">Todavía no ha escrito nadie. Rompe el hielo: ¿de dónde sales?</p>';
+            return sep + '<div class="ev-msg' + (me ? ' me' : '') + '">' + (me ? '' : ava(x.user_id)) + '<div><b>' + esc(who(x.user_id)) + (bikeOf(x.user_id) ? ' <small>· ' + esc(bikeOf(x.user_id)) + '</small>' : '') + '</b><p>' + esc(x.body) + '</p><time>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + (me ? '' : '<button class="gr-more" data-crep="' + x.id + '" type="button" aria-label="Reportar">···</button>') + '</time></div></div>';
+          }).join('') : '<div class="empty small"><b>Nadie ha escrito todavía</b>Rompe el hielo: ¿de dónde sales?</div>';
           if (stick) el.scrollTop = el.scrollHeight;
           $$('[data-crep]', el).forEach(function (b) { b.addEventListener('click', function () { var x = rows.filter(function (q) { return String(q.id) === b.dataset.crep; })[0]; if (!x || !window.RGGroups) return; clearInterval(chatT); RGGroups.report({ target: x.user_id, name: who(x.user_id), kind: 'mensaje', excerpt: x.body, place: 'Chat de ' + e.title, back: function () { chatSheet(e); } }); }); });
         });
@@ -705,49 +867,44 @@
     load(true);
     chatT = setInterval(function () { if (!$('#chList')) { clearInterval(chatT); return; } if (document.visibilityState !== 'hidden') load(false); }, 5000);
   }
-  function ticketSheet(e) {
-    Cl.sheet('<div class="head"><h1>Mi entrada</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
-      '<div class="rg-ticket"><div class="rg-ticket-qr" id="tkQr"><span class="muted">Cargando…</span></div><b>' + esc(e.title) + '</b><span class="muted">' + fmtWhen(e.starts_at) + '</span><span class="muted rg-small">Enseña este código al llegar: el organizador lo lee y marca tu llegada.</span></div>' +
-      '<button class="btn" id="tkWeb" type="button">' + icn('share') + 'Compartir la salida</button>');
-    $('#clX').addEventListener('click', Cl.closeSheet);
-    $('#tkWeb').addEventListener('click', function () { var u = WEB + '/?e=' + e.id; if (navigator.share) navigator.share({ title: e.title, url: u }).catch(function () {}); else openUrl(u); });
+  function ticketSheet(e, mine) {
+    var v = mine || {}, s = Cl.sheet('<div class="head"><h1>Mi entrada</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      '<div class="as-ticket"><div class="as-ticket-qr" id="tkQr"><span class="muted">Cargando…</span></div><b>' + esc(e.title) + '</b><span>' + esc(fmtWhen(e.starts_at)) + '</span><span>' + esc(who(S.user.id)) + (v.bike ? ' · ' + esc(v.bike) : '') + ' · ' + (v.companion ? '2 plazas' : '1 plaza') + '</span></div>' +
+      '<p class="muted" style="margin:0;text-align:center">Enséñalo al llegar al punto de salida: el organizador lo lee y marca tu llegada.</p>' +
+      '<button class="btn big" id="tkBright" type="button">' + icn('screen') + 'Subir el brillo</button>', 'full');
+    var bright = false, setB = function (on) { bright = on; s.classList.toggle('as-bright', on); try { if (P.ScreenBrightness) P.ScreenBrightness.setBrightness({ brightness: on ? 1 : -1 }).catch(function () {}); } catch (x) {} var b = $('#tkBright'); if (b) b.innerHTML = icn('screen') + (on ? 'Brillo normal' : 'Subir el brillo'); };
+    $('#clX').addEventListener('click', function () { if (bright) setB(false); Cl.closeSheet(); });
+    $('#tkBright').addEventListener('click', function () { setB(!bright); });
     sb.rpc('event_public', { p_id: e.id }).then(function (r) {
-      var box = $('#tkQr'); if (!box) return;
+      var box2 = $('#tkQr'); if (!box2) return;
       var code = r.data && r.data.ticket, svg = code ? qrSvg(code) : '';
-      if (svg) box.innerHTML = svg; else box.innerHTML = '<span class="muted">' + (r.error ? 'No se ha podido cargar la entrada. Revisa la conexión.' : 'La entrada aparece cuando tienes la plaza confirmada.') + '</span>';
+      if (svg) box2.innerHTML = svg; else box2.innerHTML = '<span class="muted">' + (r.error ? 'No se ha podido cargar la entrada. Revisa la conexión.' : 'La entrada aparece cuando tienes la plaza confirmada.') + '</span>';
     });
   }
-  function whoGoes(e, att) {
-    var going = att.filter(function (x) { return x.event_id === e.id && x.status === 'going'; }), off = att.filter(function (x) { return x.event_id === e.id && x.status === 'offered'; }), queue = queueOf(att, e);
-    var evAd = S.evAdmins[e.id] || [];
-    var person = function (g, tag) { var ad = evAd.indexOf(g.user_id) >= 0; return '<div class="club-person">' + ava(g.user_id, ad ? 'rol-admin' : 'rol-comp') + '<div><b>' + esc(who(g.user_id)) + (ad ? ' <span class="mstatus ok">admin</span>' : '') + (g.companion ? ' <span class="mstatus">+1</span>' : '') + (tag ? ' <span class="mstatus">' + tag + '</span>' : '') + '</b><span class="muted">' + esc(bike(g.user_id)) + '</span></div></div>'; };
-    Cl.sheet('<div class="head"><h1>Quién viene</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><p class="muted">' + esc(e.title) + ' · ' + fmtWhen(e.starts_at) + (e.capacity ? ' · ' + e.capacity + (e.capacity === 1 ? ' plaza' : ' plazas') : '') + '</p><div class="rg-list">' +
-      (going.length || off.length ? going.map(function (g) { return person(g); }).join('') + off.map(function (g) { return person(g, 'por confirmar'); }).join('') : '<p class="muted">Nadie apuntado todavía.</p>') + '</div>' +
-      (queue.length && (isAdmin() || (S.evAdmins[e.id] || []).indexOf(S.user.id) >= 0) ? '<h2 class="rg-h2">Lista de espera</h2><p class="muted rg-small" style="text-align:left">Solo la ven los administradores.</p><div class="rg-list">' + queue.map(function (g, i) { return person(g, 'puesto ' + (i + 1)); }).join('') + '</div>' : ''));
-    $('#clX').addEventListener('click', Cl.closeSheet);
-  }
-  function eventForm(c, e) {
+  function whoGoes(e) { openEvent(e.id, 'gente'); }
+
+  function eventForm(c, e, focus) {
     var plans = A.plans(), keep = e && e.route ? '<option value="keep" selected>' + esc('Mantener: ' + (e.route.name || 'ruta actual')) + '</option>' : '';
     var link0 = e ? (e.meet_url || (e.meet_lat != null ? L.mapsPointUrl(e.meet_lat, e.meet_lon) : '')) : '', v6 = S.v6 !== false;
     Cl.sheet('<div class="head"><h1>' + (e ? 'Editar salida' : 'Nueva salida') + '</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><form class="rg-form" id="evForm">' +
       '<label>Nombre<input id="evTitle" required maxlength="120" value="' + esc(e ? e.title : '') + '" placeholder="Ruta del domingo"></label>' +
-      '<label>Día y hora de salida<input id="evWhen" type="datetime-local" required value="' + localInput(e && e.starts_at) + '"></label>' +
+      '<label>Día y hora<input id="evWhen" type="datetime-local" required value="' + localInput(e && e.starts_at) + '"></label>' +
       '<label>Punto de salida<input id="evMeet" maxlength="120" value="' + esc(e ? e.meet_name : '') + '" placeholder="Gasolinera de…"></label>' +
-      (v6 ? '<label>Enlace de Google Maps del punto de salida<input id="evMeetUrl" inputmode="url" maxlength="600" value="' + esc(link0) + '" placeholder="Pega aquí el enlace del sitio"></label>' +
-        '<div class="rg-row" style="margin-top:-4px"><button class="btn small" id="evPaste" type="button">Pegar</button><button class="btn small" id="evHere" type="button">Usar donde estoy ahora</button></div>' +
-        '<p class="muted rg-small" style="text-align:left">En Google Maps: toca el sitio → Compartir → Copiar enlace. Si lo dejas vacío y la salida lleva ruta, el punto de encuentro es donde empieza la ruta.</p>' +
-        '<label>Plazas (motos)<input id="evCap" type="number" inputmode="numeric" min="1" max="1000" value="' + (e && e.capacity ? e.capacity : '') + '" placeholder="Sin límite"></label>' +
-        '<label class="rg-check ev-opencheck"><input type="checkbox" id="evOpenNear"' + (e && e.open_near ? ' checked' : '') + '><span><b>Salida abierta</b><small>Cualquier motero de la zona la verá en Explorar y podrá pedir sitio. Tú decides a quién aceptas.</small></span></label>' +
-        '<div id="evExtra">' + (window.RGEventExtra ? RGEventExtra.form(e) : '') + '</div>' +
-        '<p class="muted rg-small" style="text-align:left">Con límite, quien se apunte cuando esté lleno queda en lista de espera. Si alguien se desapunta, la plaza se ofrece al siguiente y tiene que confirmar.</p>'
-        : (isAdmin() ? '<p class="muted rg-small" style="text-align:left">Para poner límite de plazas, lista de espera y enlace de Maps de la salida falta ejecutar <b>supabase/06_plazas_y_salida.sql</b> en Supabase.</p>' : '')) +
-      '<label>Descripción<textarea id="evDesc" maxlength="4000" placeholder="Paradas, nivel, normas, lo que quieras contar">' + esc(e ? e.description : '') + '</textarea></label>' +
+      (v6 ? '<div class="as-code"><input id="evMeetUrl" inputmode="url" maxlength="600" value="' + esc(link0) + '" placeholder="Enlace de Google Maps (opcional)" aria-label="Enlace de Google Maps del punto de salida"><button class="btn" id="evHere" type="button" title="Usar donde estoy ahora">' + icn('locate') + '</button></div>' : '') +
+      (e ? '' : '<span class="label">Duración</span><div class="seg" id="evDur"><button type="button" data-d="1" aria-pressed="true">Un día</button><button type="button" data-d="n" aria-pressed="false">Varios días</button></div>') +
+      (v6 ? '<label>Plazas<input id="evCap" type="number" inputmode="numeric" min="1" max="1000" value="' + (e && e.capacity ? e.capacity : '') + '" placeholder="Sin límite"></label>' +
+        '<label class="rg-check ev-opencheck"><input type="checkbox" id="evOpenNear"' + (e && e.open_near ? ' checked' : '') + '><span><b>Abierta a moteros de fuera</b><small>Sale en «Abiertas cerca» y pueden pedir sitio. Tú decides a quién aceptas.</small></span></label>' : '') +
+      '<details class="as-fold" id="evMore"><summary>Más opciones</summary><div class="rg-form">' +
       '<label>Ruta<select id="evRoute"><option value="">Sin ruta</option>' + keep + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
-      '<p class="muted rg-small" style="text-align:left">Salen tus rutas planificadas. Para añadir una, créala en el mapa (pegando el enlace de Google Maps) y guárdala.</p>' +
-      (v6 ? '<label>Enlace de la ruta en Google Maps (opcional)<input id="evRouteUrl" inputmode="url" maxlength="600" value="' + esc(e && e.route_url ? e.route_url : '') + '" placeholder="Pega aquí el enlace de la ruta"></label>' : '') +
-      '<label>Foto de portada (opcional)<input id="evCover" type="file" accept="image/*"></label>' +
-      '<label>Enlace de Luma (opcional)<input id="evLuma" inputmode="url" maxlength="300" value="' + esc(e && e.luma_url ? e.luma_url : '') + '" placeholder="https://luma.com/…"></label>' +
-      '<button class="btn big primary" type="submit">' + (e ? 'Guardar cambios' : 'Publicar') + '</button></form>');
+      (v6 ? '<label>Enlace de la ruta en Google Maps<input id="evRouteUrl" inputmode="url" maxlength="600" value="' + esc(e && e.route_url ? e.route_url : '') + '" placeholder="Opcional"></label>' : '') +
+      '<label>Descripción<textarea id="evDesc" maxlength="4000" placeholder="Paradas, nivel, normas, lo que quieras contar">' + esc(e ? e.description : '') + '</textarea></label>' +
+      '<label>Foto de portada<input id="evCover" type="file" accept="image/*"></label>' +
+      (v6 ? '<div id="evExtra" class="rg-form">' + (window.RGEventExtra ? RGEventExtra.form(e) : '') + '</div>' : '') +
+      '<label>Enlace de Luma<input id="evLuma" inputmode="url" maxlength="300" value="' + esc(e && e.luma_url ? e.luma_url : '') + '" placeholder="Opcional"></label>' +
+      '<p class="muted rg-small" style="text-align:left;margin:0">Las preguntas a los inscritos y la aprobación se configuran en la web.</p></div></details>' +
+      '<div class="as-fixed"><button class="btn big primary" type="submit">' + (e ? 'Guardar cambios' : 'Publicar') + '</button></div></form>', 'full');
+    $$('#evDur button').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.d === 'n' && window.RGTrips) { var t = $('#evTitle').value; Cl.closeSheet(); RGTrips.create(c.id, t); } }); });
+    if (focus === 'cap') setTimeout(function () { var i = $('#evCap'); if (i) { i.scrollIntoView({ block: 'center' }); i.focus(); } }, 150);
     $('#clX').addEventListener('click', Cl.closeSheet);
     if ($('#evPaste')) $('#evPaste').addEventListener('click', function () {
       var job = P.Clipboard ? P.Clipboard.read().then(function (r) { return (r && r.value) || ''; }) : (navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : Promise.reject());
@@ -786,8 +943,8 @@
           }).then(function (r) {
             ok(r);
             if (e && !isAdmin() && r.data && !r.data.length) throw new Error('No se ha podido guardar: para que los administradores de la ruta puedan editar la salida falta ejecutar supabase/10_tiempo_real.sql.');
-            Cl.closeSheet(); A.toast(warn || (e ? 'Salida actualizada.' : 'Salida publicada.'), warn ? 'warn' : 'ok');
-            ring(c.id, { kind: e ? 'edit' : 'event' }); inbox(true); return paneEvents(c);
+            if (warn) A.toast(warn, 'warn');
+            ring(c.id, { kind: e ? 'edit' : 'event' }); inbox(true); Cl.closePages(); S.top = 'events'; LASTEV = null; render(); if (e) setTimeout(function () { openEvent(e.id); }, 400);
           });
         });
       });
@@ -800,9 +957,9 @@
       return sb.from('community_posts').select('id,body,created_at,author_id').eq('community_id', c.id).order('created_at', { ascending: false }).limit(40).then(function (r) {
         var posts = ok(r); return names(posts.map(function (p) { return p.author_id; })).then(function () { return posts; }); });
     }, function (posts) { (function () {
-        var pane = $('#clPane'); if (!pane || S.tab !== 'board' || !cur() || cur().id !== c.id) return;
-        pane.innerHTML = (isAdmin() ? '<div class="club-card"><span class="label">Aviso para la comunidad</span><textarea class="note" id="poBody" maxlength="4000" placeholder="Escribe un aviso para la comunidad"></textarea><button class="btn big primary" id="poSend" type="button">Publicar aviso</button></div>' : '') +
-          (posts.length ? posts.map(function (p) { return '<div class="club-card" data-po="' + p.id + '"><span class="muted">' + esc(who(p.author_id)) + ' · ' + fmtWhen(p.created_at) + '</span><p>' + esc(p.body) + '</p>' + (isAdmin() ? '<button class="link danger" type="button"><svg><use href="#i-trash"/></svg>Borrar</button>' : '') + '</div>'; }).join('') : '<div class="empty">Aún no hay avisos.</div>');
+        var pane = $('#rgPage #clPane') || $('#clPane'); if (!pane || S.tab !== 'board' || !cur() || cur().id !== c.id) return;
+        pane.innerHTML = (isAdmin() ? '<textarea class="note" id="poBody" maxlength="4000" placeholder="Escribe un aviso para la comunidad"></textarea><button class="btn big primary" id="poSend" type="button">Publicar aviso</button>' : '') +
+          (posts.length ? posts.map(function (p) { return '<div class="club-card" data-po="' + p.id + '"><span class="muted">' + esc(who(p.author_id)) + ' · ' + fmtWhen(p.created_at) + '</span><p>' + esc(p.body) + '</p>' + (isAdmin() ? '<button class="link danger" type="button"><svg><use href="#i-trash"/></svg>Borrar</button>' : '') + '</div>'; }).join('') : '<div class="empty"><b>Sin avisos</b>' + (isAdmin() ? 'Lo que publiques aquí le llega a toda la comunidad.' : 'Aquí escriben los administradores. Tú lees.') + '</div>');
         if ($('#poSend')) $('#poSend').addEventListener('click', function (ev) { var t = $('#poBody').value.trim(); if (!t) return; Cl.busy(ev.currentTarget, function () { return sb.from('community_posts').insert({ community_id: c.id, body: t }).then(function (r) { ok(r); ring(c.id, { kind: 'post' }); return paneBoard(c); }); }); });
         $$('[data-po] .link', pane).forEach(function (b) { b.addEventListener('click', function () { armed(b, '¿Seguro? Toca otra vez', function () { sb.from('community_posts').delete().eq('id', b.parentNode.dataset.po).then(function (r) { ok(r); return paneBoard(c); }).catch(fail); }); }); });
       })(); }, useCache);
@@ -826,7 +983,7 @@
     $$('[data-url]').forEach(function (b) { b.addEventListener('click', function () { openUrl(p.links[+b.dataset.url].url); }); });
     $$('[data-code]').forEach(function (b) { b.addEventListener('click', function () { copy(p.links[+b.dataset.code].code, 'Código copiado'); }); });
     if ($('#pgEdit')) { $('#pgEdit').addEventListener('click', function () { pageForm(c, p); });
-      $('#pgDel').addEventListener('click', function (ev) { armed(ev.currentTarget, '¿Seguro? Toca otra vez', function () { sb.from('community_pages').delete().eq('id', p.id).then(function (r) { ok(r); Cl.closeSheet(); return panePages(c); }).catch(fail); }); }); }
+      $('#pgDel').addEventListener('click', function (ev) { armed(ev.currentTarget, '¿Seguro? Toca otra vez', function () { sb.from('community_pages').delete().eq('id', p.id).then(function (r) { ok(r); Cl.closeSheet(); return panePagesBack(c); }).catch(fail); }); }); }
   }
   function pageForm(c, p) {
     var linkRow = function (l) { return '<div class="club-linkrow"><input data-f="label" maxlength="60" placeholder="Texto del botón" value="' + esc(l.label || '') + '"><input data-f="url" inputmode="url" maxlength="400" placeholder="Enlace (https://…)" value="' + esc(l.url || '') + '"><input data-f="code" maxlength="40" placeholder="Código de descuento (opcional)" value="' + esc(l.code || '') + '"></div>'; };
@@ -841,7 +998,7 @@
       ev.preventDefault();
       var links = $$('.club-linkrow').map(function (row) { var o = {}; $$('input', row).forEach(function (i) { o[i.dataset.f] = i.value.trim(); }); return o; }).filter(function (l) { return l.url || l.code || l.label; });
       var row = { community_id: c.id, title: $('#pgTitle').value.trim(), body: $('#pgBody').value.trim(), links: links };
-      Cl.busy(ev.target.querySelector('button[type=submit]'), function () { return (p ? sb.from('community_pages').update(row).eq('id', p.id) : sb.from('community_pages').insert(row)).then(function (r) { ok(r); Cl.closeSheet(); A.toast('Página guardada.', 'ok'); ring(c.id, { kind: 'page' }); return panePages(c); }); });
+      Cl.busy(ev.target.querySelector('button[type=submit]'), function () { return (p ? sb.from('community_pages').update(row).eq('id', p.id) : sb.from('community_pages').insert(row)).then(function (r) { ok(r); Cl.closePages(); ring(c.id, { kind: 'page' }); return panePagesBack(c); }); });
     });
   }
 
@@ -851,12 +1008,23 @@
       return sb.from('community_members').select('user_id,role,joined_at').eq('community_id', c.id).order('joined_at').then(function (r) {
         var ms = ok(r); return names(ms.map(function (m) { return m.user_id; })).then(function () { return ms; }); });
     }, function (ms) { (function () {
-        var pane = $('#clPane'); if (!pane || S.tab !== 'members' || !cur() || cur().id !== c.id) return;
+        var pane = $('#rgPage #clPane') || $('#clPane'); if (!pane || S.tab !== 'members' || !cur() || cur().id !== c.id) return;
         pane.innerHTML = '<div id="clReqs"></div><span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span><div class="club-card club-people">' + ms.map(function (m) {
           var me = m.user_id === S.user.id;
           return '<div class="club-person" data-u="' + m.user_id + '">' + ava(m.user_id, m.role === 'admin' ? 'rol-admin' : 'rol-comp') + '<div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
-            (!me ? '<span class="rg-macts">' + (isAdmin() ? '<button class="link" data-act="role" type="button">' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</button><button class="link danger" data-act="kick" type="button">Expulsar</button>' : '') + '<button class="link" data-rep="' + m.user_id + '" type="button">Reportar</button></span>' : '') + '</div>';
-        }).join('') + '</div><button class="btn" id="clLeave" type="button"><svg><use href="#i-exit"/></svg>Salir de esta comunidad</button>';
+            (!me ? '<button class="as-x" data-more="' + m.user_id + '" type="button" title="Más">' + icn('more') + '</button>' : '') + '</div>';
+        }).join('') + '</div><button class="as-link danger" id="clLeave" type="button">Salir de esta comunidad</button>';
+        $$('[data-more]', pane).forEach(function (b) { b.addEventListener('click', function () {
+          var uid = b.dataset.more, m = ms.filter(function (x) { return x.user_id === uid; })[0];
+          var sh = Cl.sheet('<div class="head"><h1>' + esc(who(uid)) + '</h1><button class="btn small icon" id="mmX" type="button"><svg><use href="#i-close"/></svg></button></div><div class="as-rows">' + (isAdmin() ? '<button class="as-row" data-m="role" type="button">' + icn('check') + '<span><b>' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</b></span></button><button class="as-row" data-m="kick" type="button">' + icn('exit') + '<span><b>Expulsar</b></span></button>' : '') + '<button class="as-row danger" data-m="rep" type="button">' + icn('warn') + '<span><b>Reportar</b></span></button></div>');
+          $('#mmX', sh).addEventListener('click', Cl.closeSheet);
+          $$('[data-m]', sh).forEach(function (b2) { b2.addEventListener('click', function () {
+            var k = b2.dataset.m; Cl.closeSheet();
+            if (k === 'rep') { if (window.RGGroups) RGGroups.report({ target: uid, name: who(uid), kind: 'persona', place: c.name, back: function () { Cl.closeSheet(); } }); }
+            else if (k === 'role') sb.from('community_members').update({ role: m.role === 'admin' ? 'member' : 'admin' }).eq('community_id', c.id).eq('user_id', uid).then(function (r) { ok(r); return paneMembers(c); }).catch(fail);
+            else sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', uid).then(function (r) { ok(r); return paneMembers(c); }).catch(fail);
+          }); });
+        }); });
         $$('[data-act]', pane).forEach(function (b) { b.addEventListener('click', function () {
           var uid = b.closest('.club-person').dataset.u, m = ms.filter(function (x) { return x.user_id === uid; })[0];
           if (b.dataset.act === 'role') sb.from('community_members').update({ role: m.role === 'admin' ? 'member' : 'admin' }).eq('community_id', c.id).eq('user_id', uid).then(function (r) { ok(r); return paneMembers(c); }).catch(fail);
@@ -878,7 +1046,7 @@
         $$('[data-rep]', pane).forEach(function (b) { b.addEventListener('click', function () { if (window.RGGroups) RGGroups.report({ target: b.dataset.rep, name: who(b.dataset.rep), kind: 'persona', place: c.name, back: function () { Cl.closeSheet(); } }); }); });
         $('#clLeave').addEventListener('click', function (ev) {
           if (isAdmin() && ms.filter(function (x) { return x.role === 'admin'; }).length === 1 && ms.length > 1) { A.toast('Eres el único administrador: nombra a otro antes de salir.', 'warn'); return; }
-          armed(ev.currentTarget, ms.length === 1 ? 'Eres el último: la comunidad se borrará. Toca otra vez' : '¿Seguro? Te quitas también de sus salidas. Toca otra vez', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; listAt = 0; inbox(true); return load().then(render); }).catch(fail); });
+          armed(ev.currentTarget, ms.length === 1 ? 'Eres el último: la comunidad se borrará. Toca otra vez' : '¿Seguro? Te quitas también de sus salidas. Toca otra vez', function () { sb.from('community_members').delete().eq('community_id', c.id).eq('user_id', S.user.id).then(function (r) { ok(r); S.cid = null; listAt = 0; inbox(true); return load().then(function () { Cl.closePages(); S.top = 'events'; render(); }); }).catch(fail); });
         });
       })(); }, useCache);
   }
@@ -1111,5 +1279,5 @@
     if (u) setTimeout(pushRegister, 2500);
     if (changed) { S.loaded = false; S.names = {}; IN.events = []; IN.at = 0; if (!u) { forgetReminders(); liveSync(); } else setTimeout(function () { nativePending(); inbox(true); if (!S.loaded) load().catch(function () {}); else liveSync(); }, 1500); if (!$('#view-club').hidden) show(); }
   });
-  window.RGClub = { ev: function (id) { return EVS[id]; }, newEvent: function () { var c = cur(); if (!c) { A.showView('club'); return false; } if (!isAdmin()) return false; S.tab = 'events'; A.showView('club'); eventForm(c, null); return true; }, catalog: function (cid, name) { catalogSheet(cid, name); }, goto: function (cid, tab) { if (cid) setCid(cid); if (tab) S.tab = tab; A.showView('club'); }, show: show, inbox: inbox, state: S, chat: function (e) { chatSheet(e); }, api: { names: names, who: who, ava: ava, isAdmin: isAdmin, cur: cur, S: S }, ring: function (cid, m) { ring(cid, m); }, mine: function () { return IN.events.slice(); } };
+  window.RGClub = { ev: function (id) { return EVS[id]; }, openEvent: openEvent, communities: communities, newEvent: function () { var c = cur(); A.showView('club'); if (!c || !isAdmin()) return false; eventForm(c, null); return true; }, catalog: function (cid, name, add) { catalogSheet(cid, name); if (add) { var cc = S.list.filter(function (x) { return x.id === cid; })[0]; if (cc && cc.role === 'admin') routeForm(cc); } }, goto: function (cid, tab) { if (cid) setCid(cid); S.top = /chats|groups|board/.test(tab || '') ? 'chats' : /info|pages|members/.test(tab || '') ? 'info' : 'events'; A.showView('club'); }, show: show, inbox: inbox, state: S, chat: function (e) { openEvent(e.id, 'chat'); }, api: { names: names, who: who, ava: ava, isAdmin: isAdmin, cur: cur, S: S }, ring: function (cid, m) { ring(cid, m); }, mine: function () { return IN.events.slice(); } };
 })();

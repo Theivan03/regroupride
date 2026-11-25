@@ -235,6 +235,49 @@
     if (dot) dot.hidden = !(due.length || soon.length || docs.length);
     var st = $('#yoSecT'), cs = contacts(); if (st) st.textContent = (soloOn() ? 'Voy solo activado' : 'Voy solo apagado') + ' · ' + (cs.length ? cs.length + (cs.length === 1 ? ' contacto' : ' contactos') : 'sin contactos');
   }
+  /* ---------- Mi moto: la ficha larga se parte en Resumen, Taller, Papeles y Gastos ---------- */
+  var MT = { tab: 'resumen', v: 0 };
+  function moto() {
+    var view = $('#view-garage'), host = $('#vehicles'); if (!view || !host) return;
+    var cards = $$('.vehicle', host), bar = $('#gaTabs');
+    if (!bar) { bar = document.createElement('div'); bar.id = 'gaTabs'; bar.className = 'as-tabs'; host.parentNode.insertBefore(bar, host); }
+    var pick = $('#gaPick'); if (!pick) { pick = document.createElement('div'); pick.id = 'gaPick'; pick.className = 'pills'; host.parentNode.insertBefore(pick, bar); }
+    bar.hidden = !cards.length; pick.hidden = cards.length < 2;
+    if (MT.v >= cards.length) MT.v = 0;
+    pick.innerHTML = cards.map(function (c, i) { return '<button class="pill" type="button" data-v="' + i + '" aria-pressed="' + (i === MT.v) + '">' + esc(($('.name', c) || {}).textContent || 'Moto') + '</button>'; }).join('');
+    $$('button', pick).forEach(function (b) { b.addEventListener('click', function () { MT.v = +b.dataset.v; moto(); }); });
+    bar.innerHTML = [['resumen', 'Resumen'], ['taller', 'Taller'], ['papeles', 'Papeles'], ['gastos', 'Gastos']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (t[0] === MT.tab) + '">' + t[1] + '</button>'; }).join('');
+    $$('button', bar).forEach(function (b) { b.addEventListener('click', function () { MT.tab = b.dataset.t; moto(); }); });
+    host.dataset.tab = MT.tab;
+    cards.forEach(function (c, i) {
+      c.hidden = i !== MT.v; if (i !== MT.v) return;
+      var gx = $('.gx', c), g = 'papeles';
+      if (gx) Array.prototype.forEach.call(gx.children, function (el) {
+        if (el.classList.contains('as-gen')) return;
+        var lab = (($('.label', el) || {}).textContent || '').toLowerCase();
+        if (el.classList.contains('gx-h')) g = /document/.test(lab) ? 'papeles' : /repost|gasto/.test(lab) ? 'gastos' : 'resumen';
+        if (el.classList.contains('gx-stolen')) g = 'resumen';
+        el.dataset.g = g;
+      });
+      $$('.as-gen', c).forEach(function (x) { x.remove(); });
+      var add = function (tab, html, where) { var d = document.createElement('div'); d.className = 'as-gen'; d.dataset.g = tab; d.innerHTML = html; (where || gx || c).appendChild(d); return d; };
+      var click = function (sel) { return function () { var b = $(sel, c); if (b) b.click(); }; };
+      if (gx) {
+        // Resumen: estado (taller y papeles) y el botón de repostar
+        var ms = $('.mhead .mstatus', c), docs = $$('.gx-row', gx);
+        var st = add('resumen', '<div class="as-rows">' + (ms ? '<div class="as-row"><span><b>Taller</b></span><i class="as-tag' + (/al día/.test(ms.textContent) ? '' : ' amber') + '">' + esc(ms.textContent.trim()) + '</i></div>' : '') + docs.map(function (d) { var m = $('.mstatus', d); return '<div class="as-row"><span><b>' + esc(($('b', d) || {}).textContent || '') + '</b><small>' + esc(($('small', d) || {}).textContent || '') + '</small></span>' + (m ? '<i class="as-tag' + (/al día/.test(m.textContent) ? '' : ' amber') + '">' + esc(m.textContent.trim()) + '</i>' : '') + '</div>'; }).join('') + '</div><button class="btn big primary" type="button" data-k="fuel">Apuntar repostaje</button>');
+        gx.insertBefore(st, gx.firstChild); $('[data-k=fuel]', st).addEventListener('click', click('[data-gx=fuel]'));
+        var f = $('.gx-figs', gx); if (f) { var cp = add('resumen', '<div class="gx-figs">' + f.innerHTML + '</div>'); gx.insertBefore(cp, st.nextSibling); }
+        var pa = add('papeles', (docs.length ? '' : '<div class="empty"><b>Sin vencimientos</b>Apunta la ITV, el seguro o el permiso y te aviso 30 y 7 días antes.</div>') + '<p class="muted rg-small" style="text-align:left;margin:0">Avisos a 30 y a 7 días. La foto del documento se queda en este teléfono.</p><button class="btn big primary" type="button" data-k="doc">Añadir vencimiento</button>');
+        $('[data-k=doc]', pa).addEventListener('click', click('[data-gx=doc]'));
+        var ga = add('gastos', '<button class="btn big primary" type="button" data-k="fuel">Repostaje</button><button class="btn" type="button" data-k="cost">Otro gasto</button>');
+        $('[data-k=fuel]', ga).addEventListener('click', click('[data-gx=fuel]')); $('[data-k=cost]', ga).addEventListener('click', click('[data-gx=cost]'));
+      }
+    });
+  }
+  var motoT = 0, vh = $('#vehicles');
+  if (vh && window.MutationObserver) new MutationObserver(function (m) { if (m.every(function (x) { return x.target.closest && x.target.closest('.as-gen'); })) return; clearTimeout(motoT); motoT = setTimeout(moto, 120); }).observe(vh, { childList: true, subtree: true });
+
   /* ---------- Estadísticas: Cifras, Metas y Logros ---------- */
   var stTab = 'cifras';
   function stats(t) {
@@ -312,7 +355,7 @@
   }
   document.addEventListener('rg:view', function (e) {
     var v = e.detail;
-    if (v === 'profile') yo(); else if (v === 'stats') setTimeout(function () { stats(); }, 0); else if (v === 'settings') sort(); else if (v === 'security') security(); else if (v === 'help') help();
+    if (v === 'garage') setTimeout(moto, 50); if (v === 'profile') yo(); else if (v === 'stats') setTimeout(function () { stats(); }, 0); else if (v === 'settings') sort(); else if (v === 'security') security(); else if (v === 'help') help();
   });
   setTimeout(function () { yo(); help(); }, 3000);
 
