@@ -152,6 +152,7 @@ textarea{padding:12px 14px!important}
 body.rg-tabs-min .as-snack{bottom:calc(210px + env(safe-area-inset-bottom,0px))}
 
 /* ---------- barra de pestañas: negra, 64 px, activa en blanco con punto lima ---------- */
+.tabs{grid-template-columns:repeat(4,1fr)!important}
 .tabs{background:var(--tinta)!important;height:calc(64px + env(safe-area-inset-bottom,0px))!important;border-top:1px solid transparent!important}
 @media (prefers-color-scheme:dark){html:not([data-theme="light"]) .tabs{border-top-color:var(--linea)!important}}
 html[data-theme="dark"] .tabs{border-top-color:var(--linea)!important}
