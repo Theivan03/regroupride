@@ -50,56 +50,41 @@
     sb.rpc('live_share_ping', { p_token: S.share.token, p_lat: f.lat, p_lon: f.lon, p_speed: v != null && isFinite(v) ? Math.round(v) : null }).then(function () {}, function () {});
   }
 
-  /* ---------- pantalla ---------- */
-  function open() {
-    if (!Cl.user()) { Cl.openAuth(false); return; }
-    loadContacts(true).then(draw);
-  }
-  function draw() {
-    var cs = S.contacts || [], sharing = !!S.share;
-    var s = Cl.sheet('<div class="head"><h1>Voy solo</h1><button class="btn small icon" id="soX" type="button" title="Cerrar">' + ic('close') + '</button></div>' +
-      '<p class="muted" style="margin:0;text-align:left">Cuando ruedas sin grupo, la app vigila las paradas bruscas. Si te paras de golpe y no sigues, te pregunta si estás bien y cuenta 60 segundos. Si no contestas, avisa a tus contactos con tu posición.</p>' +
-      '<label class="rg-check"><input type="checkbox" id="soOn"' + (S.on ? ' checked' : '') + '><span><b>Vigilar cuando ruedo solo</b><small>Solo mientras grabas una ruta y no vas en un grupo en vivo.</small></span></label>' +
-      '<span class="label">Contactos de emergencia</span><div class="so-list">' + (cs.length ? cs.map(function (c) { return '<div class="so-c"><span><b>' + esc(c.name) + '</b><small>' + esc(c.phone) + '</small></span><button class="btn small icon" data-del="' + c.id + '" type="button" title="Quitar">' + ic('trash') + '</button></div>'; }).join('') : '<div class="empty" style="padding:10px">Aún no has añadido a nadie.</div>') + '</div>' +
-      (cs.length < 5 ? '<form class="so-add" id="soAdd"><input id="soName" maxlength="60" placeholder="Nombre" autocomplete="off" required><input id="soPhone" type="tel" inputmode="tel" maxlength="20" placeholder="Teléfono" autocomplete="off" required><button class="btn small primary" type="submit">Añadir</button></form>' : '') +
-      '<p class="muted rg-small" style="text-align:left">El aviso llega solo, como notificación, a los contactos que tengan ReGroupRide con ese teléfono. A quien no la tenga, pásale antes de salir el enlace de seguimiento: lo verá en rojo si no respondes. La app no llama al 112 por su cuenta.</p>' +
-      '<span class="label">Enlace de seguimiento</span><p class="muted" style="margin:0;text-align:left">Una página web con tu posición mientras grabas la ruta. Quien la abra no necesita instalar nada.</p>' +
-      '<div class="rg-row"><button class="btn primary" id="soShare" type="button">' + ic('share') + (sharing ? 'Volver a compartir' : 'Compartir enlace') + '</button>' + (sharing ? '<button class="btn" id="soEnd" type="button">Dejar de compartir</button>' : '') + '</div>' +
-      (sharing ? '<p class="muted rg-small" style="text-align:left">Compartiendo desde las ' + new Date(S.share.at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '. Se corta solo al terminar la ruta.</p>' : ''));
-    $('#soX', s).addEventListener('click', Cl.closeSheet);
-    $('#soOn', s).addEventListener('change', function (e) { S.on = e.target.checked; store('rg.solo', S.on ? '1' : '0'); paintBtn(); });
-    $$('[data-del]', s).forEach(function (b) { b.addEventListener('click', function () { sb.from('emergency_contacts').delete().eq('id', b.dataset.del).then(function () { return loadContacts(true); }).then(draw); }); });
-    if ($('#soAdd', s)) $('#soAdd', s).addEventListener('submit', function (ev) {
-      ev.preventDefault(); var n = $('#soName').value.trim(), p = $('#soPhone').value.replace(/[^0-9+]/g, '');
-      if (!n || p.replace(/\D/g, '').length < 9) { A.toast('Escribe el nombre y un teléfono completo.', 'warn'); return; }
-      Cl.busy(ev.submitter || $('#soAdd button'), function () { return sb.from('emergency_contacts').insert({ name: n, phone: p }).then(function (r) { if (r.error) throw r.error; return loadContacts(true); }).then(draw); });
-    });
-    $('#soShare', s).addEventListener('click', function (ev) { Cl.busy(ev.currentTarget, function () { return sendLink().then(draw); }).catch(function (e) { A.toast(Cl.msg(e), 'warn'); }); });
-    if ($('#soEnd', s)) $('#soEnd', s).addEventListener('click', function () { endShare(); draw(); });
+  /* ---------- Yo › Seguridad: vigilancia, contactos y enlace ---------- */
+  function open() { if (!Cl.user()) { Cl.openAuth(false); return; } Cl.closePages(); A.showView('security'); }
+  function pane(el) {
+    if (!Cl.user()) { el.innerHTML = '<div class="empty"><b>Entra en tu cuenta</b>Los contactos y el enlace de seguimiento se guardan en tu cuenta.</div>'; return; }
+    var draw = function () {
+      if (!el.isConnected) return;
+      var cs = S.contacts || [], sharing = !!S.share;
+      el.innerHTML = '<label class="as-switch-row"><span><b>Vigilar cuando ruedo solo</b><small>Si te paras de golpe y no sigues, te pregunta si estás bien y cuenta 60 segundos. Sin respuesta, avisa a tus contactos con tu posición.</small></span><span class="switch"><input type="checkbox" id="soOn"' + (S.on ? ' checked' : '') + '><span></span></span></label>' +
+        '<span class="label">Contactos</span><div class="as-rows">' + (cs.length ? cs.map(function (c) { return '<div class="as-row"><span><b>' + esc(c.name) + '</b><small>' + esc(c.phone) + '</small></span><button class="as-x" data-del="' + c.id + '" type="button" title="Quitar">' + ic('close') + '</button></div>'; }).join('') : '<div class="empty small"><b>Sin contactos</b>Añade a quien quieras que se entere si te pasa algo.</div>') + '</div>' +
+        (cs.length < 5 ? '<form class="as-add" id="soAdd"><input id="soName" maxlength="60" placeholder="Nombre" autocomplete="off" required><input id="soPhone" type="tel" inputmode="tel" maxlength="20" placeholder="Teléfono" autocomplete="off" required><button class="btn" type="submit">Añadir contacto</button></form>' : '') +
+        '<p class="muted rg-small" style="text-align:left;margin:0">El aviso llega como notificación a los contactos que tengan ReGroupRide con ese teléfono. A quien no la tenga, pásale el enlace antes de salir. La app no llama al 112.</p>' +
+        '<span class="label">Enlace de seguimiento</span><p class="muted" style="margin:0;text-align:left">Una página web con tu posición mientras grabas la ruta. Quien la abra no necesita instalar nada.' + (sharing ? ' Compartiendo desde las ' + new Date(S.share.at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '.' : '') + '</p>' +
+        '<button class="btn big primary" id="soShare" type="button">' + ic('share') + 'Compartir enlace</button>' + (sharing ? '<button class="btn" id="soEnd" type="button">Dejar de compartir</button>' : '');
+      $('#soOn', el).addEventListener('change', function (e) { S.on = e.target.checked; store('rg.solo', S.on ? '1' : '0'); });
+      $$('[data-del]', el).forEach(function (b) { b.addEventListener('click', function () { sb.from('emergency_contacts').delete().eq('id', b.dataset.del).then(function () { return loadContacts(true); }).then(draw); }); });
+      if ($('#soAdd', el)) $('#soAdd', el).addEventListener('submit', function (ev) {
+        ev.preventDefault(); var n = $('#soName', el).value.trim(), p = $('#soPhone', el).value.replace(/[^0-9+]/g, '');
+        if (!n || p.replace(/\D/g, '').length < 9) { A.toast('Escribe el nombre y un teléfono completo.', 'warn'); return; }
+        Cl.busy(ev.submitter || $('#soAdd button', el), function () { return sb.from('emergency_contacts').insert({ name: n, phone: p }).then(function (r) { if (r.error) throw r.error; return loadContacts(true); }).then(draw); });
+      });
+      $('#soShare', el).addEventListener('click', function (ev) { Cl.busy(ev.currentTarget, function () { return sendLink().then(draw); }); });
+      if ($('#soEnd', el)) $('#soEnd', el).addEventListener('click', function () { endShare(); draw(); });
+    };
+    draw(); loadContacts(true).then(draw);
   }
   function paintBtn() {}
-  // Al iniciar una ruta sin grupo se pregunta si se va solo. Sin respuesta en 20 s, se queda como la última vez.
-  var askEl = null;
-  function askClose() { if (askEl) { clearTimeout(askEl._t); if (askEl.parentNode) askEl.parentNode.removeChild(askEl); askEl = null; } }
-  function startAsk() {
-    askClose(); var n = (S.contacts || []).length;
-    askEl = document.createElement('div'); askEl.className = 'rg-soloask';
-    askEl.innerHTML = '<b>¿Vas solo en esta ruta?</b><span>' + (n ? 'Si te paras de golpe y no contestas, aviso a ' + (n === 1 ? 'tu contacto' : 'tus ' + n + ' contactos') + '.' : 'Vigilo las paradas bruscas. Añade un contacto para que le llegue el aviso.') + '</span>' +
-      '<div><button class="btn small primary" data-s="1" type="button">Sí, voy solo</button><button class="btn small" data-s="0" type="button">No</button><button class="btn small" data-s="cfg" type="button">' + (n ? 'Contactos' : 'Añadir contacto') + '</button>' + (window.RGSocial ? '<button class="btn small" data-s="chk" type="button">Lista antes de salir</button>' : '') + '</div>';
-    document.body.appendChild(askEl);
-    askEl.addEventListener('click', function (ev) { var b = ev.target.closest('[data-s]'); if (!b) return; var v = b.dataset.s; askClose(); if (v === 'cfg') { open(); return; } if (v === 'chk') { RGSocial.checklist(null); return; } S.on = v === '1'; store('rg.solo', S.on ? '1' : '0'); if (S.on) A.toast('Aviso: voy solo activado' + ((S.contacts || []).length ? '.' : ', pero sin contactos a los que avisar.'), 'ok'); });
-    askEl._t = setTimeout(askClose, 20000);
-  }
-  // en Ajustes → Privacidad
-  var about = document.getElementById('about');
-  if (about) { var box = document.createElement('div'); box.className = 'rg-maker'; box.dataset.sec = 'priv'; box.innerHTML = '<span class="label">Voy solo y seguimiento</span><p class="muted" style="margin:0">Contactos de emergencia, aviso si te paras de golpe y enlace para que tu familia vea por dónde vas.</p><button class="btn" id="soSet" type="button">Configurar</button>'; about.parentNode.insertBefore(box, about); box.querySelector('#soSet').addEventListener('click', open); }
+  function setOn(v) { S.on = !!v; store('rg.solo', S.on ? '1' : '0'); }
 
   /* ---------- pregunta y aviso ---------- */
   function overlay(html) { closeAsk(); var el = document.createElement('div'); el.className = 'rg-stopask'; el.innerHTML = '<div class="rg-stopask-in">' + html + '</div>'; document.body.appendChild(el); return el; }
   function closeAsk() { if (S.ask) { clearInterval(S.ask.t); if (S.ask.el.parentNode) S.ask.el.parentNode.removeChild(S.ask.el); S.ask = null; } }
   function ask() {
     if (S.ask) return;
-    var el = overlay('<b>¿Estás bien?</b><p>Te has parado de golpe. Si no tocas nada, aviso a tus contactos en <span id="saN">60</span> s.</p><button class="btn big primary" data-a="ok" type="button">Estoy bien</button><button class="btn big" data-a="help" type="button">Necesito ayuda</button>');
+    var cs0 = S.contacts || [], whoTx = cs0.length ? (cs0.length === 1 ? cs0[0].name : cs0[0].name + ' y ' + (cs0.length - 1) + ' más') : '';
+    var el = overlay('<b>¿Estás bien?</b><p>Te has parado de golpe. Si no tocas nada, cuando llegue a cero ' + (whoTx ? 'aviso a ' + esc(whoTx) + ' con tu posición.' : 'el enlace de seguimiento mostrará el aviso.') + '</p><span class="as-count cifra" id="saN">60</span><button class="btn big primary" data-a="ok" type="button">Estoy bien</button><button class="btn big" data-a="help" type="button">Necesito ayuda</button>');
     var end = Date.now() + 60000;
     S.ask = { el: el, t: setInterval(function () { var left = Math.ceil((end - Date.now()) / 1000), n = el.querySelector('#saN'); if (n) n.textContent = Math.max(0, left); if (left <= 0) alertNow(); else if (left % 10 === 0) buzz(); }, 1000) };
     el.addEventListener('click', function (ev) { var b = ev.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === 'help') alertNow(); else { closeAsk(); S.alerted = true; } });
@@ -126,8 +111,8 @@
   /* ---------- vigilancia: cada 3 s mientras se graba ---------- */
   function tick() {
     var rec = A.isRec && A.isRec(), now = Date.now();
-    if (!rec) { if (S.wasRec) { askClose(); S.wasRec = false; S.buf = []; S.cand = null; S.alerted = false; if (S.share && !(S.ask && !S.ask.t)) endShare(); } return; }
-    if (!S.wasRec) { S.wasRec = true; S.buf = []; S.cand = null; S.alerted = false; loadContacts(false).then(function () { if (A.isRec() && !inGroup() && !(A.isDemo && A.isDemo()) && !(A.isTrip && A.isTrip()) && Cl.user()) startAsk(); }); }
+    if (!rec) { if (S.wasRec) { S.wasRec = false; S.buf = []; S.cand = null; S.alerted = false; if (S.share && !(S.ask && !S.ask.t)) endShare(); } return; }
+    if (!S.wasRec) { S.wasRec = true; S.buf = []; S.cand = null; S.alerted = false; loadContacts(false); }
     var f = A.lastFix && A.lastFix(); if (!f || now - f.ts > 12000) return;
     ping(false);
     if (!S.on || (A.isDemo && A.isDemo()) || inGroup() || !Cl.user()) { S.cand = null; return; }
@@ -143,5 +128,5 @@
   }
   setInterval(tick, 3000);
   if (Cl.onChange) Cl.onChange(function (u) { S.contacts = null; if (u) setTimeout(function () { loadContacts(true); }, 3000); else paintBtn(); });
-  window.RGSolo = { open: open, state: S, _ask: ask, _alert: alertNow, link: sendLink };
+  window.RGSolo = { open: open, pane: pane, setOn: setOn, contacts: function () { return S.contacts || []; }, load: loadContacts, state: S, _ask: ask, _alert: alertNow, link: sendLink };
 })();

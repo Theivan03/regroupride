@@ -1,6 +1,5 @@
-/* ReGroupRide — la estructura de cinco pestañas: Yo (perfil, estadísticas y ajustes por secciones), Explorar
-   (planificar, fotógrafos, rutas de mis comunidades y el botón «Crear»), la campana de avisos y chats, y el resumen
-   «Hoy» del mapa en reposo. No guarda nada en el servidor: reúne lo que ya hay en cada módulo. */
+/* ReGroupRide — piezas comunes: la campana (solo avisos), los no leídos de los chats, la línea «Hoy» del mapa,
+   las rutas de los catálogos, las fotos y la zona de privacidad. La organización de pantallas está en rg-ui.js. No guarda nada en el servidor: reúne lo que ya hay en cada módulo. */
 (function () {
   'use strict';
   var A = window.RGApp, Cl = window.RGCloud; if (!A || !Cl) return;
@@ -9,72 +8,11 @@
   function ic(n) { return '<svg><use href="#i-' + n + '"/></svg>'; }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
   function head(t) { return '<div class="head"><h1>' + t + '</h1><button class="btn small icon" id="shX" type="button" title="Cerrar">' + ic('close') + '</button></div>'; }
-  function openSheet(html) { var s = Cl.sheet(html); $('#shX', s).addEventListener('click', Cl.closeSheet); return s; }
+  function openSheet(html, kind) { var s = Cl.sheet(html, kind); $('#shX', s).addEventListener('click', Cl.closeSheet); return s; }
   function when(ms) { var d = new Date(ms), n = new Date(), day = d.toDateString() === n.toDateString() ? 'Hoy' : d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\.|,/g, ''); return day + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); }
   function ago(ms) { var m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 1 ? 'ahora' : m < 60 ? 'hace ' + m + ' min' : m < 1440 ? 'hace ' + Math.round(m / 60) + ' h' : 'hace ' + Math.round(m / 1440) + ' d'; }
   function mine() { return (window.RGClub && RGClub.mine ? RGClub.mine() : []).filter(function (e) { return e.starts_at > Date.now() - 6 * 36e5; }).sort(function (a, b) { return a.starts_at - b.starts_at; }); }
   function clubs() { return (window.RGClub && RGClub.state && RGClub.state.list) || []; }
-
-  /* ---------- Yo: estadísticas y ajustes cuelgan de aquí ---------- */
-  if ($('#yoStats')) $('#yoStats').addEventListener('click', function () { A.showView('stats'); });
-  if ($('#yoSettings')) $('#yoSettings').addEventListener('click', function () { A.showView('settings'); });
-  $$('[data-yo]').forEach(function (b) { b.addEventListener('click', function () { A.showView('profile'); }); });
-
-  /* ---------- Ajustes en cinco secciones: cada bloque de la pantalla cae en la suya ---------- */
-  var setV = $('#view-settings'), secNow = 'cuenta';
-  function secOf(el) {
-    if (el.tagName === 'H1' || el.id === 'setSecs' || el.classList.contains('head')) return '';
-    if (el.dataset && el.dataset.sec) return el.dataset.sec;
-    var lab = (($('.label', el) || {}).textContent || '').toLowerCase();
-    if (el.id === 'rgPerms' || el.id === 'rgNoti' || /fotógraf/.test(lab)) return 'avisos';
-    if (el.classList.contains('rg-fields') || el.classList.contains('rg-music-set')) return 'marcha';
-    if (el.classList.contains('actions') || /no ves|privacidad/.test(lab)) return 'priv';
-    if (el.classList.contains('help') || /quién hace/.test(lab)) return 'ayuda';
-    return 'cuenta';
-  }
-  function secPaint() {
-    if (!setV) return;
-    Array.prototype.forEach.call(setV.children, function (el) { var s = secOf(el); if (s) el.classList.toggle('rg-sec-off', s !== secNow); });
-    $$('#setSecs button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.s === secNow)); });
-  }
-  if (setV) {
-    $$('#setSecs button').forEach(function (b) { b.addEventListener('click', function () { secNow = b.dataset.s; secPaint(); }); });
-    // «Ruta simulada» es una herramienta de diagnóstico: va con la ayuda, bajo «Algo no funciona»
-    var demo = $('#btnDemo'), diag = $('#diag');
-    if (demo && diag) { var hp = diag.parentNode, lb = $('.label', hp); if (lb) lb.textContent = 'Algo no funciona'; var p = document.createElement('p'); p.className = 'muted rg-small'; p.textContent = 'Estos datos sirven para saber si los sensores y el GPS del teléfono responden. Con la ruta simulada pruebas la app sin moverte.'; hp.insertBefore(p, diag); demo.classList.remove('wide'); hp.appendChild(demo); }
-    if (window.MutationObserver) new MutationObserver(secPaint).observe(setV, { childList: true });
-    document.addEventListener('rg:view', function (e) { if (e.detail === 'settings') secPaint(); });
-    secPaint();
-  }
-  // privacidad: un texto corto para que la sección no quede en un solo botón rojo
-  (function () {
-    var act = $('#btnWipe'); if (!act) return; act = act.parentNode;
-    var box = document.createElement('div'); box.className = 'rg-maker'; box.id = 'rgPrivBox';
-    box.innerHTML = '<span class="label">Privacidad</span><p class="muted" style="margin:0">Las rutas que grabas se quedan en este teléfono. Tu posición solo se comparte con tu grupo en vivo mientras ruedas, y con quien tú elijas.</p>';
-    act.parentNode.insertBefore(box, act);
-  })();
-
-  /* ---------- Explorar ---------- */
-  function plan() { A.showView('map'); var b = $('#btnPlan'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); }
-  if ($('#exPlan')) $('#exPlan').addEventListener('click', plan);
-  if ($('#exPhoto')) $('#exPhoto').addEventListener('click', function () { if (window.RGPhoto) RGPhoto.open('spots'); });
-  if ($('#exTrips')) $('#exTrips').addEventListener('click', function () { if (window.RGTrips) RGTrips.list(); });
-  // Un solo botón «Crear»: ruta, salida o viaje
-  function plus(ev) {
-    var fromClub = !!(ev && ev.currentTarget && ev.currentTarget.id === 'clPlus');
-    var cl = clubs(), admin = !!(window.RGClub && RGClub.api && RGClub.api.cur() && RGClub.api.isAdmin());
-    var s = openSheet(head('Crear') +
-      '<button class="club-card rg-pick" type="button" data-k="plan">' + ic('route') + '<span><b>Una ruta</b><span class="muted">Traza por dónde quieres ir y guárdala.</span></span></button>' +
-      '<button class="club-card rg-pick" type="button" data-k="ev">' + ic('cal') + '<span><b>Una salida</b><span class="muted">' + (admin ? 'Día, hora y punto de encuentro para tu comunidad.' : cl.length ? 'Las salidas las publican los administradores de la comunidad.' : 'Antes hay que entrar en una comunidad o crear la tuya.') + '</span></span></button>' +
-      '<button class="club-card rg-pick" type="button" data-k="trip">' + ic('map') + '<span><b>Un viaje</b><span class="muted">' + (admin && fromClub ? 'Varios días, publicado en la comunidad, con etapas y gastos.' : 'Varios días entre amigos, con etapas, alojamiento y gastos.') + '</span></span></button>');
-    $$('[data-k]', s).forEach(function (b) { b.addEventListener('click', function () {
-      var k = b.dataset.k; Cl.closeSheet();
-      if (k === 'plan') plan();
-      else if (k === 'trip') { if (window.RGTrips) RGTrips.create(admin && fromClub ? RGClub.api.cur().id : null); }
-      else if (!window.RGClub || !RGClub.newEvent()) { A.showView('club'); if (cl.length) A.toast('Las salidas las crea un administrador de la comunidad.', 'warn'); }
-    }); });
-  }
-  ['#exPlus', '#clPlus'].forEach(function (id) { var b = $(id); if (b) b.addEventListener('click', plus); });
 
   // Rutas de los catálogos de mis comunidades, todas juntas y con el mismo buscador
   var CAT = { at: 0, rows: null };
@@ -103,10 +41,14 @@
   var B = { key: null, items: [], at: 0, busy: false };
   var PH = { at: 0, n: 0, place: '' };
   function seen() { var v = +store('rg.bell.seen'); if (!v) { v = Date.now() - 2 * 864e5; store('rg.bell.seen', String(v)); } return v; }
-  function unread() { var s = seen(), me = Cl.user(); return B.items.filter(function (x) { return x.at > s; }).length; }
+  function isChat(x) { return /^chat-|^grp-/.test(String(x.id || '')); }
+  function unread() { var s = seen(); return B.items.filter(function (x) { return x.at > s && !isChat(x); }).length; }
+  function chatSeen() { var v = +store('rg.chat.seen'); if (!v) { v = Date.now() - 864e5; store('rg.chat.seen', String(v)); } return v; }
+  function chatUnread() { var s = chatSeen(); return B.items.filter(function (x) { return x.at > s && isChat(x); }); }
   function badge() {
     var n = unread() + mine().filter(function (e) { return e.status === 'offered'; }).length;
     $$('.rg-bell-n').forEach(function (i) { i.hidden = !n; i.textContent = n > 9 ? '9+' : String(n); });
+    var cn = chatUnread().length, tn = $('#tabChatN'); if (tn) { tn.hidden = !cn; tn.textContent = cn > 9 ? '9+' : String(cn); }
     today();
   }
   function bellLoad(force) {
@@ -122,32 +64,29 @@
   function itemGo(x) {
     var id = String(x.id || ''), cl = clubs().filter(function (c) { return c.name === x.community; })[0];
     Cl.closeSheet();
-    if (x.event) { var e = mine().filter(function (m) { return m.id === x.event; })[0]; if (e && window.RGClub) { RGClub.chat(e); return; } }
+    if (x.event && window.RGClub && RGClub.openEvent) { RGClub.openEvent(x.event, /^chat-/.test(id) ? 'chat' : 'plan'); return; }
     if (/^solo-/.test(id) && x.token) { window.open('https://regroupride-eventos.netlify.app/seguir.html?s=' + x.token, '_blank'); return; }
-    if (/^oacc-/.test(id)) { if (window.RGOpen) RGOpen.open(); return; }
+    if (/^oacc-/.test(id)) { if (window.RGClub) RGClub.goto(null, 'events'); return; }
     if (/^stl-/.test(id)) { if (window.RGGarage) RGGarage.stolen(); return; }
     if (/^fb/.test(id)) { Cl.openFeedback(); return; }
-    if (/^ph/.test(id)) { if (window.RGPhoto) RGPhoto.open('spots'); return; }
+    if (/^ph/.test(id)) { if (window.RGUI) RGUI.near('fotos'); return; }
+    if (/^mt-/.test(id)) { A.showView('garage'); return; }
     if (!window.RGClub) return;
-    RGClub.goto(cl ? cl.id : null, /^grp-/.test(id) ? 'groups' : x.kind === 'post' ? 'board' : x.kind === 'page' ? 'pages' : /^req|^join/.test(id) ? 'members' : 'events');
+    if (x.kind === 'event' && RGClub.openEvent && /^[0-9a-f-]{8,}$/i.test(id)) { RGClub.openEvent(id); return; }
+    RGClub.goto(cl ? cl.id : null, /^grp-/.test(id) || x.kind === 'post' ? 'chats' : x.kind === 'page' || /^req|^join/.test(id) ? 'info' : 'events');
   }
   function bellOpen() {
-    var s0 = seen(), ev = mine(), cl = clubs();
-    var KI = { event: 'cal', post: 'list', page: 'info', note: 'bell', call: 'people' }, KT = { event: 'Nueva salida', post: 'Tablón', page: 'Info' };
-    var news = B.items.slice(0, 30).map(function (x, i) {
-      return '<button class="rg-bl' + (x.at > s0 ? ' new' : '') + '" type="button" data-i="' + i + '">' + ic(KI[x.kind] || 'bell') + '<span><b>' + esc(x.head || KT[x.kind] || 'Aviso') + '</b><span>' + esc(x.title || '') + '</span><small>' + esc(x.community || '') + ' · ' + ago(x.at) + '</small></span></button>';
+    var s0 = seen(), ev = mine();
+    var KI = { event: 'cal', post: 'bell', page: 'info', note: 'bell', call: 'people' }, KT = { event: 'Nueva salida', post: 'Avisos', page: 'Info' };
+    var news = B.items.filter(function (x) { return !/^chat-|^grp-/.test(String(x.id || '')); }).slice(0, 30);
+    var rows = news.map(function (x, i) {
+      return '<button class="as-row' + (x.at > s0 ? ' new' : '') + '" type="button" data-i="' + i + '">' + ic(KI[x.kind] || 'bell') + '<span><b>' + esc(x.head || KT[x.kind] || 'Aviso') + '</b><small>' + esc(x.title || '') + '</small><small>' + esc(x.community || '') + ' · ' + ago(x.at) + '</small></span>' + ic('chev') + '</button>';
     }).join('');
-    var offered = ev.filter(function (e) { return e.status === 'offered'; }).map(function (e) { return '<button class="rg-bl new" type="button" data-off="' + e.id + '">' + ic('check') + '<span><b>Tienes una plaza</b><span>' + esc(e.title) + '</span><small>' + esc(e.community || '') + ' · contesta cuanto antes</small></span></button>'; }).join('');
-    var chats = ev.filter(function (e) { return e.status !== 'offered'; }).slice(0, 8).map(function (e) { return '<button class="rg-bl" type="button" data-chat="' + e.id + '">' + ic('people') + '<span><b>' + esc(e.title) + '</b><small>Chat de la salida · ' + esc(when(e.starts_at)) + '</small></span></button>'; }).join('') +
-      cl.map(function (c) { return '<button class="rg-bl" type="button" data-talk="' + c.id + '">' + ic('list') + '<span><b>' + esc(c.name) + '</b><small>Charlas de la comunidad</small></span></button>'; }).join('');
-    var s = openSheet(head('Avisos y chats') +
-      (Cl.user() ? '' : '<p class="muted">Entra en tu cuenta para ver tus avisos.</p>') +
-      '<span class="label">Avisos</span><div class="rg-bls">' + (offered + news || '<div class="empty">No tienes avisos nuevos.</div>') + '</div>' +
-      (chats ? '<span class="label">Chats</span><div class="rg-bls">' + chats + '</div>' : ''));
-    $$('[data-i]', s).forEach(function (b) { b.addEventListener('click', function () { itemGo(B.items[+b.dataset.i]); }); });
-    $$('[data-off]', s).forEach(function (b) { b.addEventListener('click', function () { Cl.closeSheet(); if (window.RGClub) RGClub.goto(null, 'events'); }); });
-    $$('[data-chat]', s).forEach(function (b) { b.addEventListener('click', function () { var e = ev.filter(function (m) { return m.id === b.dataset.chat; })[0]; if (e && window.RGClub) RGClub.chat(e); }); });
-    $$('[data-talk]', s).forEach(function (b) { b.addEventListener('click', function () { Cl.closeSheet(); if (window.RGClub) RGClub.goto(b.dataset.talk, 'groups'); }); });
+    var offered = ev.filter(function (e) { return e.status === 'offered'; }).map(function (e) { return '<button class="as-row new" type="button" data-off="' + e.id + '">' + ic('check') + '<span><b>Tienes una plaza</b><small>' + esc(e.title) + ' · contesta cuanto antes</small></span>' + ic('chev') + '</button>'; }).join('');
+    var s = openSheet(head('Avisos') + (Cl.user() ? '' : '<p class="muted">Entra en tu cuenta para ver tus avisos.</p>') +
+      '<div class="as-rows">' + (offered + rows || '<div class="empty"><b>Sin avisos</b>Aquí llegan las salidas nuevas, los avisos de tu comunidad y lo que venza en tu moto.</div>') + '</div>', 'tall');
+    $$('[data-i]', s).forEach(function (b) { b.addEventListener('click', function () { itemGo(news[+b.dataset.i]); }); });
+    $$('[data-off]', s).forEach(function (b) { b.addEventListener('click', function () { Cl.closeSheet(); var e = ev.filter(function (m) { return m.id === b.dataset.off; })[0]; if (e && window.RGClub && RGClub.openEvent) RGClub.openEvent(e.id); else if (window.RGClub) RGClub.goto(null, 'events'); }); });
     store('rg.bell.seen', String(Date.now())); badge();
     bellLoad(true);
   }
@@ -164,28 +103,18 @@
     sb.rpc('photo_list', { p_lat: f.lat, p_lon: f.lon }).then(function (r) {
       if (r.error || !r.data) return; var now = Date.now(), end = new Date(); end.setHours(23, 59, 59, 0);
       var near = (r.data.spots || []).filter(function (s) { return s.km != null && s.km <= 40 && s.ends_at > now && s.starts_at < +end; });
-      PH.n = near.length; PH.place = near.length ? near[0].place : ''; today();
+      PH.n = near.length; PH.place = near.length ? near[0].place : '';
     }, function () {});
   }
   function today() {
-    var el = $('#rgToday'), tot = $('#idleTotals'); if (!el) return;
-    var rows = [], ev = mine(), off = ev.filter(function (e) { return e.status === 'offered'; })[0], next = ev.filter(function (e) { return e.status === 'going' || e.status === 'waiting'; })[0];
-    if (off) rows.push({ i: 'check', k: 'off', b: 'Tienes una plaza', t: off.title + ' · contesta cuanto antes', hot: 1 });
-    if (next) rows.push({ i: next.is_trip ? 'route' : 'cal', k: 'ev', go: next.is_trip ? function () { if (window.RGTrips) RGTrips.open(next.id); } : null, b: (next.is_trip ? 'Viaje: ' : 'Salida: ') + next.title, t: when(next.starts_at) + (next.meet_name ? ' · ' + next.meet_name : '') + (next.status === 'waiting' ? ' · en espera' : '') });
-    var due = []; try { due = (A.maintDue ? A.maintDue() : []).filter(function (x) { return x.st === 'due'; }); } catch (e) {}
-    if (due.length) rows.push({ i: 'wrench', k: 'mt', b: due.length === 1 ? 'Mantenimiento vencido' : due.length + ' mantenimientos vencidos', t: due[0].m.name + ' · ' + (due[0].v.name || 'tu moto'), hot: 1 });
-    if (PH.n) rows.push({ i: 'camera', k: 'ph', b: PH.n === 1 ? 'Un fotógrafo cerca hoy' : PH.n + ' fotógrafos cerca hoy', t: PH.place });
-    (window.RGToday || []).forEach(function (f) { try { var x = f(); if (x) rows.push(x); } catch (e) {} });
-    var go = function (r) { if (r.go) { r.go(); return; } if (r.k === 'mt') A.showView('garage'); else if (r.k === 'ph') { if (window.RGPhoto) RGPhoto.open('spots'); } else if (window.RGClub) RGClub.goto(r.k === 'ev' && next ? next.community_id : null, 'events'); };
-    var html = function () { return rows.slice(0, 6).map(function (r, i) { return '<button class="rg-td' + (r.hot ? ' hot' : '') + '" type="button" data-n="' + i + '">' + ic(r.i) + '<span><b>' + esc(r.b) + '</b><small>' + esc(r.t || '') + '</small></span>' + ic('chev') + '</button>'; }).join(''); };
-    var bind = function (root, close) { $$('[data-n]', root).forEach(function (b) { b.addEventListener('click', function () { if (close) Cl.closeSheet(); go(rows[+b.dataset.n]); }); }); };
-    // en el mapa: una línea con lo primero y cuántas cosas más hay; con una ruta cargada no sale, para no tapar el mapa
+    var el = $('#asHoy'); if (!el) return;
+    var ev = mine(), off = ev.filter(function (e) { return e.status === 'offered'; })[0], next = ev.filter(function (e) { return e.status === 'going' || e.status === 'waiting'; })[0], e = off || next;
     var busy = !!(A.activePlan && A.activePlan()) || (A.isPlanMode && A.isPlanMode());
-    el.hidden = !rows.length || busy; if (tot) tot.hidden = !!rows.length || busy;
-    el.innerHTML = rows.length ? '<button class="rg-td rg-td-one' + (rows.some(function (r) { return r.hot; }) ? ' hot' : '') + '" type="button" id="tdOne">' + ic(rows[0].i) + '<span><b>' + esc(rows[0].b) + '</b></span>' + (rows.length > 1 ? '<i>+' + (rows.length - 1) + '</i>' : '') + ic('chev') + '</button>' : '';
-    if ($('#tdOne')) $('#tdOne').addEventListener('click', function () { if (rows.length === 1) { go(rows[0]); return; } var s = openSheet(head('Hoy') + '<div class="rg-today">' + html() + '</div>'); bind(s, true); });
-    // en Explorar: todo a la vista
-    var ex = $('#exToday'); if (ex) { ex.hidden = !rows.length; ex.innerHTML = rows.length ? '<span class="label">Hoy</span>' + html() : ''; bind(ex, false); }
+    el.hidden = !e || busy; if (!e) { el.innerHTML = ''; el.onclick = null; return; }
+    var d = new Date(e.starts_at), isToday = d.toDateString() === new Date().toDateString();
+    el.className = 'as-hoy' + (off ? ' hot' : '');
+    el.innerHTML = '<span class="as-date"><b>' + d.getDate() + '</b><small>' + d.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '') + '</small></span><span class="as-hoy-t"><b>' + (off ? 'Tienes una plaza · ' : isToday ? 'Hoy · ' : '') + esc(e.title) + '</b><small>' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + (e.meet_name ? ' · ' + esc(e.meet_name) : '') + (e.status === 'waiting' ? ' · en espera' : '') + '</small></span>' + ic('chev');
+    el.onclick = function () { if (window.RGClub && RGClub.openEvent) RGClub.openEvent(e.id); else if (window.RGClub) RGClub.goto(e.community_id, 'events'); };
   }
   window.RGToday = window.RGToday || [];
   setTimeout(function () { photoCheck(); today(); }, 6000); setInterval(function () { if (document.visibilityState !== 'hidden') { photoCheck(); today(); } }, 60000);
@@ -229,12 +158,7 @@
     if (r.wps && r.wps.length) { var mid = r.wps.slice(1, -1).filter(function (w) { return !near(Array.isArray(w) ? w : [w.lat, w.lon]); }), mk = function (p) { var w0 = r.wps[0]; return Array.isArray(w0) ? [p[1], p[0]] : Object.assign({}, w0, { lat: p[1], lon: p[0], name: undefined }); }; out.wps = [mk(cs[0])].concat(mid, [mk(cs[cs.length - 1])]); }
     return out;
   }
-  (function () {
-    var box = document.getElementById('rgPrivBox'); if (!box) return;
-    var d = document.createElement('div'); d.className = 'rg-priv-trim';
-    d.innerHTML = '<b>Zona de privacidad</b><span class="muted">Recorta el principio y el final de las rutas que publicas o compartes con tu comunidad, para que no se vea de dónde sales ni dónde acabas. Las salidas con punto de encuentro no se recortan.</span><div class="seg" id="privTrim">' + [[0, 'No'], [300, '300 m'], [500, '500 m'], [1000, '1 km']].map(function (x) { return '<button type="button" data-m="' + x[0] + '" aria-pressed="' + (trimM() === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
-    box.appendChild(d);
-    $$('#privTrim button').forEach(function (b) { b.addEventListener('click', function () { store('rg.priv.trim', b.dataset.m); $$('#privTrim button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
-  })();
-  window.RGShell = { catalog: catalog, plan: plan, trim: trim, pickPhoto: pickPhoto, upload: upload, clubs: clubs, mine: mine, esc: esc, ic: ic, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, plan: plan };
+  function privHtml() { return '<div class="seg" id="privTrim">' + [[0, 'No'], [300, '300 m'], [500, '500 m'], [1000, '1 km']].map(function (x) { return '<button type="button" data-m="' + x[0] + '" aria-pressed="' + (trimM() === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>'; }
+  function privBind(root) { $$('#privTrim button', root).forEach(function (b) { b.addEventListener('click', function () { store('rg.priv.trim', b.dataset.m); $$('#privTrim button', root).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); }); }
+  window.RGShell = { privHtml: privHtml, privBind: privBind, catalog: catalog, plan: function () { if (window.RGUI) RGUI.draw(); }, trim: trim, pickPhoto: pickPhoto, upload: upload, clubs: clubs, mine: mine, esc: esc, ic: ic, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, chatUnread: chatUnread, chatSeen: function (now) { if (now) { store('rg.chat.seen', String(Date.now())); badge(); } return chatSeen(); }, items: function () { return B.items; }, load: bellLoad, head: head, openSheet: openSheet, when: when, ago: ago };
 })();

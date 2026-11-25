@@ -71,9 +71,10 @@
     var $ = function (s, r) { return (r || document).querySelector(s); }, $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
     function ic(n) { return '<svg><use href="#i-' + n + '"/></svg>'; }
-    function open() {
-      var plans = (A.plans() || []).filter(function (p) { return p.coords && p.coords.length > 1; }), ar = areas(), got = {}; ar.forEach(function (x) { got[String(x.id)] = x; });
-      var act = A.activePlan && A.activePlan(); if (act) plans = [act].concat(plans.filter(function (p) { return p.id !== act.id; }));
+    function open(one) {
+      one = one && one.coords && one.coords.length > 1 ? one : null;
+      var plans = one ? [one] : (A.plans() || []).filter(function (p) { return p.coords && p.coords.length > 1; }), ar = areas(), got = {}; ar.forEach(function (x) { got[String(x.id)] = x; });
+      var act = !one && A.activePlan && A.activePlan(); if (act) plans = [act].concat(plans.filter(function (p) { return p.id !== act.id; }));
       var s = Cl.sheet('<div class="head"><h1>Mapas sin conexión</h1><button class="btn small icon" id="ofX" type="button" title="Cerrar">' + ic('close') + '</button></div>' +
         '<p class="muted" style="margin:0;text-align:left">Descarga el mapa de la zona de una ruta para verlo aunque te quedes sin cobertura. Hazlo con wifi: una ruta de 150 km ocupa entre 15 y 40 MB.</p>' +
         '<div class="rd-list" id="ofL">' + (plans.length ? plans.slice(0, 30).map(function (p, i) { var g = got[String(p.id)]; return '<div class="gx-log of-row"><span><b>' + esc(p.name || 'Ruta') + '</b><small>' + String(Math.round((p.dist || 0) * 10) / 10).replace('.', ',') + ' km' + (g ? ' · descargado (' + String(g.mb).replace('.', ',') + ' MB)' : '') + '</small></span><button class="btn small' + (g ? '' : ' primary') + '" data-dl="' + i + '" type="button">' + ic('download') + (g ? 'Actualizar' : 'Descargar') + '</button></div>'; }).join('') : '<div class="empty">Guarda antes una ruta (planificada, importada o de una salida) y aquí podrás descargar su mapa.</div>') + '</div>' +
@@ -81,13 +82,13 @@
         (ar.length ? '<button class="link danger" id="ofClear" type="button">Borrar todos los mapas descargados</button>' : '') +
         '<p class="muted rg-small" style="text-align:left">Sin conexión sigues viendo el mapa y el trazado de la ruta. Recalcular el camino, el tiempo y los avisos sí necesitan cobertura.</p>');
       $('#ofX', s).addEventListener('click', Cl.closeSheet);
-      if ($('#ofClear', s)) $('#ofClear', s).addEventListener('click', function () { clear().then(open); });
+      if ($('#ofClear', s)) $('#ofClear', s).addEventListener('click', function () { clear().then(function () { open(one); }); });
       $('#ofStop', s).addEventListener('click', function () { RGOffline.stop(); });
       $$('[data-dl]', s).forEach(function (b) { b.addEventListener('click', function () {
         var p = plans[+b.dataset.dl], box = $('#ofP'); box.hidden = false; $$('[data-dl]').forEach(function (x) { x.disabled = true; });
         download(p, function (d, n) { var bar = $('#ofBar'), t = $('#ofT'); if (bar) bar.style.width = Math.round(d / n * 100) + '%'; if (t) t.textContent = d + ' de ' + n + ' partes del mapa'; }).then(function (r) {
-          if (!$('#ofP')) return; if (r && r.stopped) { open(); return; } A.toast('Aviso: mapa de «' + (p.name || 'la ruta') + '» descargado. Cierra y abre la app para que el mapa lo use.', 'ok'); open();
-        }, function (e) { A.toast(e.message || 'No se ha podido descargar.', 'warn'); if ($('#ofP')) open(); });
+          if (!$('#ofP')) return; if (r && r.stopped) { open(one); return; } A.toast('Aviso: mapa de «' + (p.name || 'la ruta') + '» descargado. Cierra y abre la app para que el mapa lo use.', 'ok'); open(one);
+        }, function (e) { A.toast(e.message || 'No se ha podido descargar.', 'warn'); if ($('#ofP')) open(one); });
       }); });
     }
     var row = $('#exRow');

@@ -8,8 +8,8 @@
 <style>.rg-gate .app,.rg-gate .tabs{visibility:hidden}</style>
 <script>try{if((!navigator.webdriver||localStorage.getItem('rg.test.wall'))&&!localStorage.getItem('sb-lpkeaxtzfbuqjkkusjit-auth-token'))document.documentElement.classList.add('rg-gate')}catch(e){}</script>
 <meta name="description" content="Rutas en moto en grupo: sigue la ruta, que nadie se pierda, inclinación, estadísticas y garaje.">
-<meta name="theme-color" content="#F3F5F8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0B0F14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F1EFEA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E0E0C" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -424,6 +424,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 <link rel="stylesheet" href="rg-theme.css?v=0.51.0">
 <link rel="stylesheet" href="rg-quedada.css?v=0.51.0">
 <link rel="stylesheet" href="rg-plano.css?v=0.51.0">
+<link rel="stylesheet" href="rg-asfalto.css?v=0.51.0">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -486,6 +487,20 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
   <symbol id="i-undo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></g></symbol>
   <symbol id="i-wrench" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a4 4 0 0 0-5 5L4 17l3 3 5.5-5.5a4 4 0 0 0 5-5L15 12l-3-3z"/></g></symbol>
   <symbol id="i-weather" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 11.5 3.3 3.3 0 0 0 7 18z"/></g></symbol>
+  <symbol id="i-gravel" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="16" r="2.5"/><circle cx="15" cy="17" r="2"/><circle cx="12" cy="9" r="2.5"/><circle cx="19" cy="11" r="1.5"/></g></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5s6 6.3 6 10.5a6 6 0 0 1-12 0c0-4.2 6-10.5 6-10.5z"/></g></symbol>
+  <symbol id="i-animal" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-6l-2-3 3-1 2 2h7l3-5 2 1-2 5v7M9 20v-4M15 20v-4"/></g></symbol>
+  <symbol id="i-cone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 4h3l4 15h-11zM4 19h16M9 10h6M8 14.5h8"/></g></symbol>
+  <symbol id="i-block" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="6" rx="1"/><path d="M7 15v4M17 15v4M8 9l-3 6M14 9l-3 6M20 9l-3 6"/></g></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/></g></symbol>
+  <symbol id="i-cup" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h2a2 2 0 0 1 0 4h-2M8 3v2M12 3v2"/></g></symbol>
+  <symbol id="i-bed" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18V6M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="1.6"/></g></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></g></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.300c-.7.4-1 1-1 1.7M12 16.800v.2"/></g></symbol>
+  <symbol id="i-near" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V6a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v14M4 20h11M7 8h5v4H7z"/><path d="M14 11h2a2 2 0 0 1 2 2v3a1.5 1.5 0 0 0 3 0V9l-3-3"/></g></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></g></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></g></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></g></symbol>
 </svg>
 
 <div class="app">
@@ -494,32 +509,37 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 <section class="view map rg-eq" id="view-map" role="tabpanel">
   <div id="map"></div>
   <div class="map-top">
-    <div class="bar">
+    <button class="as-pill" id="asStatus" type="button" title="Estado de los sensores"><i></i><span id="asStatusT">Preparando…</span></button>
+    <div class="bar as-legacy">
       <span class="chip" id="chipSens">Sensores</span>
       <span class="chip" id="chipGps">GPS</span>
       <button class="chip" id="chipWake" type="button" title="Mantener la pantalla encendida">Pantalla</button>
       <span class="chip wx" id="chipWx" hidden title="Tiempo actual (Open-Meteo)">—</span>
     </div>
     <span class="timer cifra" id="rideTimer" hidden>00:00:00</span>
-    <button class="rg-bell" id="btnBell" type="button" title="Avisos y chats"><svg><use href="#i-bell"/></svg><i class="rg-bell-n" hidden></i></button><button class="avatar" id="btnProfile" type="button" title="Perfil" hidden><span id="avatarMini">I</span></button>
+    <button class="rg-bell" id="btnBell" type="button" title="Avisos"><svg><use href="#i-bell"/></svg><i class="rg-bell-n" hidden></i></button><button class="avatar" id="btnProfile" type="button" title="Perfil" hidden><span id="avatarMini">I</span></button>
   </div>
   <div class="nav-banner" id="navBanner" hidden>
     <span class="nav-ico" id="navIco"></span>
     <div class="nav-txt"><div class="nav-main"><b id="navDist"></b><span id="navText"></span></div><div class="nav-sub" id="navSub"></div></div>
   </div>
   <div class="map-ctrls" id="mapCtrls">
-    <button type="button" id="btnMore" aria-expanded="false" title="Más opciones"><svg class="m-dots"><use href="#i-more"/></svg><svg class="m-x"><use href="#i-close"/></svg></button>
+    <button type="button" id="btnNear" class="as-fl-txt" title="Gasolina, peligros, sitios y fotógrafos cerca"><svg><use href="#i-near"/></svg>Cerca</button>
     <button type="button" id="btnFollow" aria-pressed="true" title="Centrar en mi posición"><svg><use href="#i-locate"/></svg></button>
-    <button type="button" id="btnGroup" aria-pressed="false" title="Grupo en vivo"><svg><use href="#i-people"/></svg><span class="grp-badge" id="groupCount" hidden>0</span></button>
-    <button type="button" id="btnPlan" aria-pressed="false" title="Planificar una ruta"><svg><use href="#i-route"/></svg></button>
-    <button type="button" id="btnPark" aria-pressed="false" title="Aparcamiento"><svg><use href="#i-park"/></svg></button>
-    <button type="button" id="btnHeading" aria-pressed="false" title="Orientar el mapa al rumbo" hidden><svg><use href="#i-compass"/></svg></button>
-    <button type="button" id="btnLayers" aria-pressed="false" title="Ver mis rutas en el mapa" hidden><svg><use href="#i-layers"/></svg></button>
+    <button type="button" id="btnPlanBack" class="as-fl-txt" hidden><svg><use href="#i-back"/></svg>Volver</button>
+    <span class="as-legacy">
+    <button type="button" id="btnMore" aria-expanded="false"><svg class="m-dots"><use href="#i-more"/></svg><svg class="m-x"><use href="#i-close"/></svg></button>
+    <button type="button" id="btnGroup" aria-pressed="false"><svg><use href="#i-people"/></svg><span class="grp-badge" id="groupCount" hidden>0</span></button>
+    <button type="button" id="btnPlan" aria-pressed="false"><svg><use href="#i-route"/></svg></button>
+    <button type="button" id="btnPark" aria-pressed="false"><svg><use href="#i-park"/></svg></button>
+    <button type="button" id="btnHeading" aria-pressed="false" hidden><svg><use href="#i-compass"/></svg></button>
+    <button type="button" id="btnLayers" aria-pressed="false" hidden><svg><use href="#i-layers"/></svg></button>
+    </span>
   </div>
   <div class="map-bottom">
     <div class="card slim" id="followCard" hidden>
       <div class="follow-txt"><span class="name" id="followName"></span><span class="muted" id="followInfo"></span></div>
-      <button class="btn small" id="followSave" type="button" hidden>Guardar</button>
+      <button class="btn small icon" id="followSave" type="button" title="Guardar en mis rutas" hidden><svg><use href="#i-download"/></svg></button>
       <button class="btn small icon" id="followGmaps" type="button" title="Abrir en Google Maps"><svg><use href="#i-gmaps"/></svg></button>
       <button class="btn small icon" id="followStop" type="button" title="Dejar de seguir esta ruta"><svg><use href="#i-close"/></svg></button>
     </div>
@@ -528,13 +548,13 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
       <div class="muted" id="parkInfo">Guarda dónde dejas la moto y vuelve a ella sin buscar.</div>
       <div class="plan-actions">
         <button class="btn big primary" id="parkHere" type="button"><svg><use href="#i-park"/></svg>Guardar aquí</button>
-        <button class="btn small" id="parkGo" type="button" hidden><svg><use href="#i-gmaps"/></svg>Cómo llegar</button>
+        <button class="btn big" id="parkGo" type="button" hidden><svg><use href="#i-gmaps"/></svg>Volver a la moto</button>
         <button class="btn small" id="parkShow" type="button" hidden>Ver en el mapa</button>
-        <button class="btn small danger" id="parkForget" type="button" hidden>Olvidar</button>
+        <button class="btn small danger" id="parkForget" type="button" hidden>Quitar</button>
       </div>
     </div>
     <div class="card" id="planCard" hidden>
-      <div class="plan-head head"><h1>Planificar ruta</h1><button class="btn small icon" id="planClose" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>
+      <div class="plan-head head"><h1>Dibujar ruta</h1><button class="btn small icon" id="planClose" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>
       <div class="muted" id="planInfo">Pega el enlace de la ruta o toca el mapa para añadir puntos.</div>
       <div class="plan-link"><input type="text" id="planLink" placeholder="Enlace de Google Maps" inputmode="url" autocomplete="off"><button class="btn small" id="planImport" type="button"><svg><use href="#i-gmaps"/></svg>Importar</button><button class="btn small" id="planGpx" type="button" title="Importar un archivo GPX">GPX</button></div>
       <label class="rg-check plan-nohw"><input type="checkbox" id="planNoHw"><span><b>Evitar autovías</b><small>Busca carreteras secundarias, con más curvas.</small></span></label>
@@ -545,89 +565,64 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
         <button class="btn small" id="planClear" type="button" disabled><svg><use href="#i-trash"/></svg>Limpiar</button>
         <button class="btn small" id="planGmaps" type="button" disabled><svg><use href="#i-gmaps"/></svg>Maps</button>
       </div>
-      <button class="btn big primary" id="planSave" type="button" disabled>Guardar</button>
+      <button class="btn big primary" id="planSave" type="button" disabled>Guardar ruta</button>
     </div>
     <div class="card" id="idleCard">
-      <div class="rg-today" id="rgToday" hidden></div>
-      <div class="totals" id="idleTotals">
-        <div class="fig"><span class="label">Km totales</span><span class="val cifra" id="totKm">0<span class="unit">km</span></span></div>
-        <div class="fig"><span class="label">Rutas grabadas</span><span class="val cifra" id="totRides">0</span></div>
+      <button class="as-hoy" id="asHoy" type="button" hidden></button>
+      <div class="as-boxes" id="asBoxes">
+        <button type="button" id="asWho"><small>Con quién</small><b id="asWhoT">Voy solo</b></button>
+        <button type="button" id="asRoute"><small>Ruta</small><b id="asRouteT">Sin ruta</b></button>
       </div>
-      <div class="notice" id="notice" hidden style="margin-top:var(--sp-3)"></div>
-      <div class="idle-actions">
-        <button class="btn big rec rg-go" id="btnRide" type="button">Iniciar ruta</button>
-        <button class="btn big" id="btnTrip" type="button" title="Un desplazamiento corto: mide tiempo, km, velocidad e inclinación, sin guardar el recorrido"><svg><use href="#i-clock"/></svg>Trayecto</button>
-      </div>
+      <div class="notice" id="notice" hidden></div>
+      <button class="btn big rec rg-go" id="btnRide" type="button">Iniciar ruta</button>
+      <button class="as-link" id="btnTrip" type="button">Solo medir tiempo y km, sin guardar</button>
+      <div class="as-legacy"><div class="rg-today" id="rgToday" hidden></div><div class="totals" id="idleTotals"><span id="totKm"></span><span id="totRides"></span></div></div>
     </div>
-    <button class="rg-warnbtn" id="btnAlert" type="button" hidden title="Avisar al grupo: SOS, avería o gasolina"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M12 10v4.5M12 17.2v.3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg><span>Avisar</span></button>
+    <div class="as-ride-btns" id="asRideBtns" hidden>
+      <button class="as-avisar" id="btnAlert" type="button" title="Avisar"><svg><use href="#i-warn"/></svg>Avisar</button>
+      <button class="as-gas" id="btnGas" type="button" title="Gasolineras"><svg><use href="#i-fuel"/></svg>Gasolina</button>
+    </div>
     <div class="card" id="hudCard" hidden>
-      <div class="hud">
-        <div class="gauge-wrap"><div class="gauge-mini" id="gaugeMini"></div></div>
-        <div class="speed"><span class="val" id="hudSpeed">—</span><div class="unit">km/h</div></div>
-        <div class="maxes">
-          <div><span class="label">Izq</span><div class="val l" id="hudMaxL">0°</div><div class="last l"><small>últ.</small><b id="hudLastL">—</b></div></div>
-          <div><span class="label">Dcha</span><div class="val r" id="hudMaxR">0°</div><div class="last r"><small>últ.</small><b id="hudLastR">—</b></div></div>
-        </div>
-        <div class="meta" id="hudMeta"><b>0,0 km</b> · 0 curvas</div>
+      <div class="hud as-hud">
+        <div class="as-lean l"><b id="hudMaxL">0°</b><span><i>izq</i><small>máx. de hoy</small></span></div>
+        <div class="as-speed"><b id="hudSpeed">—</b><small>km/h</small></div>
+        <div class="as-lean r"><b id="hudMaxR">0°</b><span><i>dcha</i><small>máx. de hoy</small></span></div>
       </div>
-      <div class="hud-actions">
-        <div class="hud-sum"><span class="hud-line" id="hudLine">0,0 km · 0 curvas</span><span class="hud-time cifra" id="hudTime">0:00:00</span></div>
-        <button class="btn icon" id="btnHudInfo" type="button" aria-pressed="false" title="Ver velocidad e inclinación"><svg><use href="#i-chev"/></svg></button>
-        <button id="btnHudLean" type="button" hidden></button>
+      <div class="as-hud2">
+        <span class="as-km"><b class="cifra" id="asKm">0,0</b><small>km</small></span><span class="hud-time cifra" id="hudTime">0:00:00</span>
         <button class="btn big stop" id="btnStop" type="button"><svg><use href="#i-stop"/></svg>Parar</button>
       </div>
+      <div class="as-legacy"><div class="gauge-mini" id="gaugeMini"></div><b id="hudLastL"></b><b id="hudLastR"></b><div id="hudMeta"></div><span id="hudLine"></span><button id="btnHudInfo" type="button"></button><button id="btnHudLean" type="button"></button></div>
     </div>
   </div>
 </section>
 
 <!-- COMUNIDAD -->
 <section class="view rg-eq" id="view-club" role="tabpanel" hidden>
-  <div class="head"><h1>Comunidad</h1><div class="right"><button class="rg-bell" data-bell type="button" title="Avisos y chats"><svg><use href="#i-bell"/></svg><i class="rg-bell-n" hidden></i></button><button class="btn small primary rg-plus" id="clPlus" type="button" title="Crear salida, viaje o ruta"><svg><use href="#i-plus"/></svg>Crear</button></div></div>
+  <div class="head as-clhead"><button class="as-clname" id="clName" type="button"><h1 id="clNameT">Comunidad</h1><svg><use href="#i-down"/></svg></button><div class="right"><button class="rg-bell" data-bell type="button" title="Avisos"><svg><use href="#i-bell"/></svg><i class="rg-bell-n" hidden></i></button><button class="as-plus" id="clPlus" type="button" title="Crear salida"><svg><use href="#i-plus"/></svg></button></div></div>
   <div id="clubBody" class="club"></div>
 </section>
 
 <!-- RUTAS -->
 <section class="view" id="view-rides" role="tabpanel" hidden>
-  <div class="head">
-    <h1>Explorar</h1>
-    <div class="right">
-      <button class="rg-bell" data-bell type="button" title="Avisos y chats"><svg><use href="#i-bell"/></svg><i class="rg-bell-n" hidden></i></button>
-      <button class="btn small primary rg-plus" id="exPlus" type="button" title="Crear ruta, salida o viaje"><svg><use href="#i-plus"/></svg>Crear</button>
-      <input type="file" id="gpxFile" hidden>
-    </div>
+  <div class="head"><h1>Rutas</h1><div class="right"><button class="rg-bell" data-bell type="button" title="Avisos"><svg><use href="#i-bell"/></svg><i class="rg-bell-n" hidden></i></button><input type="file" id="gpxFile" hidden></div></div>
+  <div class="as-acts3">
+    <button type="button" id="ruDraw"><svg><use href="#i-pen"/></svg>Dibujar</button>
+    <button type="button" id="ruGen"><svg><use href="#i-spark"/></svg>Generar</button>
+    <button type="button" id="btnImportGpx"><svg><use href="#i-download"/></svg>Importar</button>
   </div>
-  <div class="rg-today" id="exToday" hidden></div>
-  <div class="rg-ex" id="rgEx">
-    <button class="btn big primary" id="exPlan" type="button"><svg><use href="#i-route"/></svg>Planificar una ruta</button>
-    <button class="btn rg-ex-trips" id="exTrips" type="button"><svg><use href="#i-route"/></svg><span><b>Mis viajes</b><small>Escapadas de varios días, entre amigos o con tu comunidad</small></span><svg><use href="#i-chev"/></svg></button>
-    <div class="rg-ex-row" id="exRow">
-      <button class="btn" id="exPhoto" type="button"><svg><use href="#i-camera"/></svg>Fotógrafos</button>
-      <button class="btn" id="btnImportGpx" type="button"><svg><use href="#i-download"/></svg>Importar GPX</button>
-    </div>
-  </div>
-  <span class="label">Rutas</span>
-  <div class="summary-row" id="ridesSummary"></div>
-  <div class="search"><svg><use href="#i-search"/></svg><input type="search" id="ridesSearch" placeholder="Buscar rutas por nombre o fecha"></div>
-  <div class="pills" id="ridesFilters">
-    <button class="pill" data-f="all" aria-pressed="true" type="button">Todas</button>
-    <button class="pill" data-f="plans" aria-pressed="false" type="button">Planificadas</button>
-    <button class="pill" data-f="public" aria-pressed="false" type="button">De otros moteros</button>
-    <button class="pill" data-f="catalog" aria-pressed="false" type="button">De mis comunidades</button>
-    <button class="pill" data-f="fav" aria-pressed="false" type="button">Favoritas</button>
-    <button class="pill" data-f="trips" aria-pressed="false" type="button">Trayectos</button>
-    <button class="pill" data-f="moto" aria-pressed="false" type="button" id="pillMoto" hidden>Moto</button>
-    <button class="pill" data-f="coche" aria-pressed="false" type="button" id="pillCoche" hidden>Coche</button>
-  </div>
+  <div class="search"><svg><use href="#i-search"/></svg><input type="search" id="ridesSearch" placeholder="Buscar por nombre o fecha"></div>
+  <div class="as-tabs" id="ruTabs"><button type="button" data-t="done" aria-pressed="true">Hechas</button><button type="button" data-t="plans" aria-pressed="false">Planeadas</button><button type="button" data-t="others" aria-pressed="false">De otros</button></div>
+  <div class="pills" id="ruSub" hidden></div>
   <div id="ridesList" class="list"></div>
-  <div class="actions" id="ridesActions" hidden><button class="btn wide" id="btnExportAll" type="button"><svg><use href="#i-download"/></svg>Exportar todas las curvas (CSV)</button></div>
+  <div class="as-legacy"><div class="summary-row" id="ridesSummary"></div><div class="pills" id="ridesFilters">
+    <button class="pill" data-f="all" aria-pressed="true" type="button">Todas</button><button class="pill" data-f="plans" aria-pressed="false" type="button">Planeadas</button><button class="pill" data-f="public" aria-pressed="false" type="button">Públicas</button><button class="pill" data-f="catalog" aria-pressed="false" type="button">Mis comunidades</button><button class="pill" data-f="fav" aria-pressed="false" type="button">Favoritas</button><button class="pill" data-f="trips" aria-pressed="false" type="button">Trayectos</button><button class="pill" data-f="moto" aria-pressed="false" type="button" id="pillMoto" hidden>Moto</button><button class="pill" data-f="coche" aria-pressed="false" type="button" id="pillCoche" hidden>Coche</button>
+  </div><div class="actions" id="ridesActions" hidden></div></div>
 </section>
 
 <!-- DETALLE -->
 <section class="view" id="view-detail" role="tabpanel" hidden>
-  <div class="head">
-    <button class="link" id="btnBack" type="button"><svg><use href="#i-back"/></svg>Rutas</button>
-    <span class="cifra" id="detailTitle" style="font-size:var(--fs-row)"></span>
-  </div>
+  <div class="head as-back"><button class="as-backbtn" id="btnBack" type="button" title="Volver"><svg><use href="#i-back"/></svg></button><div class="as-dtitle"><h1 id="detailTitle"></h1><small id="detailSub"></small></div><button class="as-backbtn" id="btnDetailMore" type="button" title="Más"><svg><use href="#i-more"/></svg></button></div>
   <div style="position:relative">
     <div id="detailMap"></div>
     <div class="seg toggle-float" id="colorMode"><button type="button" data-m="speed" aria-pressed="false">Vel</button><button type="button" data-m="lean" aria-pressed="true">Incl.</button></div>
@@ -647,8 +642,9 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
       <div class="fig"><span class="label">Km</span><span class="val cifra" id="rpKm">—</span></div>
     </div>
   </div>
-  <span class="label">Récords de ruta</span>
-  <div class="summary" id="detailSummary"></div>
+  <div class="as-table" id="detailSummary"></div>
+  <div class="as-parkask" id="detailPark" hidden><span>¿Has aparcado ya?</span><button class="btn small" id="detailParkBtn" type="button"><svg><use href="#i-park"/></svg>Guardar sitio</button></div>
+  <div class="as-acts3" id="detailActs"><button type="button" id="btnGpx"><svg><use href="#i-download"/></svg>GPX</button><button type="button" id="btnOffline"><svg><use href="#i-layers"/></svg>Sin conexión</button><button type="button" id="btnPublish"><svg><use href="#i-share"/></svg>Publicar</button></div>
   <div class="wxline" id="detailWx" hidden></div>
   <details class="fold" id="cornersWrap">
     <summary><span id="cornersSum">Curvas</span><svg><use href="#i-chev"/></svg></summary>
@@ -667,63 +663,70 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
   <span class="label">Fotos</span>
   <div class="photos" id="photos"></div>
   <input type="file" id="photoFile" accept="image/*" multiple hidden>
-  <div class="sheet-actions">
-    <button class="btn" id="btnGpx" type="button"><svg><use href="#i-download"/></svg>GPX</button>
-    <button class="btn" id="btnAsRoute" type="button"><svg><use href="#i-route"/></svg>Ruta para seguir</button>
-    <button class="btn" id="btnGmaps" type="button"><svg><use href="#i-gmaps"/></svg>Maps</button>
-    <button class="btn" id="btnShareCard" type="button"><svg><use href="#i-camera"/></svg>Tarjeta</button>
-    <button class="btn" id="btnFav" type="button"><svg><use href="#i-star"/></svg>Favorita</button>
-    <button class="btn" id="btnExportRide" type="button"><svg><use href="#i-download"/></svg><span>Curvas CSV</span></button>
-    <button class="btn" id="btnRename" type="button"><svg><use href="#i-edit"/></svg>Renombrar</button>
+  <div class="as-acts3 as-acts-more">
+    <button type="button" id="btnAsRoute"><svg><use href="#i-route"/></svg>Ruta para seguir</button>
+    <button type="button" id="btnShareCard"><svg><use href="#i-camera"/></svg>Tarjeta</button>
+    <button type="button" id="btnFav"><svg><use href="#i-star"/></svg>Favorita</button>
   </div>
-  <button class="btn big danger" id="btnDeleteRide" type="button"><svg><use href="#i-trash"/></svg>Borrar esta ruta</button>
+  <div class="as-legacy"><button id="btnGmaps" type="button"></button><button id="btnExportRide" type="button"><span>Curvas CSV</span></button><button id="btnRename" type="button"></button><button id="btnDeleteRide" type="button">Borrar esta ruta</button></div>
 </section>
 
 <!-- PERFIL -->
 <section class="view" id="view-profile" role="tabpanel" hidden>
-  <div class="head"><h1>Yo</h1><div class="right"><span class="label" id="profileXp"></span><button class="rg-bell" data-bell type="button" title="Avisos y chats"><svg><use href="#i-bell"/></svg><i class="rg-bell-n" hidden></i></button></div><button class="link" id="btnProfileBack" type="button" hidden>Mapa</button></div>
-  <div class="profile-head">
-    <button class="avatar big" id="btnAvatar" type="button" title="Cambiar foto"><span id="avatarBig">I</span></button>
-    <input type="file" id="avatarFile" accept="image/*" hidden>
-    <div style="flex:1;min-width:0">
-      <input type="text" id="profileName" class="name-input" maxlength="24" placeholder="Tu nombre">
-      <div class="level-pill" id="levelPill">Nivel 1 · Novato</div>
+  <div class="head"><h1>Yo</h1><div class="right"><button class="rg-bell" data-bell type="button" title="Avisos"><svg><use href="#i-bell"/></svg><i class="rg-bell-n" hidden></i></button></div><button class="link" id="btnProfileBack" type="button" hidden>Mapa</button></div>
+  <div class="profile-head as-yo">
+    <div class="as-yo-top">
+      <button class="avatar big" id="btnAvatar" type="button" title="Cambiar foto"><span id="avatarBig">I</span></button>
+      <input type="file" id="avatarFile" accept="image/*" hidden>
+      <div class="as-yo-id">
+        <input type="text" id="profileName" class="name-input" maxlength="24" placeholder="Tu nombre">
+        <div class="as-yo-lv"><span class="level-pill" id="levelPill">Nivel 1 · Novato</span><span id="profileXp"></span></div>
+        <span class="bar3"><i id="levelBar" style="width:0%"></i></span><small id="levelNext"></small>
+      </div>
     </div>
+    <div class="as-yo-figs" id="yoFigs"></div>
   </div>
-  <button class="btn small rg-photo-btn" id="btnAvatar2" type="button"><svg><use href="#i-camera"/></svg>Cambiar foto de perfil</button>
-  <div class="rg-yo-nav"><button class="btn" id="yoStats" type="button"><svg><use href="#i-chart"/></svg>Estadísticas</button><button class="btn" id="yoSettings" type="button"><svg><use href="#i-sliders"/></svg>Ajustes</button></div>
-  <div class="goals">
-    <div class="goal"><span class="label" style="color:var(--color-text)">XP</span><span class="label" id="levelNext"></span><span class="bar3"><i id="levelBar" style="width:0%"></i></span></div>
+  <div class="as-rows" id="yoNav">
+    <button type="button" data-go="garage"><svg><use href="#i-bike"/></svg><span><b>Mi moto</b><small id="yoBikeT">Añade tu moto</small></span><i class="as-dot" id="yoBikeDot" hidden></i><svg><use href="#i-chev"/></svg></button>
+    <button type="button" data-go="stats"><svg><use href="#i-chart"/></svg><span><b>Estadísticas y logros</b><small id="yoStatsT">Cifras, metas y logros</small></span><svg><use href="#i-chev"/></svg></button>
+    <button type="button" data-go="security"><svg><use href="#i-shield"/></svg><span><b>Seguridad</b><small id="yoSecT">Voy solo, contactos y zona de privacidad</small></span><svg><use href="#i-chev"/></svg></button>
+    <button type="button" data-go="settings"><svg><use href="#i-sliders"/></svg><span><b>Ajustes</b><small>En marcha, avisos y cuenta</small></span><svg><use href="#i-chev"/></svg></button>
+    <button type="button" data-go="help"><svg><use href="#i-help"/></svg><span><b>Ayuda</b><small>Tutorial, sugerencias y quién hace la app</small></span><svg><use href="#i-chev"/></svg></button>
   </div>
-  <div id="profileBike"></div>
-  <div class="summary-row" id="profileTotals"></div>
-  <div><span class="label">Nivel de motero</span><div id="rgRiderLevel"></div></div>
-  <div class="goals" id="profileStreak"></div>
-  <span class="label">Logros · <span id="achCount"></span></span>
-  <div class="cats" id="achCats"></div>
-  <div class="pills" id="achFilter"></div>
-  <div id="achList" class="list"></div>
+  <div class="as-legacy"><button id="btnAvatar2" type="button"></button><div id="profileBike"></div><div id="profileTotals"></div></div>
 </section>
 
 <!-- ESTADÍSTICAS -->
 <section class="view" id="view-stats" role="tabpanel" hidden>
-  <div class="head"><button class="link" data-yo type="button"><svg><use href="#i-back"/></svg>Yo</button></div>
-  <h1>Estadísticas</h1>
-  <div class="goals" id="goals"></div>
-  <div class="seg" id="statsMode" style="align-self:flex-start"><button type="button" data-m="month" aria-pressed="true">Mes</button><button type="button" data-m="year" aria-pressed="false">Año</button></div>
-  <div class="period"><button class="btn small icon" id="perPrev" type="button"><svg><use href="#i-back"/></svg></button><span class="label" id="perLabel"></span><button class="btn small icon" id="perNext" type="button"><svg><use href="#i-chev"/></svg></button></div>
-  <div class="bigkm" id="perKm">0<small>km</small></div>
-  <div class="summary-row" id="perRow"></div>
-  <span class="label" id="chartLabel">Km por día</span>
-  <svg class="chart" id="chart" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
-  <span class="label">Récords del periodo</span>
-  <div class="records" id="perRecords"></div>
-  <div class="goals" id="streak"></div>
+  <div class="head as-back"><button class="as-backbtn" data-yo type="button" title="Volver a Yo"><svg><use href="#i-back"/></svg></button><h1>Estadísticas</h1></div>
+  <div class="as-tabs" id="stTabs"><button type="button" data-t="cifras" aria-pressed="true">Cifras</button><button type="button" data-t="metas" aria-pressed="false">Metas</button><button type="button" data-t="logros" aria-pressed="false">Logros</button></div>
+  <div class="as-pane" data-pane="cifras">
+    <div class="seg" id="statsMode" style="align-self:flex-start"><button type="button" data-m="month" aria-pressed="true">Mes</button><button type="button" data-m="year" aria-pressed="false">Año</button></div>
+    <div class="period"><button class="btn small icon" id="perPrev" type="button"><svg><use href="#i-back"/></svg></button><span class="label" id="perLabel"></span><button class="btn small icon" id="perNext" type="button"><svg><use href="#i-chev"/></svg></button></div>
+    <div class="bigkm" id="perKm">0<small>km</small></div>
+    <div class="summary-row" id="perRow"></div>
+    <span class="label" id="chartLabel">Km por día</span>
+    <svg class="chart" id="chart" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
+    <span class="label">Récords del periodo</span>
+    <div class="records" id="perRecords"></div>
+  </div>
+  <div class="as-pane" data-pane="metas" hidden>
+    <div class="goals" id="goals"></div>
+    <div class="goals" id="streak"></div>
+    <div class="goals" id="profileStreak"></div>
+  </div>
+  <div class="as-pane" data-pane="logros" hidden>
+    <div class="as-figs" id="achTotal"></div>
+    <span class="label" hidden>Logros · <span id="achCount"></span></span>
+    <div class="cats" id="achCats"></div>
+    <div class="pills" id="achFilter"></div>
+    <div id="achList" class="list"></div>
+  </div>
 </section>
 
 <!-- GARAJE -->
 <section class="view" id="view-garage" role="tabpanel" hidden>
-  <div class="head"><h1>Garaje</h1><div class="right"><button class="rg-bell" data-bell type="button" title="Avisos y chats"><svg><use href="#i-bell"/></svg><i class="rg-bell-n" hidden></i></button><button class="btn small" id="btnAddVehicle" type="button"><svg><use href="#i-plus"/></svg>Añadir</button></div></div>
+  <div class="head as-back"><button class="as-backbtn" data-yo type="button" title="Volver a Yo"><svg><use href="#i-back"/></svg></button><h1>Mi moto</h1><div class="right"><button class="btn small" id="btnAddVehicle" type="button"><svg><use href="#i-plus"/></svg>Añadir</button></div></div>
   <div class="summary-row" id="garageSummary"></div>
   <div id="vehicleForm" class="form rg-hoja" hidden>
     <div class="head"><h1 id="vehicleFormTitle">Nuevo vehículo</h1><button class="btn small icon" id="vClose" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>
@@ -745,7 +748,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
     <button class="btn rg-skip" id="vCancel" type="button">Cancelar</button>
   </div>
   <div id="maintForm" class="form rg-hoja" hidden>
-    <div class="head"><h1 id="maintFormTitle">Nueva tarea de mantenimiento</h1><button class="btn small icon" id="mClose" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>
+    <div class="head"><h1 id="maintFormTitle">Nueva tarea de taller</h1><button class="btn small icon" id="mClose" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>
     <label class="rg-campo"><span>Nombre</span><input type="text" id="mName" placeholder="Qué (p. ej. Aceite motor)" maxlength="40"></label>
     <div class="two"><label class="rg-campo"><span>Cada cuántos km</span><input type="number" id="mKm" placeholder="km" min="0" step="100" inputmode="numeric"></label><label class="rg-campo"><span>Cada cuántos meses</span><input type="number" id="mMonths" placeholder="opcional" min="0" step="1" inputmode="numeric"></label></div>
     <div class="two"><label class="rg-campo"><span>Última vez · km</span><input type="number" id="mLastKm" placeholder="km" min="0" step="1" inputmode="numeric"></label><label class="rg-campo"><span>Última vez · fecha</span><input type="date" id="mLastDate"></label></div>
@@ -757,10 +760,10 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 
 <!-- AJUSTES -->
 <section class="view" id="view-settings" role="tabpanel" hidden>
-  <div class="head"><button class="link" data-yo type="button"><svg><use href="#i-back"/></svg>Yo</button></div>
-  <h1>Ajustes</h1>
-  <div class="seg rg-wide seg-5" id="setSecs"><button type="button" data-s="cuenta" aria-pressed="true">Cuenta</button><button type="button" data-s="marcha" aria-pressed="false">En marcha</button><button type="button" data-s="avisos" aria-pressed="false">Avisos</button><button type="button" data-s="priv" aria-pressed="false">Privacidad</button><button type="button" data-s="ayuda" aria-pressed="false">Ayuda</button></div>
+  <div class="head as-back"><button class="as-backbtn" data-yo type="button" title="Volver a Yo"><svg><use href="#i-back"/></svg></button><h1>Ajustes</h1></div>
+  <div class="as-tabs" id="setSecs"><button type="button" data-s="marcha" aria-pressed="true">En marcha</button><button type="button" data-s="avisos" aria-pressed="false">Avisos</button><button type="button" data-s="cuenta" aria-pressed="false">Cuenta</button></div>
   <div class="rg-account" id="rgAccount"></div>
+  <div class="rg-maker" data-sec="cuenta"><span class="label">Nivel de motero</span><div id="rgRiderLevel"></div></div>
   <div class="rg-account" id="rgSyncBox" hidden></div>
   <div class="rg-account" id="rgPerms" hidden></div>
   <div class="card rg-fields">
@@ -771,11 +774,12 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
     <div class="field"><label for="setInvert">Invertir izquierda y derecha</label><span class="switch"><input type="checkbox" id="setInvert"><span></span></span></div>
     <div class="field"><label>Velocidad mínima para contar una curva</label><span class="stepper"><button type="button" id="vminDown" aria-label="Menos">−</button><span class="v" id="vminVal">15<small>km/h</small></span><button type="button" id="vminUp" aria-label="Más">+</button></span></div>
     <div class="field"><label>Ángulo mínimo para contar una curva</label><span class="stepper"><button type="button" id="peakDown" aria-label="Menos">−</button><span class="v" id="peakVal">10°</span><button type="button" id="peakUp" aria-label="Más">+</button></span></div>
-    <div class="field"><label>Tema</label><span class="seg tall" id="themeSeg"><button type="button" data-theme="auto">Sistema</button><button type="button" data-theme="light">Día</button><button type="button" data-theme="dark">Noche</button></span></div>
+    <div class="field"><label>Tema</label><span class="seg tall" id="themeSeg"><button type="button" data-theme="auto">Sistema</button><button type="button" data-theme="light">Claro</button><button type="button" data-theme="dark">Oscuro</button></span></div>
   </div>
   <div class="actions">
     <button class="btn wide" id="btnDemo" type="button"><svg><use href="#i-play"/></svg><span>Ruta simulada</span></button>
-    <button class="btn big danger wide" id="btnWipe" type="button"><svg><use href="#i-trash"/></svg>Borrar todos los datos</button>
+    <button class="btn wide" id="btnExportAll" type="button"><svg><use href="#i-download"/></svg>Exportar todas las curvas (CSV)</button>
+    <button class="as-danger-link" id="btnWipe" type="button">Borrar todos mis datos</button>
   </div>
   <div class="help">
     <span class="label">Cómo funciona</span>
@@ -810,13 +814,25 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
   </div>
 </section>
 
+<!-- SEGURIDAD -->
+<section class="view" id="view-security" role="tabpanel" hidden>
+  <div class="head as-back"><button class="as-backbtn" data-yo type="button" title="Volver a Yo"><svg><use href="#i-back"/></svg></button><h1>Seguridad</h1></div>
+  <div id="secBody" class="as-col"></div>
+</section>
+
+<!-- AYUDA -->
+<section class="view" id="view-help" role="tabpanel" hidden>
+  <div class="head as-back"><button class="as-backbtn" data-yo type="button" title="Volver a Yo"><svg><use href="#i-back"/></svg></button><h1>Ayuda</h1></div>
+  <div class="as-rows" id="helpNav"></div>
+  <div id="helpBody" class="as-col"></div>
+</section>
+
 </div>
 
 <nav class="tabs" role="tablist" aria-label="Secciones">
   <button class="tab" role="tab" data-view="map" aria-selected="true" type="button"><svg><use href="#i-map"/></svg>Mapa</button>
-  <button class="tab" role="tab" data-view="rides" aria-selected="false" type="button"><svg><use href="#i-search"/></svg>Explorar</button>
-  <button class="tab" role="tab" data-view="club" aria-selected="false" type="button"><svg><use href="#i-people"/></svg>Comunidad</button>
-  <button class="tab" role="tab" data-view="garage" aria-selected="false" type="button"><svg><use href="#i-garage"/></svg>Garaje</button>
+  <button class="tab" role="tab" data-view="rides" aria-selected="false" type="button"><svg><use href="#i-route"/></svg>Rutas</button>
+  <button class="tab" role="tab" data-view="club" aria-selected="false" type="button"><svg><use href="#i-people"/></svg>Comunidad<i class="as-tab-n" id="tabChatN" hidden></i></button>
   <button class="tab" role="tab" data-view="profile" aria-selected="false" type="button"><svg><use href="#i-user"/></svg>Yo</button>
 </nav>
 
@@ -881,5 +897,6 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 <script data-cfasync="false" src="rg-social.js?v=0.51.0"></script>
 <script data-cfasync="false" src="rg-oauth.js?v=0.51.0"></script>
 <script data-cfasync="false" src="rg-routes.js?v=0.51.0"></script>
+<script data-cfasync="false" src="rg-ui.js?v=0.51.0"></script>
 </body>
 </html>

@@ -23,62 +23,59 @@
     return '<div class="ph-links">' + (ig ? '<a class="btn small" href="https://instagram.com/' + ig + '" target="_blank" rel="noopener">Instagram</a>' : '') + (web ? '<a class="btn small" href="' + esc(web) + '" target="_blank" rel="noopener">Sus fotos</a>' : '') + (wa ? '<a class="btn small" href="https://wa.me/' + (wa.length === 9 ? '34' + wa : wa) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + (fb ? '<a class="btn small" href="' + esc(fb) + '" target="_blank" rel="noopener">Facebook</a>' : '') + (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em) ? '<a class="btn small" href="mailto:' + esc(em) + '">Correo</a>' : '') + '</div>';
   }
   function pic(p, emo) { return '<span class="ph-ico">' + (/^https:\/\//.test(p.photo || '') ? '<img src="' + esc(p.photo) + '" alt="" loading="lazy">' : emo) + '</span>'; }
-  var D = null, tab = 'spots';
+  var D = null, tab = 'spots', CAM = '<svg><use href="#i-camera"/></svg>', nearF = 'hoy';
 
+  function load() { var f = fix(); return sb.rpc('photo_list', { p_lat: f ? f.lat : null, p_lon: f ? f.lon : null }).then(function (r) { D = ok(r); try { if (paintMarks(D.spots || [])) marksAt = Date.now(); } catch (e) {} return D; }); }
+  // «Dónde están» y «Todos» viven en Cerca › Fotos; aquí queda la ficha de quien es fotógrafo (y las altas).
   function open(t) {
     if (!me()) { Cl.openAuth(false); return; }
-    if (t) tab = t;
-    Cl.sheet(head('Fotógrafos') + '<p class="muted">Cargando…</p>'); $('#phX').addEventListener('click', Cl.closeSheet);
-    var f = fix();
-    sb.rpc('photo_list', { p_lat: f ? f.lat : null, p_lon: f ? f.lon : null }).then(function (r) { D = ok(r); draw(); try { if (paintMarks(D.spots || [])) marksAt = Date.now(); } catch (e) {} })
-      .catch(function (e) { Cl.sheet(head('Fotógrafos') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>'); $('#phX').addEventListener('click', Cl.closeSheet); });
+    if (t === 'spots' || t === 'people' || !t) { D = null; if (window.RGUI) { RGUI.near('fotos'); return; } }
+    tab = t === 'admin' ? 'admin' : 'mine';
+    Cl.sheet(head('Soy fotógrafo') + '<p class="muted">Cargando…</p>', 'full'); $('#phX').addEventListener('click', Cl.closeSheet);
+    load().then(draw).catch(function (e) { Cl.sheet(head('Soy fotógrafo') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>', 'full'); $('#phX').addEventListener('click', Cl.closeSheet); });
   }
-  // La primera vez que se entra: un bocadillo, como los del tutorial, con el aviso de prudencia.
-  function safeBubble() {
-    if (store('rg.photo.safe') === '1' || document.querySelector('.rg-tour')) return;
-    var el = document.createElement('div'); el.className = 'rg-tour';
-    el.innerHTML = '<div class="rg-tour-hole" style="left:50%;top:50%;width:0;height:0;opacity:1"></div><div class="rg-tour-bub" data-arrow="none"><span class="rg-tour-n">Antes de nada</span><b>La foto no vale un susto</b>' +
-      '<p>Cuando veas que hay un fotógrafo cerca, pasa a tu ritmo y por tu carril. No fuerces la inclinación ni la velocidad para salir mejor.</p><p>Un accidente lo paga quien se cae, pero también los compañeros que vienen detrás, el fotógrafo y la gente que rueda por ahí. La mejor foto es la que te llevas a casa.</p>' +
-      '<div class="rg-tour-act"><button class="btn small primary" type="button">Entendido, con cabeza</button></div></div>';
-    document.body.appendChild(el);
-    var bub = el.querySelector('.rg-tour-bub'), w = Math.min(340, window.innerWidth - 24);
-    bub.style.width = w + 'px'; bub.style.left = (window.innerWidth - w) / 2 + 'px'; bub.style.top = Math.max(12, (window.innerHeight - bub.offsetHeight) / 2) + 'px';
-    setTimeout(function () { bub.classList.add('in'); }, 60);
-    el.querySelector('button').addEventListener('click', function () { store('rg.photo.safe', '1'); el.classList.add('out'); setTimeout(function () { el.remove(); }, 260); });
+  // Pestaña «Fotos» de «Cerca de ti»
+  function pane(el) {
+    var SAFE = '<div class="as-note amber">' + '<svg><use href="#i-warn"/></svg><span>La foto no vale un susto. Cuando veas a un fotógrafo, pasa a tu ritmo y por tu carril.</span></div>';
+    var shell = function (inner) { el.innerHTML = '<div class="pills" id="phF"><button class="pill" type="button" data-f="hoy" aria-pressed="' + (nearF === 'hoy') + '">Dónde están hoy</button><button class="pill" type="button" data-f="todos" aria-pressed="' + (nearF === 'todos') + '">Todos los fotógrafos</button></div><div id="phPane" class="as-col">' + inner + '</div>' + SAFE + '<button class="as-link" id="phMine" type="button">Soy fotógrafo</button>';
+      $$('#phF button', el).forEach(function (b) { b.addEventListener('click', function () { nearF = b.dataset.f; pane(el); }); });
+      $('#phMine', el).addEventListener('click', function () { open('mine'); }); };
+    if (!me()) { shell('<div class="empty"><b>Entra en tu cuenta</b>Para ver dónde van a estar los fotógrafos.</div>'); return; }
+    var paint = function () { if (!el.isConnected) return; shell(''); if (nearF === 'hoy') paneSpots(); else panePeople(); };
+    if (D && Date.now() - (D._at || 0) < 120000) { paint(); return; }
+    shell('<div class="empty"><b>Cargando…</b></div>');
+    load().then(function () { D._at = Date.now(); paint(); }).catch(function () { shell('<div class="empty"><b>No se ha podido cargar</b>Revisa la conexión.</div>'); });
   }
   function draw() {
     var m = D.me, pend = (D.pending || []).filter(function (x) { return x.status === 'pending'; });
-    var tabs = [['spots', 'Dónde están'], ['people', 'Todos'], ['mine', m && m.status === 'approved' ? 'Mi ficha' : 'Soy fotógrafo']];
+    var tabs = [['mine', m && m.status === 'approved' ? 'Mi ficha' : 'Darme de alta']];
     if (D.admin) tabs.push(['admin', 'Altas' + (pend.length ? ' · ' + pend.length : '')]);
-    Cl.sheet(head('Fotógrafos') + '<p class="muted" style="text-align:left;margin:0">Los fotógrafos que se ponen en los puertos y dónde estarán. Pasa por delante y luego busca tus fotos.</p>' +
-      '<div class="seg rg-wide' + (tabs.length > 3 ? ' seg-5' : '') + '" id="phTabs">' + tabs.map(function (x) { return '<button type="button" data-t="' + x[0] + '" aria-pressed="' + (tab === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div><div id="phPane"></div>');
+    if (tab === 'admin' && !D.admin) tab = 'mine';
+    Cl.sheet(head('Soy fotógrafo') + (tabs.length > 1 ? '<div class="seg rg-wide" id="phTabs">' + tabs.map(function (x) { return '<button type="button" data-t="' + x[0] + '" aria-pressed="' + (tab === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>' : '') + '<div id="phPane"></div>', 'full');
     $('#phX').addEventListener('click', Cl.closeSheet);
     $$('#phTabs button').forEach(function (b) { b.addEventListener('click', function () { tab = b.dataset.t; draw(); }); });
-    if (tab === 'admin' && !D.admin) tab = 'spots';
-    ({ spots: paneSpots, people: panePeople, mine: paneMine, admin: paneAdmin })[tab]();
-    setTimeout(safeBubble, 350);
+    ({ mine: paneMine, admin: paneAdmin })[tab]();
   }
   function paneSpots() {
     var host = $('#phPane'), day = '';
-    var SAFE = '<div class="rt-note warn ph-safe"><b><svg><use href="#i-warn"/></svg>Sin forzar para la foto</b><p>Pasa a tu ritmo y por tu carril. Una foto no vale un susto, ni para ti ni para los que vienen detrás.</p></div>';
-    host.innerHTML = D.spots.length ? SAFE + D.spots.map(function (s) {
+    host.innerHTML = D.spots.length ? D.spots.map(function (s) {
       var d = dayName(s.starts_at), sep = d !== day ? '<span class="label">' + d + '</span>' : ''; day = d;
       var live = s.starts_at <= Date.now() && s.ends_at > Date.now();
-      return sep + '<div class="club-card ph-card"><div class="ph-top">' + pic(s, '📸') + '<div><b>' + esc(s.name) + '</b><span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(s.place) + '</span></div>' + (live ? '<span class="mstatus ok">Ahora</span>' : '') + '</div>' +
+      return sep + '<div class="club-card ph-card"><div class="ph-top">' + pic(s, CAM) + '<div><b>' + esc(s.name) + '</b><span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(s.place) + '</span></div>' + (live ? '<span class="mstatus ok">Ahora</span>' : '') + '</div>' +
         '<div class="rt-meta"><span><svg><use href="#i-clock"/></svg>' + hhmm(s.starts_at) + ' – ' + hhmm(s.ends_at) + '</span>' + (s.km != null ? '<span><svg><use href="#i-route"/></svg>a ' + s.km + ' km de ti</span>' : '') + '</div>' +
         (s.note ? '<p class="rt-desc">' + esc(s.note) + '</p>' : '') +
         '<div class="ph-links"><button class="btn small primary" data-go="' + s.id + '" type="button"><svg><use href="#i-route"/></svg>Llévame</button><button class="btn small" data-see="' + s.id + '" type="button"><svg><use href="#i-map"/></svg>Ver en el mapa</button><a class="btn small" href="https://www.google.com/maps/dir/?api=1&destination=' + s.lat + ',' + s.lon + '" target="_blank" rel="noopener"><svg><use href="#i-gmaps"/></svg>Google Maps</a></div>' + links(s) +
         (s.user_id === me() || D.admin ? '<button class="link danger" data-del="' + s.id + '" type="button">Quitar</button>' : '') + '</div>';
-    }).join('') : '<div class="empty">Ahora mismo ningún fotógrafo ha avisado de dónde va a estar. Vuelve a mirar el fin de semana.</div>';
+    }).join('') : '<div class="empty"><b>Nadie ha avisado todavía</b>Ahora mismo ningún fotógrafo ha dicho dónde va a estar. Vuelve a mirar el fin de semana.</div>';
     var byId = function (id) { return D.spots.filter(function (x) { return x.id === id; })[0]; };
     $$('[data-go]', host).forEach(function (b) { b.addEventListener('click', function () { goTo(byId(b.dataset.go), b); }); });
     $$('[data-see]', host).forEach(function (b) { b.addEventListener('click', function () { var s = byId(b.dataset.see), map = A.map && A.map(); Cl.closeSheet(); A.showView('map'); if (map) map.flyTo({ center: [s.lon, s.lat], zoom: 13 }); }); });
-    $$('[data-del]', host).forEach(function (b) { b.addEventListener('click', function () { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = '¿Seguro? Toca otra vez'; return; } sb.from('photo_spots').delete().eq('id', b.dataset.del).then(function (r) { ok(r); open(); }).catch(fail); }); });
+    $$('[data-del]', host).forEach(function (b) { b.addEventListener('click', function () { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = '¿Seguro? Toca otra vez'; return; } sb.from('photo_spots').delete().eq('id', b.dataset.del).then(function (r) { ok(r); D = null; open(); }).catch(fail); }); });
   }
   function panePeople() {
     $('#phPane').innerHTML = D.people.length ? D.people.map(function (p) {
-      return '<div class="club-card ph-card"><div class="ph-top">' + pic(p, '📷') + '<div><b>' + esc(p.name) + '</b>' + (p.zones ? '<span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(p.zones) + '</span>' : '') + '</div>' + (p.pro ? '<span class="rt-tag">Destacado</span>' : '') + '</div>' + (p.bio ? '<p class="rt-desc">' + esc(p.bio) + '</p>' : '') + links(p) + '</div>';
-    }).join('') : '<div class="empty">Todavía no hay fotógrafos dados de alta.</div>';
+      return '<div class="club-card ph-card"><div class="ph-top">' + pic(p, CAM) + '<div><b>' + esc(p.name) + '</b>' + (p.zones ? '<span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(p.zones) + '</span>' : '') + '</div>' + (p.pro ? '<span class="rt-tag">Destacado</span>' : '') + '</div>' + (p.bio ? '<p class="rt-desc">' + esc(p.bio) + '</p>' : '') + links(p) + '</div>';
+    }).join('') : '<div class="empty"><b>Aún no hay fotógrafos</b>Si haces fotos en carretera, date de alta en «Soy fotógrafo».</div>';
   }
   function profileForm(m, label) {
     m = m || {};
@@ -175,7 +172,7 @@
   }
   function spotSheet(s) {
     var live = s.starts_at <= Date.now() && s.ends_at > Date.now();
-    Cl.sheet(head('Fotógrafo') + '<div class="club-card ph-card"><div class="ph-top">' + pic(s, '📸') + '<div><b>' + esc(s.name) + '</b><span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(s.place) + '</span></div>' + (live ? '<span class="mstatus ok">Ahora</span>' : '') + '</div>' +
+    Cl.sheet(head('Fotógrafo') + '<div class="club-card ph-card"><div class="ph-top">' + pic(s, CAM) + '<div><b>' + esc(s.name) + '</b><span class="ph-place"><svg><use href="#i-locate"/></svg>' + esc(s.place) + '</span></div>' + (live ? '<span class="mstatus ok">Ahora</span>' : '') + '</div>' +
       '<div class="rt-meta"><span><svg><use href="#i-clock"/></svg>' + dayName(s.starts_at) + ' · ' + hhmm(s.starts_at) + ' – ' + hhmm(s.ends_at) + '</span>' + (s.km != null ? '<span><svg><use href="#i-route"/></svg>a ' + s.km + ' km de ti</span>' : '') + '</div>' + (s.note ? '<p class="rt-desc">' + esc(s.note) + '</p>' : '') + links(s) + '</div>' +
       '<div class="rt-note warn"><b><svg><use href="#i-warn"/></svg>Sin forzar para la foto</b><p>Pasa a tu ritmo y por tu carril. Una foto no vale un susto.</p></div>' +
       '<button class="btn big primary" id="phGo" type="button"><svg><use href="#i-route"/></svg>Llévame hasta allí</button><a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=' + s.lat + ',' + s.lon + '" target="_blank" rel="noopener"><svg><use href="#i-gmaps"/></svg>Abrir en Google Maps</a>');
@@ -189,7 +186,7 @@
     spots.forEach(function (s) {
       var k = s.lat.toFixed(4) + ',' + s.lon.toFixed(4) + '|' + s.user_id; if (seen[k]) return; seen[k] = 1;      // el mismo fotógrafo en el mismo sitio varios días: un solo punto (el más próximo)
       var el = document.createElement('div'), live = s.starts_at <= Date.now() && s.ends_at > Date.now();
-      el.className = 'ph-mk' + (live ? ' live' : ''); el.innerHTML = '<span>📸</span>'; el.title = s.name + ' · ' + s.place;
+      el.className = 'ph-mk' + (live ? ' live' : ''); el.innerHTML = CAM; el.title = s.name + ' · ' + s.place;
       el.addEventListener('click', function (ev) { ev.stopPropagation(); spotSheet(s); });
       marks.push(new maplibregl.Marker({ element: el, anchor: 'bottom-left' }).setLngLat([s.lon, s.lat]).addTo(map));
     });
@@ -215,7 +212,7 @@
     if (Date.now() - nearAt < 4 * 60000) return; nearAt = Date.now();
     sb.rpc('photo_near', { p_lat: f.lat, p_lon: f.lon }).then(function (r) {
       (r.data || []).forEach(function (s) {
-        var headTx = '📸 ' + s.name + ' está a ' + s.km + ' km', body = s.place + ', de ' + s.from + ' a ' + s.to + '. Pasa a tu ritmo, sin forzar para la foto: la mejor es la que te llevas a casa.';
+        var headTx = s.name + ' está a ' + s.km + ' km', body = s.place + ', de ' + s.from + ' a ' + s.to + '. Pasa a tu ritmo, sin forzar para la foto: la mejor es la que te llevas a casa.';
         A.toast(headTx + ' · ' + s.place + '. Sin forzar para la foto.', 'ok');
         if (RA && RA.newsNow) RA.newsNow({ items: [{ kind: 'note', id: 'phn-' + s.id, community: 'Fotógrafos', head: headTx, title: body }], silent: false }).catch(function () {});
       });
@@ -235,5 +232,5 @@
       else { store('rg.photo.off', '1'); store('rg.photo.zone', null); zoneKey = ''; if (me()) sb.rpc('zone_set', { p_lat: null, p_lon: null }).then(function () {}, function () {}); }
     });
   }
-  window.RGPhoto = { open: open };
+  window.RGPhoto = { open: open, pane: pane };
 })();

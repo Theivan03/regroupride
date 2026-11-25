@@ -102,19 +102,22 @@
   function askStart(fix) {
     var p = plan(); nav.asked = true;
     if (!p || !p.coords || !p.coords.length) return;
-    var d0 = L.dist(fix.lat, fix.lon, p.coords[0][1], p.coords[0][0]);
-    if (d0 < 300) return;
+    if (nav.pre === 'start' && L.dist(fix.lat, fix.lon, p.coords[0][1], p.coords[0][0]) >= 300) { nav.toStart = true; nav.tr = L.Tracker(p.coords, L.navSteps(p), { fromStart: true }); nav.rejoin = null; nav.rejoinAt = 0; drawRejoin(); }
+    nav.pre = null;
+  }
+  // Al pulsar «Iniciar ruta» con una ruta cargada y lejos de su salida. Devuelve true si ha abierto la pregunta.
+  function preStart(next) {
+    var p = plan(), fix = A.lastFix() || (A.anyFix && A.anyFix()); nav.pre = null;
+    if (!p || !p.coords || p.coords.length < 2 || !fix) return false;
+    var d0 = L.dist(fix.lat, fix.lon, p.coords[0][1], p.coords[0][0]); if (d0 < 300) return false;
     var name = ((p.wps && p.wps[0] && p.wps[0][2]) || '').split(',')[0];
-    sheet('<div class="head"><h1>Iniciar ruta</h1><button class="btn small icon" id="tsX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p>Estás a <b>' + L.fmtDist(d0) + '</b> del punto de salida' + (name ? ' (' + esc(name) + ')' : '') + '.</p>' +
-      '<button class="btn big" id="tsNear" type="button"><svg><use href="#i-route"/></svg>Entrar por el punto más cercano</button><button class="btn big primary" id="tsStart" type="button"><svg><use href="#i-gmaps"/></svg>Ir al punto de salida</button>' +
-      '<p class="muted rg-small" style="text-align:left">«Ir al punto de salida» te lleva hasta donde empieza la ruta y, al llegar, sigue con ella.</p>');
+    sheet('<div class="head"><h1>Iniciar ruta</h1><button class="btn small icon" id="tsX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p style="margin:0;text-align:left">Estás a <b>' + L.fmtDist(d0) + '</b> del punto de salida de la ruta' + (name && name !== 'Salida' ? ' (' + esc(name) + ')' : '') + '.</p>' +
+      '<button class="btn big primary" id="tsStart" type="button"><svg><use href="#i-gmaps"/></svg>Ir al punto de salida</button><button class="btn big" id="tsNear" type="button"><svg><use href="#i-route"/></svg>Entrar por el punto más cercano</button>' +
+      '<p class="muted rg-small" style="text-align:left;margin:0">«Ir al punto de salida» te lleva hasta donde empieza la ruta y, al llegar, sigue con ella.</p>');
     $('#tsX').addEventListener('click', closeSheet);
-    $('#tsNear').addEventListener('click', closeSheet);
-    $('#tsStart').addEventListener('click', function () {
-      closeSheet(); var q = plan(); if (!nav.active || !q || q.id !== p.id) return;
-      nav.toStart = true; nav.tr = L.Tracker(q.coords, L.navSteps(q), { fromStart: true }); nav.rejoin = null; nav.rejoinAt = 0; drawRejoin();
-      var f = A.lastFix(); if (f) onFix(f);
-    });
+    $('#tsNear').addEventListener('click', function () { nav.pre = 'near'; closeSheet(); next(); });
+    $('#tsStart').addEventListener('click', function () { nav.pre = 'start'; closeSheet(); next(); });
+    return true;
   }
   function offAlert(d) {
     buzz([500, 200, 500, 200, 500]);
@@ -447,7 +450,7 @@
     return gpxAsPlan({ name: name || 'Ruta grabada', title: 'Ruta para seguir', coords: coords, wps: [[a[1], a[0], 'Salida'], [b[1], b[0], 'Llegada']], pois: [] });
   }
 
-  window.RGNav = { gpxRoute: gpxRoute, togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx, resolvePoint: function (t) { return resolvePoint(t); } };
+  window.RGNav = { preStart: preStart, gpxRoute: gpxRoute, togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx, resolvePoint: function (t) { return resolvePoint(t); } };
 
   /* ================= importar enlace de Google Maps ================= */
   function readClipboard() {
@@ -528,19 +531,49 @@
   // Hoja inferior (formularios y decisiones). kind 'page' = pantalla entera (bienvenida y permisos);
   // kind 'win' = ventana centrada (avisos que piden una respuesta).
   // En Mapa y Comunidad lleva la clase rg-eq, que da más violeta (guía de estética).
+  /* Hojas y pantallas completas. Una hoja es una decisión corta; lo que lleva pestañas o listas va a pantalla completa
+     con flecha de volver (kind 'full', o por su título). Las pantallas completas se apilan: al abrir otra, la anterior
+     se guarda tal cual y vuelve al cerrar. Nunca hay una hoja sobre otra hoja. */
+  var FULL = /^(Chat|Fotos|Gestionar|Comunidades|Mis viajes|Viaje|Sugerencias|Normas|Descuentos|Retos|Sitios|Catálogo|Rutas de |Documentos|Papeles|Gastos|Me han robado|Motos robadas|Diagnóstico|Lista antes de salir|Nueva salida|Editar salida|Nueva comunidad|Editar comunidad|Nuevo viaje|Editar viaje|Mapas sin conexión|Fotógrafos|Soy fotógrafo|Proponer un sitio|Entrada QR|Control de entrada|Asistentes|Grupos|Organizar por grupos|Personas que no veo|Nueva página|Info)/;
+  var pageStack = [];
+  function titleOf(html) { var m = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html); return m ? m[1].replace(/<[^>]+>/g, '').trim() : ''; }
+  function pageEl() { var p = $('#rgPage'); if (!p) { p = document.createElement('div'); p.id = 'rgPage'; p.className = 'rg-sheet rg-full'; p.hidden = true; var sh = $('#rgSheet'); sh.parentNode.insertBefore(p, sh); } return p; }
   function sheet(html, kind) {
     if (!kind && (/^<div class="rg-logo"/.test(html) || /<h1>(Un permiso más|Falta algo para rodar|Permiso de ubicación)<\/h1>/.test(html))) kind = 'page';
+    var t = titleOf(html);
+    if (!kind && (FULL.test(t) || /data-full/.test(html.slice(0, 300)))) kind = 'full';
+    if (kind === 'full') {
+      var p = pageEl(), cur = p.firstChild, sh = $('#rgSheet'); if (!sh.hidden) { sh.hidden = true; sh.innerHTML = ''; }
+      var at = -1; pageStack.forEach(function (x, i) { if (x.t === t) at = i; });
+      if (at >= 0) pageStack.length = at;                                              // se vuelve a una pantalla que estaba debajo
+      else if (cur && !p.hidden && p.dataset.t !== t) pageStack.push({ t: p.dataset.t, el: cur, top: cur.scrollTop });   // otra pantalla encima
+      var keep = cur && !p.hidden && p.dataset.t === t ? cur.scrollTop : 0;
+      var inn = document.createElement('div'); inn.className = 'rg-sheet-in'; inn.innerHTML = html.replace(/(<div class="head"[^>]*>)([\s\S]*?)(<button[^>]*class="btn small icon"[^>]*>)\s*<svg><use href="#i-close"\/><\/svg>\s*(<\/button>)/, function (m, a, mid, b, c) { return a + b.replace('title="Cerrar"', 'title="Volver"') + '<svg><use href="#i-back"/></svg>' + c + mid; });
+      p.innerHTML = ''; p.appendChild(inn); p.dataset.t = t; p.className = 'rg-sheet rg-full' + (pageStack.length ? ' rg-deep' : ''); p.hidden = false; inn.scrollTop = keep;
+      document.body.classList.add('rg-has-page'); return p;
+    }
     var s = $('#rgSheet'), v = document.querySelector('.app > .view:not([hidden])'), eq = !!(v && (v.id === 'view-map' || v.id === 'view-club')) && kind !== 'page';
     var still = !s.hidden;      // si ya estaba abierta (se redibuja), no repite la animación de entrada
-    s.className = 'rg-sheet' + (kind === 'page' ? ' rg-page' : '') + (kind === 'win' ? ' rg-win' : '') + (eq ? ' rg-eq' : '') + (still ? ' rg-still' : '');
-    s.innerHTML = '<div class="rg-sheet-in">' + html + '</div>'; s.hidden = false; s.scrollTop = 0; var inn = s.firstChild; if (inn) inn.scrollTop = 0; return s;
+    s.className = 'rg-sheet' + (kind === 'page' ? ' rg-page' : '') + (kind === 'win' ? ' rg-win' : '') + (kind === 'tall' ? ' rg-tall' : '') + (eq ? ' rg-eq' : '') + (still ? ' rg-still' : '');
+    s.innerHTML = '<div class="rg-sheet-in">' + html + '</div>'; s.hidden = false; s.scrollTop = 0; var inn2 = s.firstChild; if (inn2) inn2.scrollTop = 0; return s;
   }
-  function closeSheet() { var s = $('#rgSheet'); s.hidden = true; s.innerHTML = ''; }
+  // Cierra lo que esté encima: la hoja si hay una; si no, la pantalla completa (y vuelve a la que hubiera debajo).
+  function closeSheet() {
+    var s = $('#rgSheet'); if (!s.hidden) { s.hidden = true; s.innerHTML = ''; return; }
+    var p = $('#rgPage'); if (!p || p.hidden) return;
+    var prev = pageStack.pop();
+    if (prev) { p.innerHTML = ''; p.appendChild(prev.el); p.dataset.t = prev.t; prev.el.scrollTop = prev.top || 0; p.className = 'rg-sheet rg-full' + (pageStack.length ? ' rg-deep' : ''); try { document.dispatchEvent(new CustomEvent('rg:page', { detail: prev.t })); } catch (e) {} return; }
+    p.hidden = true; p.innerHTML = ''; p.dataset.t = ''; document.body.classList.remove('rg-has-page');
+    try { document.dispatchEvent(new CustomEvent('rg:page', { detail: '' })); } catch (e) {}
+  }
+  function closePages() { var s = $('#rgSheet'); s.hidden = true; s.innerHTML = ''; pageStack.length = 0; var p = $('#rgPage'); if (p) { p.hidden = true; p.innerHTML = ''; p.dataset.t = ''; } document.body.classList.remove('rg-has-page'); }
+  document.addEventListener('rg:view', function () { closePages(); });
   // «Atrás» en cualquier hoja: pulsa su botón de cerrar o de cancelar. Lo usan el botón atrás de Android y el toque fuera de la hoja.
   function sheetBack() {
-    var s = $('#rgSheet'); if (!s || s.hidden) return false;
-    var b = s.querySelector('.head .btn.icon, #rgSkip, #ofNo, #gxNo, #lnNo'); if (b) b.click();
-    return true;      // si la hoja pide una respuesta (permisos, avisos), se queda: no se cambia la pantalla de debajo
+    var s = $('#rgSheet'), p = $('#rgPage');
+    if (s && !s.hidden) { var b = s.querySelector('.head .btn.icon, #rgSkip, #ofNo, #gxNo, #lnNo'); if (b) b.click(); return true; }      // si la hoja pide una respuesta (permisos, avisos), se queda
+    if (p && !p.hidden) { var b2 = p.querySelector('.head .btn.icon'); if (b2) b2.click(); else closeSheet(); return true; }
+    return false;
   }
   document.addEventListener('click', function (ev) { var s = $('#rgSheet'); if (ev.target === s && !s.classList.contains('rg-page') && !s.classList.contains('rg-win')) sheetBack(); });
   // Fondo vivo (líneas que se mueven despacio) detrás de las pantallas que no son el mapa.
@@ -922,6 +955,6 @@
   if (sb) sb.auth.onAuthStateChange(function (ev, session) { var had = !!user; user = (session && session.user) || null; if (had !== !!user) renderAccount(); if (MUST && had && !user && $('#rgSheet').hidden) openAuth(true, 'login'); });
   sync();
   window.RGCloud = { sb: sb, cfg: { url: SB_URL, key: SB_KEY }, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profile: function () { return profile; }, openRider: openRider, saveName: saveName, signOut: signOut, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
-    onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, sheetBack: sheetBack, ridePhone: function () { return ridePhone; },
+    onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, closePages: closePages, sheetBack: sheetBack, pageOpen: function () { var p = $('#rgPage'); return !!(p && !p.hidden); }, ridePhone: function () { return ridePhone; },
     savePhone: function (ph) { return sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id).then(function (b) { if (b.error) throw b.error; ridePhone = ph; renderAccount(); }); }, busy: busy, msg: msg, esc: esc };
 })();

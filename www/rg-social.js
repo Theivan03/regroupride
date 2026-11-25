@@ -75,28 +75,30 @@
   }
 
   /* ---------- sitios moteros ---------- */
-  var PK = { bar: ['Bar o restaurante', '🍴'], mirador: ['Mirador', '🏞️'], taller: ['Taller', '🔧'], alojamiento: ['Alojamiento', '🛏️'], otro: ['Otro', '📍'] }, PL = { kind: '', rows: [], marks: [] };
-  function places() {
-    if (!Cl.user()) { Cl.openAuth(false); return; }
-    var f = A.anyFix && A.anyFix();
-    var s = Cl.sheet(head('Sitios moteros') + '<p class="muted" style="margin:0;text-align:left">Bares, miradores, talleres y alojamientos que recomiendan las comunidades, con sitio para dejar la moto.</p>' +
-      '<div class="pills" id="plK"><button class="pill" type="button" data-k="" aria-pressed="' + (!PL.kind) + '">Todos</button>' + Object.keys(PK).map(function (k) { return '<button class="pill" type="button" data-k="' + k + '" aria-pressed="' + (PL.kind === k) + '">' + PK[k][1] + ' ' + PK[k][0].split(' ')[0] + '</button>'; }).join('') + '</div>' +
-      '<div class="rd-list" id="plL"><div class="empty">' + (f ? 'Buscando…' : 'Hace falta tu ubicación para saber qué tienes cerca.') + '</div></div><button class="btn primary" id="plAdd" type="button">' + ic('plus') + 'Proponer un sitio</button>');
-    $('#scX', s).addEventListener('click', Cl.closeSheet); $('#plAdd', s).addEventListener('click', function () { placeForm(null); });
-    $$('#plK button', s).forEach(function (b) { b.addEventListener('click', function () { PL.kind = b.dataset.k; places(); }); });
+  var PK = { bar: ['Bar o restaurante', 'cup'], mirador: ['Mirador', 'eye'], taller: ['Taller', 'wrench'], alojamiento: ['Alojamiento', 'bed'], otro: ['Otro', 'gmaps'] }, PL = { kind: '', rows: [], marks: [] };
+  // Pestaña «Sitios» de «Cerca de ti»
+  function placesPane(el) {
+    var f = A.anyFix && A.anyFix(), short = { bar: 'Bar', mirador: 'Mirador', taller: 'Taller', alojamiento: 'Alojamiento' };
+    el.innerHTML = '<div class="pills" id="plK"><button class="pill" type="button" data-k="" aria-pressed="' + (!PL.kind) + '">Todos</button>' + Object.keys(short).map(function (k) { return '<button class="pill" type="button" data-k="' + k + '" aria-pressed="' + (PL.kind === k) + '">' + short[k] + '</button>'; }).join('') + '</div>' +
+      '<div class="as-col" id="plL"><div class="empty"><b>' + (f ? 'Buscando…' : 'Falta tu posición') + '</b>' + (f ? '' : 'Abre el mapa y espera a que te sitúe.') + '</div></div><button class="btn big" id="plAdd" type="button">' + ic('plus') + 'Proponer un sitio</button>';
+    $('#plAdd', el).addEventListener('click', function () { placeForm(null); });
+    $$('#plK button', el).forEach(function (b) { b.addEventListener('click', function () { PL.kind = b.dataset.k; placesPane(el); }); });
     if (!f) return;
-    sb.rpc('places_near', { p_lat: f.lat, p_lon: f.lon, p_km: 150 }).then(function (r) {
-      var el = $('#plL'); if (!el) return; PL.rows = r.error ? [] : (r.data || []); marks();
+    var paint = function () {
+      var l = $('#plL', el); if (!l || !l.isConnected) return;
       var rows = PL.rows.filter(function (x) { return !PL.kind || x.kind === PL.kind; });
-      el.innerHTML = rows.length ? rows.map(function (x, i) { var k = PK[x.kind] || PK.otro; return '<div class="club-card pl-card"><b>' + k[1] + ' ' + esc(x.name) + '</b><span class="muted">' + k[0] + ' · a ' + String(x.km).replace('.', ',') + ' km · recomendado por ' + esc(x.community) + '</span>' + (x.note ? '<span>' + esc(x.note) + '</span>' : '') +
-        '<span class="rt-meta">' + (x.parking ? '<span>' + ic('park') + 'aparcamiento para motos</span>' : '') + (x.discount ? '<span>' + ic('star') + esc(x.discount) + '</span>' : '') + '</span><div class="rg-row"><button class="btn small primary" data-go="' + i + '" type="button">' + ic('gmaps') + 'Cómo llegar</button>' + (x.mine ? '<button class="btn small" data-ed="' + i + '" type="button">' + ic('edit') + 'Editar</button>' : '') + '</div></div>'; }).join('') : '<div class="empty">Aún no hay sitios recomendados a menos de 150 km. Propón el primero.</div>';
-      $$('[data-go]', el).forEach(function (b) { b.addEventListener('click', function () { var x = rows[+b.dataset.go]; window.open('https://www.google.com/maps/dir/?api=1&destination=' + x.lat + ',' + x.lon, '_blank'); }); });
-      $$('[data-ed]', el).forEach(function (b) { b.addEventListener('click', function () { placeForm(rows[+b.dataset.ed]); }); });
-    }, function () { var el = $('#plL'); if (el) el.innerHTML = '<div class="empty">No se ha podido cargar.</div>'; });
+      l.innerHTML = rows.length ? rows.map(function (x, i) { var k = PK[x.kind] || PK.otro; return '<div class="as-card"><div class="as-card-h">' + ic(k[1]) + '<span><b>' + esc(x.name) + '</b><small>' + k[0] + ' · a ' + String(x.km).replace('.', ',') + ' km · lo recomienda ' + esc(x.community) + '</small></span></div>' + (x.note ? '<p>' + esc(x.note) + '</p>' : '') +
+        (x.parking || x.discount ? '<ul class="as-checks">' + (x.parking ? '<li>' + ic('check') + 'Aparcamiento para motos</li>' : '') + (x.discount ? '<li>' + ic('check') + esc(x.discount) + '</li>' : '') + '</ul>' : '') + '<div class="as-card-b"><button class="btn" data-go="' + i + '" type="button">' + ic('gmaps') + 'Cómo llegar</button>' + (x.mine ? '<button class="btn" data-ed="' + i + '" type="button">' + ic('edit') + 'Editar</button>' : '') + '</div></div>'; }).join('') : '<div class="empty"><b>Sin sitios cerca</b>Aún no hay sitios recomendados a menos de 150 km. Propón el primero.</div>';
+      $$('[data-go]', l).forEach(function (b) { b.addEventListener('click', function () { var x = rows[+b.dataset.go], map = A.map && A.map(); Cl.closeSheet(); A.showView('map'); if (map) map.flyTo({ center: [x.lon, x.lat], zoom: 14 }); }); });
+      $$('[data-ed]', l).forEach(function (b) { b.addEventListener('click', function () { placeForm(rows[+b.dataset.ed]); }); });
+    };
+    if (PL.rows.length && Date.now() - (PL.at || 0) < 120000) { paint(); return; }
+    sb.rpc('places_near', { p_lat: f.lat, p_lon: f.lon, p_km: 150 }).then(function (r) { PL.rows = r.error ? [] : (r.data || []); PL.at = Date.now(); marks(); paint(); }, function () { var l = $('#plL', el); if (l) l.innerHTML = '<div class="empty"><b>No se ha podido cargar</b>Revisa la conexión.</div>'; });
   }
+  function places() { PL.at = 0; if (window.RGUI) RGUI.near('sitios'); }
   function marks() {
     var map = A.map && A.map(); if (!map || !window.maplibregl) return; PL.marks.forEach(function (m) { m.remove(); }); PL.marks = [];
-    PL.rows.slice(0, 60).forEach(function (x) { var el = document.createElement('div'); el.className = 'rd-mk pl'; el.textContent = (PK[x.kind] || PK.otro)[1]; el.title = x.name; el.addEventListener('click', function (ev) { ev.stopPropagation(); PL.kind = ''; places(); }); PL.marks.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([x.lon, x.lat]).addTo(map)); });
+    PL.rows.slice(0, 60).forEach(function (x) { var el = document.createElement('div'); el.className = 'rd-mk pl'; el.innerHTML = ic((PK[x.kind] || PK.otro)[1]); el.title = x.name; el.addEventListener('click', function (ev) { ev.stopPropagation(); PL.kind = ''; places(); }); PL.marks.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([x.lon, x.lat]).addTo(map)); });
   }
   function placeForm(x) {
     var cl = (window.RGShell ? RGShell.clubs() : []); if (!cl.length) { A.toast('Para proponer un sitio hay que estar en una comunidad.', 'warn'); return; }
@@ -156,5 +158,5 @@
     $('#scX', s).addEventListener('click', function () { challenges(c, true); });
     $('#chF', s).addEventListener('submit', function (ev) { ev.preventDefault(); Cl.busy(ev.submitter || $('#chF button'), function () { return sb.from('challenges').insert({ community_id: c.id, title: $('#chT').value.trim(), kind: $('#chK').value, goal: parseInt($('#chG').value, 10) || null, starts_on: $('#chA').value, ends_on: $('#chB').value }).then(function (r) { if (r.error) throw r.error; challenges(c, true); }); }).catch(function (e) { A.toast(Cl.msg(e), 'warn'); }); });
   }
-  window.RGSocial = { challenges: challenges, places: places, album: album, checklist: checklist };
+  window.RGSocial = { placesPane: placesPane, challenges: challenges, places: places, album: album, checklist: checklist };
 })();

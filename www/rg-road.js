@@ -60,27 +60,26 @@
       return fromPhone().catch(function () { if (d && d.rows && d.rows.length) return d; return { rows: [], at: null }; });
     }, function () { return fromPhone().catch(function () { return { rows: [], at: null }; }); });
   }
-  function fuelOpen() {
-    if (!Cl.user()) { Cl.openAuth(false); return; }
+  // Pestaña «Gasolina» de «Cerca de ti»: se pinta dentro del panel que le pasan.
+  function fuelPane(el) {
     var f = A.anyFix && A.anyFix(), p = plan(); if (!p) F.route = false;
-    var s = Cl.sheet(head('Gasolineras') +
-      '<div class="rd-bar"><div class="seg" id="fuKind"><button type="button" data-k="g95" aria-pressed="' + (F.kind === 'g95') + '">95</button><button type="button" data-k="g98" aria-pressed="' + (F.kind === 'g98') + '">98</button></div>' +
-      '<div class="seg" id="fuSort"><button type="button" data-s="price" aria-pressed="' + (F.sort === 'price') + '">Más baratas</button><button type="button" data-s="near" aria-pressed="' + (F.sort === 'near') + '">Más cerca</button></div></div>' +
-      (p ? '<label class="rg-check"><input type="checkbox" id="fuRoute"' + (F.route ? ' checked' : '') + '><span><b>Solo las de mi ruta</b><small>A menos de 1,5 km del trazado de «' + esc(p.name || 'tu ruta') + '».</small></span></label>' : '') +
-      '<div id="fuList" class="rd-list"><div class="empty">' + (f || F.route ? 'Buscando…' : 'Hace falta tu ubicación. Abre el mapa y espera a que te sitúe.') + '</div></div>' +
-      '<p class="muted rg-small" id="fuNote" style="text-align:left">Precios comunicados por las estaciones al Ministerio para la Transición Ecológica.</p>');
-    $('#rdX', s).addEventListener('click', Cl.closeSheet);
-    $$('#fuKind button', s).forEach(function (b) { b.addEventListener('click', function () { F.kind = b.dataset.k; store('rg.fuel.kind', F.kind); fuelOpen(); }); });
-    $$('#fuSort button', s).forEach(function (b) { b.addEventListener('click', function () { F.sort = b.dataset.s; fuelOpen(); }); });
-    if ($('#fuRoute', s)) $('#fuRoute', s).addEventListener('change', function (e) { F.route = e.target.checked; fuelOpen(); });
-    var done = function (rows, at, nt) {
+    var pill = function (k, v, t, on) { return '<button class="pill" type="button" data-' + k + '="' + v + '" aria-pressed="' + on + '">' + t + '</button>'; };
+    el.innerHTML = '<div class="pills" id="fuBar">' + pill('k', 'g95', '95', F.kind === 'g95') + pill('k', 'g98', '98', F.kind === 'g98') + pill('s', 'price', 'Más baratas', F.sort === 'price' && !F.route) + pill('s', 'near', 'Más cerca', F.sort === 'near' && !F.route) + (p ? pill('r', '1', 'En mi ruta', F.route) : '') + '</div>' +
+      '<div id="fuList" class="as-rows"><div class="empty"><b>' + (f || F.route ? 'Buscando…' : 'Falta tu posición') + '</b>' + (f || F.route ? '' : 'Abre el mapa y espera a que te sitúe.') + '</div></div>' +
+      '<label class="as-switch-row"><span><b>Ver gasolineras en el mapa</b></span><span class="switch"><input type="checkbox" id="fuMap"' + (F.shown ? ' checked' : '') + '><span></span></span></label>' +
+      '<p class="muted rg-small" id="fuNote" style="text-align:left">Precios comunicados por las estaciones al Ministerio para la Transición Ecológica.</p>';
+    $$('#fuBar [data-k]', el).forEach(function (b) { b.addEventListener('click', function () { F.kind = b.dataset.k; store('rg.fuel.kind', F.kind); fuelPane(el); }); });
+    $$('#fuBar [data-s]', el).forEach(function (b) { b.addEventListener('click', function () { F.sort = b.dataset.s; F.route = false; fuelPane(el); }); });
+    $$('#fuBar [data-r]', el).forEach(function (b) { b.addEventListener('click', function () { F.route = !F.route; fuelPane(el); }); });
+    $('#fuMap', el).addEventListener('change', function (e) { if (e.target.checked) fuelMarks(F.rows.slice(0, 40)); else fuelMarks([]); });
+    var done = function (rows, at) {
       F.rows = rows.filter(function (x) { return x[F.kind] != null; });
       F.rows.sort(function (a, b) { return F.sort === 'price' ? (a[F.kind] - b[F.kind]) || (a.km - b.km) : a.km - b.km; });
-      var el = $('#fuList'); if (!el) return; fuelList(el);
-      var n = $('#fuNote'); if (n && at) n.textContent = 'Precios comunicados por las estaciones al Ministerio para la Transición Ecológica. Actualizados ' + new Date(at).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '.';
-      if (n && !at && !F.rows.length) n.textContent = 'Todavía no hay precios guardados de esta zona. Se descargan desde la app del móvil la primera vez que alguien los consulta aquí.';
+      var l = $('#fuList', el); if (!l || !l.isConnected) return; fuelList(l);
+      var n = $('#fuNote', el); if (n && at) n.textContent = 'Precios del Ministerio para la Transición Ecológica. Actualizados el ' + new Date(at).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '.';
+      if (n && !at && !F.rows.length) n.textContent = 'Todavía no hay precios guardados de esta zona. Se descargan desde el móvil la primera vez que alguien los consulta aquí.';
     };
-    var fail = function () { var el = $('#fuList'); if (el) el.innerHTML = '<div class="empty">No se ha podido cargar. Revisa la conexión.</div>'; };
+    var fail = function () { var l = $('#fuList', el); if (l) l.innerHTML = '<div class="empty"><b>No se ha podido cargar</b>Revisa la conexión.</div>'; };
     if (F.route && p) {
       var bb = bbox(p.coords);
       sb.rpc('fuel_box', { a_lat: bb[0], a_lon: bb[1], b_lat: bb[2], b_lon: bb[3] }).then(function (r) {
@@ -92,14 +91,15 @@
       fuelAround(f, 25).then(function (d) { done(d.rows || [], d.at); }, fail);
     }
   }
+  function fuelOpen() { if (window.RGUI) RGUI.near('gasolina'); }
   function fuelList(el) {
-    if (!F.rows.length) { el.innerHTML = '<div class="empty">No hay gasolineras con ese combustible ' + (F.route ? 'junto a tu ruta (o aún no hay precios guardados de esa zona).' : 'a menos de 25 km, o aún no hay precios guardados de esta zona.') + '</div>'; return; }
-    var min = Math.min.apply(null, F.rows.map(function (x) { return +x[F.kind]; }));
-    el.innerHTML = '<button class="btn rd-map" id="fuMap" type="button">' + ic('map') + (F.shown ? 'Quitar del mapa' : 'Verlas en el mapa') + '</button>' + F.rows.slice(0, 40).map(function (x, i) {
-      return '<button class="rd-row" type="button" data-i="' + i + '"><span class="rd-price' + (+x[F.kind] === min ? ' best' : '') + '">' + eur(x[F.kind]) + '<small>€/l</small></span><span class="rd-txt"><b>' + esc(x.name) + (+x[F.kind] === min ? '<i>la más barata</i>' : '') + '</b><small>' + esc(x.town || '') + ' · a ' + kmTxt(x.km) + ' km' + (x.hours ? ' · ' + esc(x.hours) : '') + '</small></span>' + ic('chev') + '</button>';
+    if (!F.rows.length) { el.innerHTML = '<div class="empty"><b>Sin gasolineras con precio</b>' + (F.route ? 'No hay ninguna junto a tu ruta, o aún no hay precios guardados de esa zona.' : 'Nada a menos de 25 km, o aún no hay precios guardados de esta zona.') + '</div>'; return; }
+    var min = Math.min.apply(null, F.rows.map(function (x) { return +x[F.kind]; })), near = F.rows.slice().sort(function (a, b) { return a.km - b.km; })[0];
+    el.innerHTML = F.rows.slice(0, 40).map(function (x, i) {
+      var tag = +x[F.kind] === min ? 'la más barata' : (x === near ? 'la más cerca' : '');
+      return '<div class="as-fuel"><span class="as-price"><b class="cifra">' + eur(x[F.kind]) + '</b><small>€/l</small></span><span class="as-fuel-t"><b>' + esc(x.name) + (tag ? '<i>' + tag + '</i>' : '') + '</b><small>' + esc(x.town || '') + ' · a ' + kmTxt(x.km) + ' km' + (x.hours ? ' · ' + esc(x.hours) : '') + '</small></span><button class="btn small" type="button" data-i="' + i + '">Ir</button></div>';
     }).join('');
-    $$('[data-i]', el).forEach(function (b) { b.addEventListener('click', function () { var x = F.rows[+b.dataset.i]; gmaps(x.lat, x.lon); }); });
-    $('#fuMap', el).addEventListener('click', function () { if (F.shown) fuelMarks([]); else { fuelMarks(F.rows.slice(0, 40)); Cl.closeSheet(); A.showView('map'); } });
+    $$('[data-i]', el).forEach(function (b) { b.addEventListener('click', function () { var x = F.rows[+b.dataset.i]; Cl.closeSheet(); A.showView('map'); fuelGo(x); }); });
   }
   function fuelMarks(rows) {
     var map = A.map && A.map(); F.marks.forEach(function (m) { m.remove(); }); F.marks = []; F.shown = false;
@@ -107,7 +107,7 @@
     var min = Math.min.apply(null, rows.map(function (x) { return +x[F.kind]; }));
     rows.forEach(function (x) {
       var el = document.createElement('div'); el.className = 'rd-mk fuel' + (+x[F.kind] === min ? ' best' : ''); el.textContent = eur(x[F.kind]); el.title = x.name;
-      el.addEventListener('click', function (ev) { ev.stopPropagation(); var s = Cl.sheet(head(esc(x.name)) + '<p style="margin:0;text-align:left"><b class="rd-big">' + eur(x[F.kind]) + ' €/l</b> · gasolina ' + (F.kind === 'g95' ? '95' : '98') + '<br><span class="muted">' + esc([x.addr, x.town].filter(Boolean).join(', ')) + (x.hours ? '<br>' + esc(x.hours) : '') + '</span></p><div class="rg-row"><button class="btn primary" id="fuGo" type="button">' + ic('gmaps') + 'Cómo llegar</button><button class="btn" id="fuOff" type="button">Quitar gasolineras del mapa</button></div>'); $('#rdX', s).addEventListener('click', Cl.closeSheet); $('#fuGo', s).addEventListener('click', function () { gmaps(x.lat, x.lon); }); $('#fuOff', s).addEventListener('click', function () { fuelMarks([]); Cl.closeSheet(); }); });
+      el.addEventListener('click', function (ev) { ev.stopPropagation(); var s = Cl.sheet(head(esc(x.name)) + '<p style="margin:0;text-align:left"><b class="rd-big">' + eur(x[F.kind]) + ' €/l</b> · gasolina ' + (F.kind === 'g95' ? '95' : '98') + '<br><span class="muted">' + esc([x.addr, x.town].filter(Boolean).join(', ')) + (x.hours ? '<br>' + esc(x.hours) : '') + '</span></p><button class="btn big primary" id="fuGo" type="button">' + ic('gmaps') + 'Cómo llegar</button><button class="btn" id="fuOff" type="button">Quitar gasolineras del mapa</button>'); $('#rdX', s).addEventListener('click', Cl.closeSheet); $('#fuGo', s).addEventListener('click', function () { gmaps(x.lat, x.lon); }); $('#fuOff', s).addEventListener('click', function () { fuelMarks([]); Cl.closeSheet(); }); });
       F.marks.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([x.lon, x.lat]).addTo(map));
     });
     F.shown = true;
@@ -118,35 +118,36 @@
     var f = (A.lastFix && A.lastFix()) || (A.anyFix && A.anyFix()); if (!f) { A.toast('Hace falta tu posición para buscar gasolineras.', 'warn'); return; }
     if (!Cl.user()) { Cl.openAuth(false); return; }
     var host = $('#view-map .map-bottom'); if (!host) return;
-    if (!FCARD) { FCARD = document.createElement('div'); FCARD.className = 'card slim rd-fcard'; host.insertBefore(FCARD, host.firstChild); }
-    FCARD.hidden = false; FCARD.innerHTML = '<div class="rd-fhead"><b>' + ic('fuel') + 'Repostar</b><button class="btn small icon" data-fc="x" type="button" title="Cerrar">' + ic('close') + '</button></div><span class="muted">Buscando gasolineras…</span>';
-    var p = plan(), v = (A.vehicles() || []).filter(function (x) { return x.principal; })[0], ahead = null;
+    if (!FCARD) { FCARD = document.createElement('div'); FCARD.className = 'card slim rd-fcard as-fcard'; host.insertBefore(FCARD, host.firstChild); }
+    if (!FCARD.hidden && FCARD.dataset.on) { FCARD.hidden = true; FCARD.dataset.on = ''; return; }
+    var k = F.kind, hd = '<div class="rd-fhead"><b>' + ic('fuel') + 'Gasolina ' + (k === 'g95' ? '95' : '98') + '</b><button class="btn small icon" data-fc="x" type="button" title="Cerrar">' + ic('close') + '</button></div>';
+    FCARD.hidden = false; FCARD.dataset.on = '1'; FCARD.innerHTML = hd + '<span class="muted">Buscando gasolineras…</span>';
+    var p = plan(), ahead = null;
     if (p) { var bi = 0, bd = 1e12; for (var i = 0; i < p.coords.length; i += 2) { var d = dist(f.lat, f.lon, p.coords[i][1], p.coords[i][0]); if (d < bd) { bd = d; bi = i; } } ahead = bd < 3000 ? p.coords.slice(bi) : null; }
     var near = fuelAround(f, 25).then(function (d) { return d.rows || []; }, function () { return []; });
     var box = ahead && ahead.length > 1 ? (function () { var bb = bbox(ahead); return sb.rpc('fuel_box', { a_lat: bb[0], a_lon: bb[1], b_lat: bb[2], b_lon: bb[3] }).then(function (r) { return r.error ? [] : (r.data || []); }, function () { return []; }); })() : Promise.resolve([]);
     Promise.all([near, box]).then(function (res) {
-      var k = F.kind, ok = function (x) { return x[k] != null; }, rows = res[0].filter(ok).sort(function (a, b) { return a.km - b.km; }), nearest = rows[0], best = null;
+      var ok = function (x) { return x[k] != null; }, rows = res[0].filter(ok).sort(function (a, b) { return a.km - b.km; }), nearest = rows[0], cheap = rows.slice().sort(function (a, b) { return (a[k] - b[k]) || (a.km - b.km); })[0], best = null;
       if (ahead) {
         var seen = {}, cum = [0]; for (var i = 1; i < ahead.length; i++) cum.push(cum[i - 1] + dist(ahead[i - 1][1], ahead[i - 1][0], ahead[i][1], ahead[i][0]));
-        var lim = (v && v.range > 30 ? v.range * 0.5 : 80) * 1000;      // lo que queda por delante hasta donde llegue el depósito (o 80 km)
         var cand = res[1].concat(res[0]).filter(ok).filter(function (x) { if (seen[x.id]) return false; seen[x.id] = 1; return true; }).map(function (x) {
           var bi2 = -1, bd2 = 1500, st = Math.max(1, Math.floor(ahead.length / 1200)); for (var j = 0; j < ahead.length; j += st) { var dd = dist(x.lat, x.lon, ahead[j][1], ahead[j][0]); if (dd < bd2) { bd2 = dd; bi2 = j; } }
-          return bi2 < 0 || cum[bi2] > lim ? null : Object.assign({}, x, { along: cum[bi2] / 1000, off: bd2 });
+          return bi2 < 0 || cum[bi2] > 80000 ? null : Object.assign({}, x, { along: cum[bi2] / 1000, off: bd2 });
         }).filter(Boolean);
         best = cand.sort(function (a, b) { return (a[k] - b[k]) || (a.along - b.along); })[0] || null;
       }
       if (!FCARD || FCARD.hidden) return;
-      var row = function (x, tag, sub) { return '<div class="rd-frow"><span class="rd-price">' + eur(x[k]) + '<small>€/l</small></span><span class="rd-txt"><b>' + esc(x.name) + '<i>' + tag + '</i></b><small>' + esc(x.town || '') + ' · ' + sub + '</small></span><button class="btn small primary" data-fc="' + x.id + '" type="button">Ir</button></div>'; };
-      var html = '', map = {};
-      if (best) { map[best.id] = best; html += row(best, 'en tu ruta', 'a ' + kmTxt(best.along) + ' km siguiendo la ruta' + (best.off > 200 ? ', ' + Math.round(best.off / 50) * 50 + ' m de desvío' : '')); }
-      if (nearest && (!best || nearest.id !== best.id)) { map[nearest.id] = nearest; html += row(nearest, 'la más cercana', 'a ' + kmTxt(nearest.km) + ' km de ti'); }
-      FCARD.innerHTML = '<div class="rd-fhead"><b>' + ic('fuel') + 'Repostar · gasolina ' + (k === 'g95' ? '95' : '98') + '</b><button class="btn small icon" data-fc="x" type="button" title="Cerrar">' + ic('close') + '</button></div>' + (html || '<span class="muted">No encuentro gasolineras con precio a menos de 25 km' + (p ? ' ni junto a tu ruta' : '') + '.</span>') + (p && !best && nearest ? '<span class="muted rg-small" style="text-align:left">No hay ninguna junto a lo que te queda de ruta dentro de tu autonomía.</span>' : '');
+      var map = {}, n = 0, row = function (x, tag, sub) { map[x.id] = x; return '<div class="as-frow"><span class="as-frow-t"><small>' + tag + '</small><b>' + esc(x.name) + '</b><span>' + sub + ' · <b class="cifra">' + eur(x[k]) + '</b> €/l</span></span><button class="btn ' + (n++ ? '' : 'primary') + '" data-fc="' + x.id + '" type="button">Ir</button></div>'; };
+      var first = best || nearest, html = '';
+      if (first) html += row(first, best ? 'La mejor en tu ruta' : 'La más cerca', best ? 'a ' + kmTxt(best.along) + ' km por la ruta' : 'a ' + kmTxt(first.km) + ' km');
+      if (cheap && (!first || cheap.id !== first.id)) html += row(cheap, 'La más barata', 'a ' + kmTxt(cheap.km) + ' km');
+      FCARD.innerHTML = hd + (html || '<span class="muted">No encuentro gasolineras con precio a menos de 25 km' + (p ? ' ni junto a tu ruta' : '') + '.</span>');
       FCARD.onclick = function (ev) {
-        var b = ev.target.closest('[data-fc]'); if (!b) return; if (b.dataset.fc === 'x') { FCARD.hidden = true; return; }
-        var x = map[b.dataset.fc]; if (!x) return; FCARD.hidden = true; fuelGo(x);
+        var b = ev.target.closest('[data-fc]'); if (!b) return; FCARD.hidden = true; FCARD.dataset.on = ''; if (b.dataset.fc === 'x') return;
+        var x = map[b.dataset.fc]; if (x) fuelGo(x);
       };
     });
-    FCARD.onclick = function (ev) { var b = ev.target.closest('[data-fc=x]'); if (b) FCARD.hidden = true; };
+    FCARD.onclick = function (ev) { var b = ev.target.closest('[data-fc=x]'); if (b) { FCARD.hidden = true; FCARD.dataset.on = ''; } };
   }
   // la elegida queda marcada en el mapa (y en la ruta que se sigue); si está fuera del trazado, se abre el camino en Maps
   function fuelGo(x) {
@@ -155,31 +156,13 @@
     else fuelMarks([x]);
     var map = A.map && A.map(); if (map && !(A.isRec && A.isRec())) map.easeTo({ center: [x.lon, x.lat], zoom: 13 });
     if (x.along != null && x.off <= 400) { A.toast('Aviso: gasolinera marcada en tu ruta, a ' + kmTxt(x.along) + ' km: ' + label + '.', 'ok'); say('Gasolinera marcada en tu ruta, a ' + Math.round(x.along) + ' kilómetros.'); }
-    else { var s = Cl.sheet(head(esc(x.name)) + '<p style="margin:0;text-align:left"><b class="rd-big">' + eur(x[F.kind]) + ' €/l</b><br><span class="muted">' + esc([x.addr, x.town].filter(Boolean).join(', ')) + '</span><br>Queda marcada en el mapa. Está fuera de tu ruta: al volver, la app te marca cómo recuperar el trazado.</p><div class="rg-row"><button class="btn primary" id="fgGo" type="button">' + ic('gmaps') + 'Cómo llegar</button></div>'); $('#rdX', s).addEventListener('click', Cl.closeSheet); $('#fgGo', s).addEventListener('click', function () { Cl.closeSheet(); gmaps(x.lat, x.lon); }); }
+    else { A.toast('Aviso: ' + label + ' marcada en el mapa.', 'ok'); if (A.isRec && A.isRec()) say('Gasolinera marcada en el mapa.'); else gmaps(x.lat, x.lon); }
   }
-  // accesos: botón en el menú del mapa, y al avisar de gasolina al grupo
-  (function () { var mc = $('#mapCtrls'); if (!mc) return; var b = document.createElement('button'); b.type = 'button'; b.id = 'btnFuel'; b.title = 'Repostar: gasolineras cerca y en tu ruta'; b.innerHTML = ic('fuel'); mc.appendChild(b); b.addEventListener('click', fuelPick); })();
-  document.addEventListener('click', function (ev) { var b = ev.target.closest && ev.target.closest('[data-av=gasolina]'); if (b) setTimeout(fuelPick, 600); });
-  // aviso por autonomía: si la moto tiene autonomía apuntada y se acerca al 75 %, propone la gasolinera más barata cerca
-  var RW = { ride: 0, told: false };
-  function rangeWatch() {
-    var rn = A.recNow && A.recNow(); if (!rn) { RW.told = false; return; } if (RW.told) return;
-    var v = (A.vehicles() || []).filter(function (x) { return x.principal; })[0]; if (!v || !(v.range > 30)) return;
-    var since = rn.km, last = (v.fuel || []).slice().sort(function (a, b) { return b.at - a.at; })[0];
-    if (last) since += (A.rides() || []).filter(function (r) { return r.start > last.at && (r.vehicleId === v.id || !r.vehicleId); }).reduce(function (s, r) { return s + (r.dist || 0); }, 0);
-    if (since < v.range * 0.75) return; RW.told = true;
-    var f = A.lastFix && A.lastFix(); if (!f) return;
-    setTimeout(fuelPick, 400);
-    fuelAround(f, 20).then(function (r) {
-      var rows = (r.rows || []).filter(function (x) { return x[F.kind] != null; }).sort(function (a, b) { return a[F.kind] - b[F.kind]; }), x = rows[0];
-      var msg = 'Llevas unos ' + Math.round(since) + ' km desde el último repostaje' + (x ? '. La más barata cerca: ' + x.name + ', a ' + kmTxt(x.km) + ' km (' + eur(x[F.kind]) + ' €)' : '') + '.';
-      A.toast('Aviso de gasolina: ' + msg, 'warn'); say('Aviso de gasolina. Llevas ' + Math.round(since) + ' kilómetros desde el último repostaje.'); note('fuel-' + Date.now(), 'Toca repostar pronto', msg);
-    }, function () {});
-  }
-  setInterval(rangeWatch, 30000);
+  (function () { var b = $('#btnGas'); if (b) b.addEventListener('click', fuelPick); })();
+  document.addEventListener('click', function (ev) { var b = ev.target.closest && ev.target.closest('[data-av=gasolina]'); if (b) setTimeout(function () { if (FCARD) { FCARD.hidden = true; FCARD.dataset.on = ''; } fuelPick(); }, 600); });
 
   /* ---------- incidencias de la DGT y peligros avisados ---------- */
-  var HK = { grava: ['Gravilla', '🪨'], aceite: ['Aceite o gasoil', '🛢️'], animales: ['Animales', '🦌'], obras: ['Obras', '🚧'], obstaculo: ['Obstáculo en la calzada', '⚠️'], mojado: ['Suelo mojado o hielo', '💧'], otro: ['Otro peligro', '❗'] };
+  var HK = { grava: ['Gravilla', 'gravel'], aceite: ['Aceite o gasoil', 'drop'], animales: ['Animales', 'animal'], obras: ['Obras', 'cone'], obstaculo: ['Obstáculo', 'block'], mojado: ['Suelo mojado', 'wave'], otro: ['Otro peligro', 'warn'] };
   var DK = { roadClosed: 'Carretera cortada', carriagewayClosures: 'Calzada cortada', laneClosures: 'Carril cortado', narrowLanes: 'Carriles estrechos', contraflow: 'Circulación en sentido contrario', singleAlternateLineTraffic: 'Paso alternativo', roadworks: 'Obras', maintenanceWork: 'Obras', accident: 'Accidente', Accident: 'Accidente', AbnormalTraffic: 'Retención', MaintenanceWorks: 'Obras', ConstructionWorks: 'Obras',
     AnimalPresenceObstruction: 'Animales en la calzada', VehicleObstruction: 'Vehículo parado', GeneralObstruction: 'Obstáculo en la calzada', EnvironmentalObstruction: 'Obstáculo por el tiempo', WeatherRelatedRoadConditions: 'Calzada en mal estado por el tiempo', NonWeatherRelatedRoadConditions: 'Calzada en mal estado', PoorEnvironmentConditions: 'Mal tiempo', RoadOrCarriagewayOrLaneManagement: 'Restricción de circulación', SpeedManagement: 'Límite de velocidad temporal', ReroutingManagement: 'Desvío', PublicEvent: 'Evento en la vía',
     snowfall: 'Nieve', ice: 'Hielo', fog: 'Niebla', flooding: 'Inundación', rockfalls: 'Desprendimientos', oilOnRoad: 'Aceite en la calzada', strongWinds: 'Viento fuerte', heavyRain: 'Lluvia fuerte' };
@@ -196,45 +179,48 @@
   function hzMarks() {
     var map = A.map && A.map(); if (!map || !window.maplibregl) return;
     H.marks.forEach(function (m) { m.remove(); }); H.marks = [];
-    H.hz.forEach(function (x) { var el = document.createElement('div'); el.className = 'rd-mk hz'; el.textContent = (HK[x.kind] || HK.otro)[1]; el.addEventListener('click', function (ev) { ev.stopPropagation(); hzSheet(x); }); H.marks.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([x.lon, x.lat]).addTo(map)); });
-    H.dgt.filter(function (x) { return x.km <= 40; }).slice(0, 80).forEach(function (x) { var el = document.createElement('div'); el.className = 'rd-mk dgt' + (dgtBad(x) ? ' bad' : ''); el.textContent = '!'; el.addEventListener('click', function (ev) { ev.stopPropagation(); dgtSheet(x); }); H.marks.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([x.lon, x.lat]).addTo(map)); });
+    H.hz.forEach(function (x) { var el = document.createElement('div'); el.className = 'rd-mk hz'; el.innerHTML = ic((HK[x.kind] || HK.otro)[1]); el.addEventListener('click', function (ev) { ev.stopPropagation(); hzSheet(x); }); H.marks.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([x.lon, x.lat]).addTo(map)); });
+    H.dgt.filter(function (x) { return x.km <= 40; }).slice(0, 80).forEach(function (x) { var el = document.createElement('div'); el.className = 'rd-mk dgt' + (dgtBad(x) ? ' bad' : ''); el.innerHTML = ic(dgtBad(x) ? 'block' : 'cone'); el.addEventListener('click', function (ev) { ev.stopPropagation(); dgtSheet(x); }); H.marks.push(new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([x.lon, x.lat]).addTo(map)); });
   }
   function hzSheet(x) {
-    var k = HK[x.kind] || HK.otro, s = Cl.sheet(head(k[1] + ' ' + k[0]) + '<p style="margin:0;text-align:left">' + (x.note ? esc(x.note) + '<br>' : '') + '<span class="muted">Avisado por un motero hace ' + Math.max(1, Math.round((Date.now() - x.at) / 60000)) + ' min · a ' + kmTxt(x.km) + ' km de ti</span></p><div class="rg-row"><button class="btn" id="hzGone" type="button">' + (x.mine ? 'Quitar mi aviso' : 'Ya no está') + '</button></div>');
+    var k = HK[x.kind] || HK.otro, s = Cl.sheet(head(k[0]) + '<p style="margin:0;text-align:left">' + (x.note ? esc(x.note) + '<br>' : '') + '<span class="muted">Avisado por un motero hace ' + Math.max(1, Math.round((Date.now() - x.at) / 60000)) + ' min · a ' + kmTxt(x.km) + ' km de ti</span></p><button class="btn big" id="hzGone" type="button">' + (x.mine ? 'Quitar mi aviso' : 'Ya no está') + '</button>');
     $('#rdX', s).addEventListener('click', Cl.closeSheet);
     $('#hzGone', s).addEventListener('click', function () { sb.rpc('hazard_gone', { p_id: x.id }).then(function () { Cl.closeSheet(); if (x.mine) H.hz = H.hz.filter(function (y) { return y.id !== x.id; }); hzMarks(); A.toast('Aviso anotado: gracias.', 'ok'); }, function () {}); });
   }
-  function dgtSheet(x) { var s = Cl.sheet(head(esc(dgtLabel(x))) + '<p style="margin:0;text-align:left">' + (x.road ? '<b>' + esc(x.road) + '</b><br>' : '') + '<span class="muted">Incidencia de la DGT' + (x.since ? ' desde el ' + new Date(x.since).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '') + ' · a ' + kmTxt(x.km) + ' km de ti</span></p><div class="rg-row"><button class="btn" id="dgGo" type="button">' + ic('gmaps') + 'Ver en Google Maps</button></div>'); $('#rdX', s).addEventListener('click', Cl.closeSheet); $('#dgGo', s).addEventListener('click', function () { window.open('https://www.google.com/maps/search/?api=1&query=' + x.lat + ',' + x.lon, '_blank'); }); }
+  function dgtSheet(x) { var s = Cl.sheet(head(esc(dgtLabel(x))) + '<p style="margin:0;text-align:left">' + (x.road ? '<b>' + esc(x.road) + '</b><br>' : '') + '<span class="muted">Incidencia de la DGT' + (x.since ? ' desde el ' + new Date(x.since).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '') + ' · a ' + kmTxt(x.km) + ' km de ti</span></p><button class="btn big" id="dgGo" type="button">' + ic('gmaps') + 'Ver en Google Maps</button>'); $('#rdX', s).addEventListener('click', Cl.closeSheet); $('#dgGo', s).addEventListener('click', function () { window.open('https://www.google.com/maps/search/?api=1&query=' + x.lat + ',' + x.lon, '_blank'); }); }
   // lo que cae sobre la ruta que voy a seguir
   function onRoute() { var p = plan(); if (!p) return []; return H.dgt.filter(function (x) { return toLine(x.lat, x.lon, p.coords) <= 120; }).map(function (x) { return { t: dgtLabel(x), road: x.road, bad: dgtBad(x), x: x, dgt: 1 }; }).concat(H.hz.filter(function (x) { return toLine(x.lat, x.lon, p.coords) <= 150; }).map(function (x) { return { t: (HK[x.kind] || HK.otro)[0], road: '', bad: 1, x: x }; })); }
   function routeCheck(quiet) {
     var p = plan(), id = p ? p.id : null, list = onRoute(); H.routeN = list.length;
-    if (id !== H.planId) { H.planId = id; if (p && !quiet) { hzLoad(true); return; } if (p && list.length) A.toast('Aviso: ' + list.length + (list.length === 1 ? ' incidencia' : ' incidencias') + ' en tu ruta. Míralas en Explorar → Incidencias.', 'warn'); }
-    if (window.RGShell) RGShell.today();
+    if (id !== H.planId) { H.planId = id; if (p && !quiet) { hzLoad(true); return; } if (p && list.length) A.toast('Aviso: ' + list.length + (list.length === 1 ? ' peligro' : ' peligros') + ' en tu ruta. Míralos en Cerca › Peligros.', 'warn'); }
   }
   setInterval(function () { routeCheck(false); }, 5000);
-  (window.RGToday = window.RGToday || []).push(function () { return H.routeN && plan() ? { i: 'warn', hot: 1, b: H.routeN + (H.routeN === 1 ? ' incidencia en tu ruta' : ' incidencias en tu ruta'), t: onRoute().slice(0, 2).map(function (x) { return x.t + (x.road ? ' (' + x.road + ')' : ''); }).join(' · '), go: incOpen } : null; });
-  function incOpen() {
-    if (!Cl.user()) { Cl.openAuth(false); return; }
-    var s = Cl.sheet(head('Incidencias y peligros') + '<div id="inList" class="rd-list"><div class="empty">Cargando…</div></div><button class="btn primary" id="inAdd" type="button">' + ic('warn') + 'Avisar de un peligro aquí</button><p class="muted rg-small" style="text-align:left">Incidencias oficiales de la DGT (no cubre Cataluña ni el País Vasco) y avisos de otros moteros, que caducan a las pocas horas.</p>');
-    $('#rdX', s).addEventListener('click', Cl.closeSheet); $('#inAdd', s).addEventListener('click', hazard);
+  // Pestaña «Peligros» de «Cerca de ti». Con ruta cargada, primero los que caen sobre la ruta.
+  function hazPane(el) {
+    el.innerHTML = '<div id="inList" class="as-rows"><div class="empty"><b>Cargando…</b></div></div><button class="btn big as-amber" id="inAdd" type="button">' + ic('warn') + 'Avisar de un peligro aquí</button><p class="muted rg-small" style="text-align:left">Incidencias oficiales de la DGT (no cubre Cataluña ni el País Vasco) y avisos de otros moteros, que caducan a las pocas horas.</p>';
+    $('#inAdd', el).addEventListener('click', hazard);
     hzLoad(true).then(function () {
-      var el = $('#inList'); if (!el) return; var onr = onRoute();
-      var all = H.hz.map(function (x) { return { km: x.km, e: (HK[x.kind] || HK.otro)[1], t: (HK[x.kind] || HK.otro)[0], s: (x.note ? x.note + ' · ' : '') + 'avisado por un motero', x: x, f: hzSheet }; })
-        .concat(H.dgt.map(function (x) { return { km: x.km, e: dgtBad(x) ? '⛔' : '🚧', t: dgtLabel(x), s: (x.road || 'DGT'), x: x, f: dgtSheet }; })).sort(function (a, b) { return a.km - b.km; }).slice(0, 60);
-      el.innerHTML = (onr.length ? '<div class="notice">' + onr.length + (onr.length === 1 ? ' cae' : ' caen') + ' sobre la ruta que tienes cargada: ' + esc(onr.slice(0, 3).map(function (x) { return x.t + (x.road ? ' (' + x.road + ')' : ''); }).join(' · ')) + '</div>' : '') +
-        (all.length ? all.map(function (x, i) { return '<button class="rd-row" type="button" data-i="' + i + '"><span class="rd-emo">' + x.e + '</span><span class="rd-txt"><b>' + esc(x.t) + '</b><small>' + esc(x.s) + ' · a ' + kmTxt(x.km) + ' km</small></span>' + ic('chev') + '</button>'; }).join('') : '<div class="empty">' + ((A.anyFix && A.anyFix()) ? 'Nada avisado a menos de 60 km.' : 'Hace falta tu ubicación para saber qué tienes cerca.') + '</div>');
-      $$('[data-i]', el).forEach(function (b) { b.addEventListener('click', function () { var x = all[+b.dataset.i]; x.f(x.x); }); });
+      var l = $('#inList', el); if (!l || !l.isConnected) return; var p = plan(), on = function (x, m) { return p && toLine(x.lat, x.lon, p.coords) <= m ? 1 : 0; };
+      var all = H.hz.map(function (x) { return { km: x.km, r: on(x, 150), i: (HK[x.kind] || HK.otro)[1], t: (HK[x.kind] || HK.otro)[0], s: (x.note ? x.note + ' · ' : '') + 'avisado por un motero', x: x }; })
+        .concat(H.dgt.map(function (x) { return { km: x.km, r: on(x, 120), i: dgtBad(x) ? 'block' : 'cone', t: dgtLabel(x), s: (x.road || 'DGT'), x: x, dgt: 1 }; })).sort(function (a, b) { return (b.r - a.r) || (a.km - b.km); }).slice(0, 60);
+      l.innerHTML = all.length ? all.map(function (x, i) { return '<button class="as-row" type="button" data-i="' + i + '">' + ic(x.i) + '<span><b>' + esc(x.t) + (x.r ? '<i class="as-tag amber">en tu ruta</i>' : '') + '</b><small>' + esc(x.s) + ' · a ' + kmTxt(x.km) + ' km</small></span>' + ic('chev') + '</button>'; }).join('') : '<div class="empty"><b>' + ((A.anyFix && A.anyFix()) ? 'Nada avisado cerca' : 'Falta tu posición') + '</b>' + ((A.anyFix && A.anyFix()) ? 'Ni la DGT ni otros moteros han avisado de nada a menos de 60 km.' : 'Abre el mapa y espera a que te sitúe.') + '</div>';
+      $$('[data-i]', l).forEach(function (b) { b.addEventListener('click', function () { var x = all[+b.dataset.i].x, map = A.map && A.map(); Cl.closeSheet(); A.showView('map'); if (map) map.flyTo({ center: [x.lon, x.lat], zoom: 14 }); }); });
     });
   }
-  // avisar de un peligro: desde «Avisar» o desde Incidencias
+  function incOpen() { if (window.RGUI) RGUI.near('peligros'); }
+  // Avisar de un peligro: seis tipos grandes y «Otro». Un toque lo envía; durante 5 s se puede deshacer.
   function hazard() {
     if (!Cl.user()) { Cl.openAuth(false); return; }
     var f = A.lastFix && A.lastFix(); if (!f || Date.now() - f.ts > 60000) { A.toast('Hace falta tu posición exacta para marcar el peligro. Espera a que el GPS te sitúe.', 'warn'); return; }
-    var s = Cl.sheet(head('Avisar de un peligro') + '<p class="muted" style="margin:0;text-align:left">Se marca donde estás ahora y lo ven los moteros que pasen cerca durante unas horas. Hazlo con la moto parada.</p><div class="rd-hz">' + Object.keys(HK).map(function (k) { return '<button class="btn" type="button" data-hz="' + k + '"><span>' + HK[k][1] + '</span>' + HK[k][0] + '</button>'; }).join('') + '</div><input id="hzNote" maxlength="140" placeholder="Detalle (opcional): «en la segunda curva»">');
+    var ks = ['grava', 'aceite', 'animales', 'obras', 'obstaculo', 'mojado'];
+    var s = Cl.sheet('<div class="head"><h1>¿Qué has visto?</h1><button class="btn small icon as-x52" id="rdX" type="button" title="Cerrar">' + ic('close') + '</button></div><div class="as-hz">' + ks.map(function (k) { return '<button type="button" data-hz="' + k + '">' + ic(HK[k][1]) + HK[k][0] + '</button>'; }).join('') + '</div><button class="btn big" type="button" data-hz="otro">Otro peligro</button><p class="muted" style="margin:0;text-align:left">Un toque y queda marcado donde estás. Lo ven los moteros que pasen cerca durante unas horas.</p>');
     $('#rdX', s).addEventListener('click', Cl.closeSheet);
     $$('[data-hz]', s).forEach(function (b) { b.addEventListener('click', function () {
-      Cl.busy(b, function () { return sb.from('hazards').insert({ kind: b.dataset.hz, lat: f.lat, lon: f.lon, note: $('#hzNote').value.trim() || null }).then(function (r) { if (r.error) throw r.error; Cl.closeSheet(); A.toast('Aviso enviado: ' + HK[b.dataset.hz][0].toLowerCase() + '. Gracias.', 'ok'); H.at = 0; hzLoad(true); }); }).catch(function (e) { A.toast(Cl.msg(e), 'warn'); });
+      var kind = b.dataset.hz; Cl.closeSheet();
+      sb.from('hazards').insert({ kind: kind, lat: f.lat, lon: f.lon, note: null }).select('id').single().then(function (r) {
+        if (r.error) throw r.error; H.at = 0; hzLoad(true); var hid = r.data && r.data.id;
+        if (window.RGUI && RGUI.snack) RGUI.snack('Avisado · ' + HK[kind][0].toLowerCase(), hid ? 'Deshacer' : '', function () { sb.rpc('hazard_gone', { p_id: hid }).then(function () { H.hz = H.hz.filter(function (y) { return y.id !== hid; }); hzMarks(); }, function () {}); }, 5000);
+      }).catch(function (e) { A.toast(Cl.msg(e), 'warn'); });
     }); });
   }
   // cerca de un peligro avisado: una vez por aviso
@@ -246,14 +232,7 @@
   setInterval(function () { if (document.visibilityState !== 'hidden' && ((A.isRec && A.isRec()) || !$('#view-map').hidden)) hzLoad(false); }, 60000);
   setTimeout(function () { hzLoad(false); }, 12000);
 
-  // el botón «Avisar» también sale rodando sin grupo: ahí sirve para avisar de un peligro
-  var ab = $('#btnAlert');
-  function inGroup() { return !!(window.RGGroup && RGGroup.state && RGGroup.state.s); }
-  if (ab) { ab.addEventListener('click', function () { if (!inGroup()) hazard(); }); setInterval(function () { if (!inGroup()) ab.hidden = !(A.isRec && A.isRec()); }, 2000); }
-
-  var row = $('#exRow');
-  if (row) { [['exFuel', 'fuel', 'Gasolineras', fuelOpen], ['exInc', 'warn', 'Incidencias', incOpen]].forEach(function (x) { var b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.id = x[0]; b.innerHTML = ic(x[1]) + x[2]; row.appendChild(b); b.addEventListener('click', x[3]); }); }
   // cortes, accidentes, hielo… de la DGT y peligros avisados que caen sobre un trazado
   function badOn(coords) { return H.dgt.filter(function (x) { return dgtBad(x) && toLine(x.lat, x.lon, coords) <= 150; }).length + H.hz.filter(function (x) { return toLine(x.lat, x.lon, coords) <= 150; }).length; }
-  window.RGRoad = { pick: fuelPick, badOn: badOn, fuel: fuelOpen, incidents: incOpen, hazard: hazard, state: H };
+  window.RGRoad = { pick: fuelPick, badOn: badOn, fuel: fuelOpen, incidents: incOpen, hazard: hazard, state: H, fuelPane: fuelPane, hazPane: hazPane };
 })();
