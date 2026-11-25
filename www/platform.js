@@ -116,9 +116,10 @@ var Platform = (function () {
   /* --- voz (TTS nativo en la app; speechSynthesis en el navegador) --- */
   function canSpeak() { return has('TextToSpeech') || !!window.speechSynthesis; }
   function speak(text) {
-    if (has('TextToSpeech')) { return P.TextToSpeech.speak({ text: text, lang: 'es-ES', rate: 1.05, pitch: 1, volume: 1, category: 'ambient' }).catch(function () {}); }
+    var I = window.RGI18N, LG = I && I.lang === 'en' ? 'en-GB' : 'es-ES'; if (I) text = I.t(text);
+    if (has('TextToSpeech')) { return P.TextToSpeech.speak({ text: text, lang: LG, rate: 1.05, pitch: 1, volume: 1, category: 'ambient' }).catch(function () {}); }
     if (window.speechSynthesis) {
-      try { var u = new SpeechSynthesisUtterance(text); u.lang = 'es-ES'; u.rate = 1.05; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } catch (e) {}
+      try { var u = new SpeechSynthesisUtterance(text); u.lang = LG; u.rate = 1.05; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } catch (e) {}
     }
     return Promise.resolve();
   }

@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.52.0';
+  var APP_VERSION = '0.53.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -1036,7 +1036,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     var principal = vehicles.filter(function (v) { return v.principal; })[0];
     vehicles.forEach(function (v) {
       var mine = rides.filter(function (r) { return r.vehicleId === v.id || (!r.vehicleId && principal && principal.id === v.id); });
-      var vkm = mine.reduce(function (s, r) { return s + (r.dist || 0); }, 0), vs = mine.reduce(function (s, r) { return s + (r.movingS || 0); }, 0), odo = Math.round((v.odoStart || 0) + vkm), digits = String(odo).padStart(6, '0');
+      var vkm = mine.reduce(function (s, r) { return s + (r.dist || 0); }, 0), vs = mine.reduce(function (s, r) { return s + (r.movingS || 0); }, 0), odo = Math.round((v.odoStart || 0) + vkm), digits = String(window.RGI18N && RGI18N.mi ? Math.round(odo / 1.609344) : odo).padStart(6, '0');
       var d = document.createElement('div'); d.className = 'vehicle' + (v.principal ? ' main' : '');
       d.innerHTML = '<div class="vhead"><div>' + (v.principal ? '<span class="mstatus ok"><svg><use href="#i-check"/></svg>principal</span>' : '<span class="label">' + (v.type === 'coche' ? 'Coche' : 'Moto') + '</span>') + '<div class="name">' + esc(v.name) + '</div><div class="muted">' + esc([[v.make, v.model].filter(Boolean).join(' '), v.leanLimit ? 'margen orientativo ' + v.leanLimit + '°' : ''].filter(Boolean).join(' · ')) + '</div></div></div>' +
         '<div><span class="label">Odómetro · km</span><br><span class="odo">' + digits.slice(0, 5) + '<b>' + digits.slice(5) + '</b></span></div>' +

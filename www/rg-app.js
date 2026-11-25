@@ -591,6 +591,7 @@
   var MUST = !navigator.webdriver; try { if (localStorage.getItem('rg.test.wall')) MUST = true; } catch (e) {}
   function openAuth(first, mode0) {
     var mode = mode0 || (first ? 'signup' : 'login');
+    try { if (localStorage.getItem('rg.auth.mode') === 'signup') { mode = 'signup'; localStorage.removeItem('rg.auth.mode'); } } catch (e) {}
     var pic = null;
     function draw() {
       var s = sheet(LOGO + '<p class="muted rg-lead">Rutas en grupo, sin perder a nadie.</p><div id="rgAuthBox" data-mode="' + mode + '">' +
@@ -600,7 +601,8 @@
           '<button class="rg-pic" id="rgPic" type="button"><span class="rg-ava" id="rgPicAva"><svg width="26" height="26"><use href="#i-camera"/></svg></span><span><b>Tu foto</b><small>Opcional. Es la que verá el grupo.</small></span></button>' +
           '<label>Tu nombre<input id="rgName" maxlength="60" autocomplete="name" placeholder="Como te conoce la gente"></label>' +
           '<label>Teléfono<input id="rgTel" type="tel" inputmode="tel" minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" placeholder="600 000 000" title="Tu número, con 9 cifras o más"></label>' +
-          '<label>¿Cómo vas en moto?<select id="rgLevel">' + levelOptions(3) + '</select></label></div></div>' +
+          '<label>¿Cómo vas en moto?<select id="rgLevel">' + levelOptions(3) + '</select></label>' +
+          '<label data-raw>Idioma · Language<select id="rgLang"><option value="es"' + (window.RGI18N && RGI18N.lang === 'en' ? '' : ' selected') + '>Español</option><option value="en"' + (window.RGI18N && RGI18N.lang === 'en' ? ' selected' : '') + '>English</option></select></label></div></div>' +
         '<label>Correo<input id="rgEmail" type="email" required autocomplete="email" inputmode="email"></label>' +
         '<label>Contraseña<input id="rgPass" type="password" required minlength="6"></label>' +
         '<button class="btn big primary" type="submit" id="rgGo"></button></form>' +
@@ -619,6 +621,7 @@
         if (sp.classList.contains('rg-split')) { sp.dataset.on = m; if (fx) { sp.classList.remove('sw-login', 'sw-signup'); void sp.offsetWidth; sp.classList.add('sw-' + m); } }
       }
       setMode(mode, false);
+      if (s.querySelector('#rgLang')) s.querySelector('#rgLang').addEventListener('change', function (ev) { try { localStorage.setItem('rg.auth.mode', 'signup'); } catch (e) {} if (window.RGI18N) RGI18N.setLang(ev.target.value); });
       s.querySelectorAll('#rgMode button').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.m !== mode) setMode(b.dataset.m, true); }); });
       $('#rgPic').addEventListener('click', function () { if (!window.RGCrop) return; RGCrop.pick().then(function (d) { if (!d) return; pic = d; var a = $('#rgPicAva'); if (a) { a.classList.add('has'); a.innerHTML = '<img src="' + d + '" alt="">'; } }); });
       if ($('#rgSkip')) $('#rgSkip').addEventListener('click', function () { try { localStorage.removeItem('rg.wall'); } catch (e) {} closeSheet(); });

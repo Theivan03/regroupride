@@ -359,6 +359,13 @@
   });
   setTimeout(function () { yo(); help(); }, 3000);
 
+  /* ---------- idioma y unidades (Ajustes › En marcha) ---------- */
+  (function () {
+    var I = window.RGI18N; if (!I) return;
+    $$('#unitSeg button').forEach(function (b) { b.setAttribute('aria-pressed', String((b.dataset.u === 'mi') === I.mi)); b.addEventListener('click', function () { I.setUnits(b.dataset.u); }); });
+    $$('#langSeg button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.l === I.lang)); b.addEventListener('click', function () { I.setLang(b.dataset.l); }); });
+  })();
+
   window.RGUI = UI;
   UI.beforeStart = beforeStart; UI.who = who; UI.near = near; UI.snack = snack; UI.draw = draw; UI.sync = sync; UI.ruTab = ruTab; UI.yo = yo;
   sync();

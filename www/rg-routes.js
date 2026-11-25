@@ -110,10 +110,11 @@
     }, function () { ghOff = true; return null; });
   }
   function open() {
+    var MI = !!(window.RGI18N && RGI18N.mi); if (MI && [64, 97, 145, 201].indexOf(O.km) < 0) O.km = 145;
     var f = A.anyFix && A.anyFix(), dirs = [[-1, 'Da igual'], [0, 'Norte'], [90, 'Este'], [180, 'Sur'], [270, 'Oeste']];
     var s = Cl.sheet('<div class="head"><h1>Generar ruta</h1><button class="btn small icon" id="lpX" type="button" title="Cerrar">' + ic('close') + '</button></div>' +
       '<p class="muted" style="margin:0;text-align:left">Di cuántos kilómetros quieres hacer y la app te propone una ruta que sale de donde estás y vuelve al mismo sitio. Cada vez busca carreteras distintas, sin barcos y evitando los cortes y peligros avisados.</p>' +
-      '<span class="label">Distancia</span><div class="pills" id="lpKm">' + [60, 100, 150, 200].map(function (k) { return '<button class="pill" type="button" data-k="' + k + '" aria-pressed="' + (k === O.km) + '">' + k + ' km</button>'; }).join('') + '</div>' +
+      '<span class="label">Distancia</span><div class="pills" id="lpKm" data-nou>' + (MI ? [40, 60, 90, 125] : [60, 100, 150, 200]).map(function (n) { var k = MI ? Math.round(n * 1.609344) : n; return '<button class="pill" type="button" data-k="' + k + '" aria-pressed="' + (Math.abs(k - O.km) < 3) + '">' + n + (MI ? ' mi' : ' km') + '</button>'; }).join('') + '</div>' +
       '<span class="label">Hacia dónde</span><div class="pills" id="lpDir">' + dirs.map(function (d) { return '<button class="pill" type="button" data-d="' + d[0] + '" aria-pressed="' + (d[0] === O.dir) + '">' + d[1] + '</button>'; }).join('') + '</div>' +
       '<label class="rg-check"><input type="checkbox" id="lpHw"' + (O.nohw ? ' checked' : '') + '><span><b>Evitar autovías</b><small>Carreteras secundarias, con más curvas.</small></span></label>' +
       '<label class="rg-check"><input type="checkbox" id="lpSt"' + (O.stops ? ' checked' : '') + '><span><b>Proponer paradas</b><small>Miradores y bares que quedan en el camino, con su nombre en el mapa.</small></span></label>' +
