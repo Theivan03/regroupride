@@ -371,21 +371,59 @@
     $$('#langSeg button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.l === I.lang)); b.addEventListener('click', function () { I.setLang(b.dataset.l); }); });
   })();
 
-  document.addEventListener('click', function (ev) {
+  /* Pestañas de dentro: el contenido nuevo entra desde el lado hacia el que se va.
+     La entrada se ata al momento en que el contenido CAMBIA de verdad, no al toque: si se lanzara al tocar, el contenido nuevo
+     se vería un instante ya colocado y luego «saltaría» al inicio de la animación (el pantallazo), y lo que llega del servidor
+     aparecería de golpe a media entrada. Mientras algo se está cargando, el hueco espera vacío y entra todo junto. */
+  var TAB = null;
+  function tabPanes(t) {
+    var nb = t.id ? document.getElementById(t.id) : t.bar, out = []; if (!nb || !nb.isConnected) return out;
+    for (var el = nb.nextElementSibling; el; el = el.nextElementSibling) {
+      if (el.hidden || el.classList.contains('as-fixed') || el.classList.contains('as-legacy') || getComputedStyle(el).display === 'none') continue;
+      out.push(el);
+    }
+    return out;
+  }
+  function tabSig(t) { return tabPanes(t).map(function (e) { return (e.id || e.className) + ':' + e.innerHTML.length + ':' + (e.dataset.tab || ''); }).join('|'); }
+  function tabEnd(t) { if (t.obs) t.obs.disconnect(); clearTimeout(t.timer); clearTimeout(t.soft); if (TAB === t) TAB = null; }
+  function tabGo(t, force) {
+    if (t.done) return; var ps = tabPanes(t); if (!ps.length) return;
+    if (!force && ps.some(function (p) { return p.querySelector('.rg-load'); })) {
+      if (!t.shown) ps.forEach(function (p) { p.classList.add('rg-tab-wait'); }); t.waiting = true;
+      // si lo que falta es solo un trozo (el tiempo, las etapas) y lo principal ya está, no se espera más de 0,3 s
+      var rest = ps.reduce(function (n, p) { var c = p.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('.rg-load'), function (x) { x.remove(); }); return n + c.textContent.replace(/\s+/g, '').length; }, 0);
+      if (rest > 40 && !t.soft) t.soft = setTimeout(function () { tabGo(t, true); }, 300);
+      return;
+    }
+    t.done = true; tabEnd(t);
+    $$('.rg-tab-wait').forEach(function (p) { if (ps.indexOf(p) < 0) p.classList.remove('rg-tab-wait'); });
+    ps.forEach(function (p) {
+      p.classList.remove('rg-tab-l', 'rg-tab-r'); void p.offsetWidth; p.classList.add('rg-tab-' + t.dir); p.classList.remove('rg-tab-wait');
+      setTimeout(function () { p.classList.remove('rg-tab-l', 'rg-tab-r'); }, 560);
+    });
+  }
+  document.addEventListener('click', function (ev) {                    // antes de que la pestaña haga nada: se anota cómo está
     var b = ev.target.closest && ev.target.closest('.as-tabs button, #trTabs button, #phTabs button'); if (!b || b.disabled) return;
     var bar = b.parentNode, btns = Array.prototype.slice.call(bar.children), cur = -1, i = btns.indexOf(b);
     btns.forEach(function (x, k) { if (x.getAttribute('aria-pressed') === 'true' || x.getAttribute('aria-selected') === 'true') cur = k; });
-    if (i === cur) return;
-    var dir = i > cur ? 'l' : 'r', id = bar.id;
-    setTimeout(function () {
-      var nb = id ? document.getElementById(id) : bar; if (!nb || !nb.isConnected) return;
-      for (var el = nb.nextElementSibling; el; el = el.nextElementSibling) {
-        if (el.hidden || el.classList.contains('as-fixed') || el.classList.contains('as-legacy')) continue;
-        el.classList.remove('rg-tab-l', 'rg-tab-r'); void el.offsetWidth; el.classList.add('rg-tab-' + dir);
-        (function (e) { setTimeout(function () { e.classList.remove('rg-tab-l', 'rg-tab-r'); }, 560); })(el);
-      }
-    }, 0);
+    if (i === cur || !bar.parentNode) return;
+    if (TAB) { var old = TAB; tabEnd(old); $$('.rg-tab-wait').forEach(function (p) { p.classList.remove('rg-tab-wait'); }); }
+    var t = TAB = { bar: bar, id: bar.id, dir: i > cur ? 'l' : 'r', done: false, waiting: false };
+    t.sig = tabSig(t);
+    if (window.MutationObserver) {
+      t.obs = new MutationObserver(function () { if (t.waiting || tabSig(t) !== t.sig) tabGo(t, false); });
+      t.obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'data-tab'] });      // todo el documento: hay pantallas que se redibujan enteras al cambiar de pestaña
+    }
+    // Si a los 0,7 s sigue cargando, se deja ver el «Cargando…» y se sigue esperando: lo que llegue después entrará con su movimiento.
+    t.timer = setTimeout(function () {
+      $$('.rg-tab-wait').forEach(function (p) { p.classList.remove('rg-tab-wait'); });
+      if (!t.waiting || t.done) { tabEnd(t); return; }
+      t.shown = true; t.timer = setTimeout(function () { tabEnd(t); }, 9000);
+    }, 700);
   }, true);
+  document.addEventListener('click', function () {                      // después de que la pestaña haya hecho lo suyo, en el mismo instante
+    var t = TAB; if (t && !t.done && (t.waiting || tabSig(t) !== t.sig)) tabGo(t, false);
+  });
   window.RGUI = UI;
   UI.beforeStart = beforeStart; UI.who = who; UI.near = near; UI.snack = snack; UI.draw = draw; UI.sync = sync; UI.ruTab = ruTab; UI.yo = yo;
   sync();

@@ -669,8 +669,8 @@ html body #idleCard,html body #hudCard{animation:rgRise .3s cubic-bezier(.2,.8,.
 html body #lightbox,html body #leanFull,html body .rg-stopask,html body .rg-soloask,html body .rg-crop,html body .rg-tour{animation:rgFade .26s ease-out both!important}
 html body .toast{animation:rgRise .22s ease-out both!important}
 /* pestañas de dentro */
-html body .rg-tab-l{animation:rgTabL .5s cubic-bezier(.22,.61,.36,1) both!important}
-html body .rg-tab-r{animation:rgTabR .5s cubic-bezier(.22,.61,.36,1) both!important}
+html body .rg-tab-l.rg-tab-l.rg-tab-l{animation:rgTabL .5s cubic-bezier(.22,.61,.36,1) both!important}
+html body .rg-tab-r.rg-tab-r.rg-tab-r{animation:rgTabR .5s cubic-bezier(.22,.61,.36,1) both!important}
 /* pantallas completas */
 html body #rgPage{animation:none!important}
 html body #rgPage.rg-first{background:transparent!important}
@@ -716,3 +716,5 @@ html[data-theme="dark"]:root{--tour-velo:rgba(0,0,0,.74)}
 .rg-tour-demo .as-col{display:flex;flex-direction:column;gap:10px}
 .rg-tour-tag{align-self:flex-start;font:700 11px/1 var(--font-texto);letter-spacing:.08em;text-transform:uppercase;color:var(--texto-2);border:1px solid var(--linea);border-radius:999px;padding:5px 9px}
 .rg-tour-demo .as-ev .btn{display:flex;align-items:center;justify-content:center}
+
+html body .rg-tab-wait{opacity:0!important;transition:none!important;animation:none!important}

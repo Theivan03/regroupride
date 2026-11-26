@@ -213,8 +213,9 @@
         else pageForm(c, null);
       }); });
     };
-    paint(PGS[c.id] || []);
-    sb.from('community_pages').select('*').eq('community_id', c.id).order('position').order('title').then(function (r) { if (!r.error) { PGS[c.id] = r.data || []; if (S.top === 'info' && cur() && cur().id === c.id) paint(r.data || []); } }, function () {});
+    // la primera vez se espera a tener las páginas: pintar sin ellas y repintar a los 200 ms hacía que la lista «creciera» a la vista
+    if (PGS[c.id]) paint(PGS[c.id]); else if (!host.children.length || host.querySelector('.rg-load')) host.innerHTML = '<div class="empty rg-load"><b>Cargando…</b></div>';
+    sb.from('community_pages').select('*').eq('community_id', c.id).order('position').order('title').then(function (r) { if (!r.error) PGS[c.id] = r.data || []; if (S.top === 'info' && cur() && cur().id === c.id) paint(PGS[c.id] || []); }, function () { if (S.top === 'info' && cur() && cur().id === c.id) paint(PGS[c.id] || []); });
   }
   var PGS = {};
   function panePagesBack(c) { if (S.top === 'info' && !$('#view-club').hidden) paneInfo(c); return Promise.resolve(); }
