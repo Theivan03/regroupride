@@ -106,6 +106,8 @@
   // Quien creó el grupo ha iniciado la ruta: se me inicia a mí también. Dos señales: la hora de salida que apunta el servidor
   // (ride_start) y, por si el servidor aún no la tiene, ver que el organizador empieza a mandar posición. Cada salida se
   // atiende una sola vez: si luego paro yo a mano no se me vuelve a poner en marcha; si el organizador para y vuelve a salir, sí.
+  // Empieza la ruta: fuera lo que haya abierto (la ficha de la salida, un chat, una hoja) y al mapa.
+  function toMap() { G.sheetOpen = false; try { if (Cl.closePages) Cl.closePages(); Cl.closeSheet(); } catch (e) {} A.showView('map'); }
   function checkStart(at, now, live) {
     if (!G.s || G.s.owner) return;
     var own = G.rows.filter(function (x) { return x.owner; })[0], riding = !!(own && live[own.user_id] && now - own.at < 90000), go = false;
@@ -114,8 +116,8 @@
     else if (!riding && G.s.ownRiding && now - (G.s.seen || 0) > 120000) G.s.ownRiding = false;
     save();
     if (!go || A.isRec()) return;
-    if (G.sheetOpen) close();
-    A.showView('map'); A.toast((own && own.name ? own.name : 'El organizador') + ' ha iniciado la ruta.', 'ok'); speak('Empieza la ruta.');
+    toMap();
+    A.toast((own && own.name ? own.name : 'El organizador') + ' ha iniciado la ruta.', 'ok'); speak('Empieza la ruta.');
     G.autoStart = Date.now(); A.startRide();
     if (window.RGNav && RGNav.preStart) setTimeout(function () { if (A.isRec()) RGNav.preStart(null, true); }, 1200);
   }
@@ -402,6 +404,7 @@
     if (rt && rt.coords && rt.coords.length > 1) job = A.usePlan({ id: parseInt(d.id.replace(/-/g, '').slice(0, 12), 16), name: rt.name || d.name, wps: rt.wps || [], pois: rt.pois || [], coords: rt.coords, dist: rt.dist || 0, dur: rt.dur || 0, routed: true, steps: rt.steps || [], created: Date.now(), groupId: d.id });
     return job.then(function () {
       G.busy = false; var c = call(), go = function () { if (!A.isRec()) A.startRide(); };
+      if (opts.start) toMap();
       if (opts.start && !A.isRec()) { if (!(window.RGNav && RGNav.preStart && RGNav.preStart(go))) go(); }   // lejos de la salida: primero, por dónde entrar
       return c;
     });
