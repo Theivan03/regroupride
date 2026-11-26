@@ -613,7 +613,7 @@
         (window.RGSocial ? row('check', 'check', 'Antes de salir', (x.check && x.check.length ? x.check.length + ' del organizador y lo de siempre' : 'Calzado, guantes, documentación…')) : '') +
         (x.voice ? row('voice', 'phone', 'Canal de voz', 'Se abre fuera de la app') : '') +
         (e.luma_url ? row('luma', 'link', 'Apuntarse en Luma', '') : '') +
-        (st === 'going' ? row('ticket', 'qr', 'Mi entrada', 'El QR que se enseña al llegar') : '') +
+        (st === 'going' && e.created_by !== uid ? row('ticket', 'qr', 'Mi entrada', 'El QR que se enseña al llegar') : '') +
         (st === 'going' ? '<label class="as-row as-switch-row"><span><b>Voy con acompañante</b></span><span class="switch"><input type="checkbox" id="evComp"' + (mine.companion ? ' checked' : '') + '><span></span></span></label>' : '') +
         row('share', 'share', 'Compartir', 'El enlace de la página pública') + '</div>' +
         (canRun ? '<button class="btn big" data-p="start" type="button">' + icn('play') + 'Iniciar la ruta para los apuntados</button>' + (e.route ? '' : '<p class="muted rg-small" style="margin:0">Sin ruta puesta: salís en grupo, os veis en el mapa y cada uno graba lo que hace.</p>') : '') +
@@ -787,7 +787,7 @@
           : '<div class="empty"><b>' + (e.capacity ? 'Nadie en espera' : 'Esta salida no tiene límite') + '</b>' + (e.capacity ? 'Cuando se llene, quien se apunte quedará aquí en orden de llegada.' : 'Con un límite de plazas, quien se apunte cuando esté llena queda en lista de espera.') + '</div>' + (e.capacity ? '' : '<button class="btn big" id="mgCap" type="button">Poner límite de plazas</button>');
       } else {
         var g2 = of(function (x) { return x.status === 'going'; }), inN = g2.filter(function (x) { return x.checked_in; }).length;
-        body = '<div class="as-figs one"><div><b class="cifra">' + inN + '<small>de ' + g2.length + '</small></b><span>Han llegado</span></div></div>' + (g2.length ? '<div class="as-rows">' + g2.map(function (x) { return '<div class="as-row" data-i="' + rows.indexOf(x) + '">' + who2(x) + '<button class="as-tagbtn' + (x.checked_in ? ' on' : '') + '" data-a="' + (x.checked_in ? 'uncheck' : 'checkin') + '" type="button">' + (x.checked_in ? 'Ha llegado' : 'Sin llegar') + '</button></div>'; }).join('') + '</div>' : '<div class="empty small"><b>Nadie apuntado todavía</b></div>') +
+        body = '<div class="as-figs one"><div><b class="cifra">' + inN + '<small>de ' + g2.length + '</small></b><span>Han llegado</span></div></div>' + (g2.length ? '<div class="as-rows">' + g2.map(function (x) { return '<div class="as-row" data-i="' + rows.indexOf(x) + '">' + who2(x) + (x.kind === 'm' && x.id === e.created_by ? '<i class="as-tag">Organiza</i>' : '<button class="as-tagbtn' + (x.checked_in ? ' on' : '') + '" data-a="' + (x.checked_in ? 'uncheck' : 'checkin') + '" type="button">' + (x.checked_in ? 'Ha llegado' : 'Sin llegar') + '</button>') + '</div>'; }).join('') + '</div>' : '<div class="empty small"><b>Nadie apuntado todavía</b></div>') +
           '<div class="as-fixed"><button class="btn big primary" id="mgScan" type="button">' + icn('qr') + 'Escanear entrada</button></div>';
       }
       shell(body);

@@ -176,3 +176,28 @@ begin
   d := replace(d, 'if e.route is null then raise exception ''Este evento no tiene ruta''; end if;', '');
   execute d;
 end $$;
+
+-- ---------- 7) Quien crea una salida va a ella: apuntado y con la llegada puesta desde el principio ----------
+create or replace function public.event_creator_goes() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.created_by is null then return new; end if;
+  perform set_config('rg.sys', '1', true);   -- el organizador siempre tiene plaza
+  insert into public.event_attendees (event_id, user_id, status, checked_in_at) values (new.id, new.created_by, 'going', now())
+    on conflict (event_id, user_id) do nothing;
+  perform set_config('rg.sys', '', true);
+  return new;
+end $$;
+drop trigger if exists t_event_creator on public.events;
+create trigger t_event_creator after insert on public.events for each row execute function public.event_creator_goes();
+do $$
+begin
+  perform set_config('rg.sys', '1', true);
+  insert into public.event_attendees (event_id, user_id, status, checked_in_at)
+    select e.id, e.created_by, 'going', now() from public.events e
+     where e.created_by is not null and exists (select 1 from auth.users u where u.id = e.created_by)
+    on conflict (event_id, user_id) do nothing;
+  update public.event_attendees a set checked_in_at = now() from public.events e
+   where e.id = a.event_id and a.user_id = e.created_by and a.status = 'going' and a.checked_in_at is null;
+  perform set_config('rg.sys', '', true);
+end $$;
