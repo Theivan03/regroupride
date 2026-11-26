@@ -755,3 +755,16 @@ html body .rg-votebtn[aria-pressed=true]{background:var(--accion);color:var(--so
 .as-swiping{z-index:1}
 .as-swiping::after{content:"Borrar";position:absolute;top:0;bottom:0;left:100%;width:140px;display:flex;align-items:center;justify-content:flex-start;padding-left:22px;background:var(--peligro,#C8102E);color:#fff;font:700 15px/1 var(--font-titulo,inherit);letter-spacing:.04em;text-transform:uppercase}
 .as-swipe-go::after{background:#8E0B20}
+
+/* 0.60.3 — fila «Voy con acompañante», barra de «Vas» más baja y pegada al borde, y cuántos van en las tarjetas */
+.as-rows .as-switch-row{padding:8px 14px;min-height:60px;cursor:pointer}
+.as-row.as-switch-row>.switch{flex:0 0 48px!important;min-width:48px;display:block;position:relative}
+.as-rows .as-switch-row b{font:700 19px/1.15 var(--font-titulo)!important;letter-spacing:.02em;text-transform:uppercase}
+.as-fixed{bottom:calc(-1 * max(24px,env(safe-area-inset-bottom,0px)))}
+.as-fixed:has(>.as-vas:only-child){padding-top:6px;padding-bottom:max(6px,env(safe-area-inset-bottom,0px))}
+.as-vas{min-height:40px}
+.as-vas span{font-size:16px}.as-vas svg{width:18px;height:18px}
+.as-vas .btn{min-height:36px!important;padding:6px 12px!important;font-size:14px!important}
+.as-going{display:flex!important;align-items:center;gap:6px;font-weight:700!important;color:var(--texto)!important;margin-top:2px}
+.as-going svg{width:15px;height:15px;flex:none}
+.as-evhead .as-going{margin-top:6px;font:700 14px/1.2 var(--font-texto)}

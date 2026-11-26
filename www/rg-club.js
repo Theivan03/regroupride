@@ -388,6 +388,8 @@
 
   /* ---------- eventos ---------- */
   // Las plazas y la lista de espera las decide el servidor (supabase/06_plazas_y_salida.sql); aquí se pide y se enseña.
+  // «30 de 50 apuntados» o «12 apuntados»: se ve en la tarjeta, sin tener que entrar
+  function goingTx(att, e) { var n = takenOf(att, e).length, cap = e.capacity || 0; return cap ? '<small class="as-going">' + icn('people') + n + ' de ' + cap + ' apuntados</small>' : n ? '<small class="as-going">' + icn('people') + n + (n === 1 ? ' apuntado' : ' apuntados') + '</small>' : ''; }
   function takenOf(att, e) { return att.filter(function (x) { return x.event_id === e.id && (x.status === 'going' || x.status === 'offered'); }); }
   // Punto de salida: el que puso el organizador o, si no, donde empieza la ruta. Siempre con su enlace de Maps.
   function meetOf(e) {
@@ -466,7 +468,7 @@
       var evs = rows.map(function (e) {
         var o = {}, k; for (k in e) if (!/^(event_attendees|event_admins|route_name|route_dist|route_start|route_wp0)$/.test(k)) o[k] = e[k];
         if (e.route === undefined) o.route = (e.route_name != null || e.route_start) ? { name: e.route_name || '', dist: e.route_dist || 0, coords: e.route_start ? [e.route_start] : [], wps: e.route_wp0 ? [e.route_wp0] : [], lite: true } : null;
-        (e.event_attendees || []).forEach(function (a) { att.push(a); });
+        (e.event_attendees || []).forEach(function (a) { if (!a.event_id) a.event_id = e.id; att.push(a); });
         (e.event_admins || []).forEach(function (a) { (adm[e.id] = adm[e.id] || []).push(a.user_id); });
         return o;
       });
@@ -489,12 +491,12 @@
     var vas = going.map(function (e) {
       var full = EVS[e.id], days = full && full.trip && full.trip.days ? full.trip.days.length : (e.is_trip ? 2 : 0), km = full && full.route ? full.route.dist : 0, n = unreadOf(function (x) { return x.event === e.id; });
       var st = e.status === 'offered' ? '<i class="as-tag amber">Tienes plaza</i>' : e.status === 'waiting' ? '<i class="as-tag">En espera</i>' : '<i class="as-tag ink">Vas</i>';
-      return '<div class="as-ev" data-ev="' + e.id + '"><button class="as-ev-main" type="button" data-open="' + e.id + '"><span class="as-ev-cover" data-cover="' + e.id + '">' + dateBlock(e.starts_at) + '</span><span class="as-ev-t"><b>' + esc(e.title) + '</b><small>' + hm2(e.starts_at) + (e.meet_name ? ' · ' + esc(e.meet_name) : '') + '</small><small>' + [days > 1 ? days + ' días' : '', km ? Math.round(km) + ' km' : '', e.community || ''].filter(Boolean).map(esc).join(' · ') + '</small></span></button>' +
+      return '<div class="as-ev" data-ev="' + e.id + '"><button class="as-ev-main" type="button" data-open="' + e.id + '"><span class="as-ev-cover" data-cover="' + e.id + '">' + dateBlock(e.starts_at) + '</span><span class="as-ev-t"><b>' + esc(e.title) + '</b><small>' + hm2(e.starts_at) + (e.meet_name ? ' · ' + esc(e.meet_name) : '') + '</small><small>' + [days > 1 ? days + ' días' : '', km ? Math.round(km) + ' km' : '', e.community || ''].filter(Boolean).map(esc).join(' · ') + '</small>' + goingTx(att, full || e) + '</span></button>' +
         '<div class="as-ev-b">' + st + '<button class="btn small" type="button" data-chat="' + e.id + '">' + icn('chat') + 'Chat' + nTag(n) + '</button></div></div>';
     }).join('');
     var prox = next.map(function (e) {
       var taken = takenOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap, m = meetOf(e);
-      return '<div class="as-ev" data-ev="' + e.id + '"><button class="as-ev-main" type="button" data-open="' + e.id + '">' + dateBlock(e.starts_at) + '<span class="as-ev-t"><b>' + esc(e.title) + '</b><small>' + hm2(e.starts_at) + (m.name ? ' · ' + esc(m.name) : '') + '</small>' + (cap ? '<small>' + taken.length + ' de ' + cap + ' plazas</small>' : '') + '</span></button>' +
+      return '<div class="as-ev" data-ev="' + e.id + '"><button class="as-ev-main" type="button" data-open="' + e.id + '">' + dateBlock(e.starts_at) + '<span class="as-ev-t"><b>' + esc(e.title) + '</b><small>' + hm2(e.starts_at) + (m.name ? ' · ' + esc(m.name) : '') + '</small>' + goingTx(att, e) + '</span></button>' +
         (m.lat != null ? '<span class="ev-wx as-wx" data-wx="' + m.lat + ',' + m.lon + ',' + new Date(e.starts_at).getTime() + '" hidden></span>' : '') +
         '<button class="btn" type="button" data-join="' + e.id + '">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button></div>';
     }).join('');
@@ -548,7 +550,7 @@
   function fetchEvent(id) {
     var q = function (cols) { return sb.from('events').select(cols).eq('id', id).single(); };
     return q(EV_COLS + (S.v6 !== false ? EV_V6 : '') + ',cover_url' + EV_ROUTE + EV_EMBED).then(function (r) { return r.error ? q('*, event_attendees(*), event_admins(user_id)') : r; }).then(function (r) {
-      var e = ok(r), att = e.event_attendees || [], o = {}, k; for (k in e) if (!/^(event_attendees|event_admins|route_name|route_dist|route_start|route_wp0)$/.test(k)) o[k] = e[k];
+      var e = ok(r), att = e.event_attendees || [], o = {}, k; att.forEach(function (a) { if (!a.event_id) a.event_id = id; }); for (k in e) if (!/^(event_attendees|event_admins|route_name|route_dist|route_start|route_wp0)$/.test(k)) o[k] = e[k];
       if (e.route === undefined) o.route = (e.route_name != null || e.route_start) ? { name: e.route_name || '', dist: e.route_dist || 0, coords: e.route_start ? [e.route_start] : [], wps: e.route_wp0 ? [e.route_wp0] : [], lite: true } : null;
       S.evAdmins[id] = (e.event_admins || []).map(function (a) { return a.user_id; }); if (e.cover_url) COVERS[id] = e.cover_url; EVS[id] = e;
       return names(att.map(function (x) { return x.user_id; })).catch(function () {}).then(function () { return { e: o, att: att }; });
@@ -582,7 +584,7 @@
     else fixed = '<button class="btn big primary" data-f="go" type="button">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button>';
     var keepTop = keep && $('#rgPage .rg-sheet-in') ? $('#rgPage .rg-sheet-in').scrollTop : 0;
     var s = Cl.sheet('<div data-pk="ev-' + EVP.id + '" class="as-hero' + (cover ? ' has' : '') + '"' + (cover ? ' style="background-image:url(&quot;' + esc(cover) + '&quot;)"' : '') + '><button class="as-hero-b" id="evBack" type="button" title="Volver">' + icn('back') + '</button>' + (canRun ? '<button class="as-hero-b txt" id="evManage" type="button">' + icn('sliders') + 'Gestionar</button>' : '') + '</div>' +
-      '<div class="as-evhead"><span class="as-evwhen">' + esc(fmtWhen(e.starts_at)) + (days > 1 ? ' · ' + days + ' días' : '') + '</span><h1>' + esc(e.title) + '</h1><small>' + esc((c ? c.name : (EVS[e.id] && EVS[e.id].communities && EVS[e.id].communities.name) || 'Entre amigos') + (e.open_near ? ' · abierta a moteros de fuera' : '')) + '</small></div>' +
+      '<div class="as-evhead"><span class="as-evwhen">' + esc(fmtWhen(e.starts_at)) + (days > 1 ? ' · ' + days + ' días' : '') + '</span><h1>' + esc(e.title) + '</h1><small>' + esc((c ? c.name : (EVS[e.id] && EVS[e.id].communities && EVS[e.id].communities.name) || 'Entre amigos') + (e.open_near ? ' · abierta a moteros de fuera' : '')) + '</small>' + goingTx(att, e) + '</div>' +
       '<div class="as-tabs" id="evTabs">' + tabs.map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (EVP.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div id="evPane" class="as-col"></div>' + (EVP.tab === 'plan' || EVP.tab === 'gente' ? '<div class="as-fixed" id="evFixed">' + fixed + '</div>' : ''), 'full');
     s.classList.add('as-evpage'); if (keepTop) $('.rg-sheet-in', s).scrollTop = keepTop;
@@ -614,7 +616,7 @@
         (x.voice ? row('voice', 'phone', 'Canal de voz', 'Se abre fuera de la app') : '') +
         (e.luma_url ? row('luma', 'link', 'Apuntarse en Luma', '') : '') +
         (st === 'going' && e.created_by !== uid ? row('ticket', 'qr', 'Mi entrada', 'El QR que se enseña al llegar') : '') +
-        (st === 'going' ? '<label class="as-row as-switch-row"><span><b>Voy con acompañante</b></span><span class="switch"><input type="checkbox" id="evComp"' + (mine.companion ? ' checked' : '') + '><span></span></span></label>' : '') +
+        (st === 'going' ? '<label class="as-row as-switch-row">' + icn('people') + '<span><b>Voy con acompañante</b><small>Un pasajero en mi moto</small></span><span class="switch"><input type="checkbox" id="evComp"' + (mine.companion ? ' checked' : '') + '><span></span></span></label>' : '') +
         row('share', 'share', 'Compartir', 'El enlace de la página pública') + '</div>' +
         (canRun ? '<button class="btn big" data-p="start" type="button">' + icn('play') + 'Iniciar la ruta para los apuntados</button>' + (e.route ? '' : '<p class="muted rg-small" style="margin:0">Sin ruta puesta: salís en grupo, os veis en el mapa y cada uno graba lo que hace.</p>') : '') +
         ((st === 'going' || st === 'offered') && !canRun ? '<button class="as-link" data-p="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '');
@@ -634,7 +636,8 @@
   }
   function goersHtml(e, att, c) {
     var going = att.filter(function (x) { return x.status === 'going'; }), off = att.filter(function (x) { return x.status === 'offered'; }), evAd = S.evAdmins[e.id] || [], org = e.created_by;
-    var person = function (uid, tag, comp) { return '<div class="as-row">' + ava(uid) + '<span><b>' + esc(who(uid)) + (tag ? '<i class="as-tag">' + tag + '</i>' : '') + (comp ? '<i class="as-tag">+1</i>' : '') + '</b><small>' + esc(bike(uid)) + '</small></span></div>'; };
+    var said = {}; att.forEach(function (x) { if (x.bike) said[x.user_id] = x.bike; });   // la moto que dijo al apuntarse, aunque no la tenga guardada
+    var person = function (uid, tag, comp) { return '<div class="as-row">' + ava(uid) + '<span><b>' + esc(who(uid)) + (tag ? '<i class="as-tag">' + tag + '</i>' : '') + (comp ? '<i class="as-tag">+1</i>' : '') + '</b><small>' + esc(bike(uid) || said[uid] || '') + '</small></span></div>'; };
     var people = going.length + going.filter(function (x) { return x.companion; }).length;
     return (org ? '<span class="label">Organiza</span><div class="as-rows">' + person(org, 'admin') + '</div>' : '') +
       '<span class="label">Van · ' + going.length + (e.capacity ? ' de ' + e.capacity + ' plazas' : going.length === 1 ? ' moto' : ' motos') + (people > going.length ? ' · ' + people + ' personas' : '') + '</span>' +

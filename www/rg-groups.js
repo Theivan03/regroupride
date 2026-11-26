@@ -28,7 +28,7 @@
       (o.excerpt ? '<div class="rt-note warn"><b>Lo que reportas</b><p>' + esc(o.excerpt) + '</p></div>' : '') +
       '<form class="rg-form" id="rpForm"><label>Motivo<select id="rpReason">' + REASONS.map(function (x) { return '<option value="' + x[0] + '">' + x[1] + '</option>'; }).join('') + '</select></label>' +
       '<label>Cuéntanos qué ha pasado<textarea id="rpDetail" class="note" maxlength="1000" required minlength="5" placeholder="Qué ha hecho, cuándo y dónde. Cuanto más concreto, mejor."></textarea></label>' +
-      '<label class="rg-check"><input type="checkbox" id="rpHide" checked><span><b>No ver más a esta persona</b><small>Sus mensajes dejarán de aparecerte. Puedes deshacerlo en Ajustes.</small></span></label>' +
+      '<label class="rg-check"><input type="checkbox" id="rpHide" checked><span><b>No ver más a esta persona</b><small>Sus mensajes dejarán de aparecerte. Puedes deshacerlo en Yo › Ajustes › Cuenta › «Personas que no ves».</small></span></label>' +
       '<button class="btn big primary" type="submit">Enviar reporte</button></form>');
     $('#grX').addEventListener('click', function () { if (o.back) o.back(); else Cl.closeSheet(); });
     $('#rpForm').addEventListener('submit', function (ev) {
@@ -196,20 +196,23 @@
     });
   }
 
-  /* ---------- Ajustes: personas que no veo ---------- */
-  var about = document.getElementById('about');
-  if (about) {
-    var box = document.createElement('div'); box.className = 'rg-maker'; box.hidden = true;
-    about.parentNode.insertBefore(box, about);
+  /* ---------- Ajustes › Cuenta: personas que no veo ---------- */
+  function openHidden() {
+    if (!me()) { Cl.openAuth(false); return; }
     var paint = function () {
-      var ids = HID ? Object.keys(HID) : []; box.hidden = !ids.length; if (!ids.length) return;
-      sb.from('profiles').select('id,name').in('id', ids).then(function (r) {
-        var nm = {}; (r.data || []).forEach(function (p) { nm[p.id] = p.name; });
-        box.innerHTML = '<span class="label">Personas que no ves</span>' + ids.map(function (id) { return '<div class="rg-row" style="justify-content:space-between"><span>' + esc(nm[id] || 'Motero') + '</span><button class="btn small" data-un="' + id + '" type="button">Volver a ver</button></div>'; }).join('');
-        $$('[data-un]', box).forEach(function (b) { b.addEventListener('click', function () { sb.from('user_hides').delete().eq('user_id', me()).eq('hidden_id', b.dataset.un).then(function () { delete HID[b.dataset.un]; paint(); }, function () {}); }); });
-      }, function () {});
+      var ids = HID ? Object.keys(HID) : [];
+      var draw = function (nm) {
+        Cl.sheet(head('Personas que no ves') + '<p class="muted" style="text-align:left;margin:0">Son las personas que has ocultado al reportarlas o desde un chat. No ves sus mensajes; ellas no lo saben.</p>' +
+          (ids.length ? '<div class="as-rows">' + ids.map(function (id) { return '<div class="as-row"><span><b data-raw>' + esc(nm[id] || 'Motero') + '</b></span><button class="btn small" data-un="' + id + '" type="button">Volver a ver</button></div>'; }).join('') + '</div>'
+            : '<div class="empty"><b>No has ocultado a nadie</b>Si reportas a alguien y marcas «No ver más a esta persona», aparecerá aquí.</div>'), 'full');
+        $('#grX').addEventListener('click', Cl.closeSheet);
+        $$('#rgSheet [data-un], #rgPage [data-un]').forEach(function (b) { b.addEventListener('click', function () { Cl.busy(b, function () { return sb.from('user_hides').delete().eq('user_id', me()).eq('hidden_id', b.dataset.un).then(function (r) { ok(r); delete HID[b.dataset.un]; A.toast('Vuelves a ver a esta persona.', 'ok'); paint(); }); }); }); });
+      };
+      if (!ids.length) { draw({}); return; }
+      sb.from('profiles').select('id,name').in('id', ids).then(function (r) { var nm = {}; (r.data || []).forEach(function (p) { nm[p.id] = p.name; }); draw(nm); }, function () { draw({}); });
     };
-    setTimeout(function () { loadHides().then(paint); }, 5000); setInterval(paint, 30000);
+    Cl.sheet(head('Personas que no ves') + '<div class="empty rg-load"><b>Cargando…</b></div>', 'full'); $('#grX').addEventListener('click', Cl.closeSheet);
+    loadHides().then(paint, paint);
   }
-  window.RGGroups = { pane: pane, report: report, hidden: hidden };
+  window.RGGroups = { pane: pane, report: report, hidden: hidden, openHidden: openHidden };
 })();

@@ -832,8 +832,10 @@
       box.innerHTML = '<div class="rg-acc"><span class="rg-ava">' + (profile && /^https:\/\//.test(profile.avatar_url || '') ? '<img src="' + esc(profile.avatar_url) + '" alt="">' : esc(name.charAt(0).toUpperCase())) + '</span><div><b>' + esc(name) + '</b><span class="muted">' + esc(user.email || '') + '</span></div></div>' +
         '<button class="rg-level" id="rgPhone" type="button"><span>' + (ridePhone ? esc(ridePhone) : 'Teléfono para las rutas') + '</span><small>' + (ridePhone ? 'Teléfono para las rutas · tocar para cambiarlo' : 'Falta tu teléfono · para que puedan llamarte en una ruta') + '</small></button>' +
         '<div class="rg-row"><button class="btn small" id="rgFeedback" type="button"><svg><use href="#i-info"/></svg>Sugerencias y fallos</button><button class="btn small" id="rgOut" type="button"><svg><use href="#i-exit"/></svg>Cerrar sesión</button></div>' +
+        '<button class="as-link" id="rgHides" type="button" style="align-self:flex-start">Personas que no ves</button>' +
         '<button class="as-link rg-del" id="rgDelete" type="button">Eliminar mi cuenta</button>';
       $('#rgDelete').addEventListener('click', openDelete);
+      $('#rgHides').addEventListener('click', function () { if (window.RGGroups && RGGroups.openHidden) RGGroups.openHidden(); });
       $('#rgPhone').addEventListener('click', openPhone);
       $('#rgOut').addEventListener('click', function (ev) { signOut(false, ev.currentTarget); });
     } else {

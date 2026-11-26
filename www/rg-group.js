@@ -65,8 +65,11 @@
   function askStop(done) {
     if (!G.s || !amAdmin() || !sb) return false;
     var others = (G.rows || []).filter(function (x) { return x.user_id !== me(); }).length;
-    if (!others) return false;
-    Cl.sheet('<span class="rg-pop-kind">Eres administrador</span><h1>¿Terminar la ruta?</h1><p>Puedes terminarla para todo el grupo (a los demás se les para y salen del grupo) o solo para ti.</p>' +
+    if (!others) {      // nadie más dentro: una salida de la comunidad se da por terminada, para poder iniciarla otra vez desde cero
+      if (G.s.eventId) { var sid = G.s.id; sb.rpc('ride_end', { p_id: sid }).then(noop, noop); if (window.RGLive) RGLive.send('rg-r-' + sid, { kind: 'end' }); leaveLocal(); }
+      return false;
+    }
+    Cl.sheet('<span class="rg-pop-kind">Eres administrador</span><h1>¿Terminar la ruta?</h1><p>Puedes terminarla para todo el grupo (a cada uno se le guarda lo que ha rodado y sale del grupo) o solo para ti.' + (G.s.eventId ? ' Si paráis a almorzar, termínala para todos y, al salir, vuelve a iniciarla desde la salida: les llega otra vez el aviso.' : '') + '</p>' +
       '<button class="btn big danger" id="stAll" type="button"><svg><use href="#i-stop"/></svg>Terminar para todos</button>' +
       '<button class="btn big" id="stMe" type="button">Solo para mí</button>' +
       '<button class="btn rg-skip" id="stNo" type="button">Seguir rodando</button>', 'win');
