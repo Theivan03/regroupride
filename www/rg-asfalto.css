@@ -644,3 +644,21 @@ html body #hudCard .as-hud2 .btn.stop{min-height:48px!important;font-size:17px!i
 #rgNoti .rg-nrow span,#rgNoti .rg-nok{font:500 15px/1.4 var(--font-texto)}
 #rgNoti .rg-nok{align-items:flex-start}
 #rgNoti p{margin:0!important;text-align:left}
+
+/* ================= movimiento: una sola regla para toda la app =================
+   · Una pantalla completa se anima UNA vez, al abrirse. Redibujarla (cambiar de pestaña, llegar los datos) o volver a ella no.
+   · «Cargando…» no aparece si los datos llegan en menos de un tercio de segundo: así no parpadea.
+   · Tocar algo responde igual en todas partes: se atenúa un instante, sin rebotes ni cambios de tamaño. */
+@keyframes rgPageIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+html body #rgPage{animation:none!important}
+html body #rgPage .rg-sheet-in{animation:rgPageIn .16s ease-out both!important}
+html body #rgPage.rg-still .rg-sheet-in{animation:none!important}
+html body #rgSheet.rg-still,html body #rgSheet.rg-still .rg-sheet-in{animation:none!important}
+.rg-load{opacity:0;animation:rgFade .2s .35s both!important}
+.rg-wait>p{opacity:0;animation:rgFade .2s .35s both!important}
+html body .btn,html body .tab,html body .link,html body .club-card,html body .seg button,html body .as-tabs button,html body .pill,html body .as-row,html body .as-ev,html body .ch-send,html body #tabsHandle{transition:opacity .08s linear,background-color .12s linear,border-color .12s linear,color .12s linear!important}
+html body .btn:active:not(:disabled),html body .tab:active,html body .link:active,html body .club-card:active,html body .seg button:active,html body .as-tabs button:active,html body .pill:active,html body .as-ev:active,html body .ch-send:active,html body #tabsHandle:active{transform:none!important;filter:none!important;opacity:.7}
+html body button.as-row:active,html body .as-row[role=button]:active{opacity:1;background:var(--superficie-2)}
+html body .tabs{transition:transform .2s ease-out,opacity .15s linear!important}
+html body .view.rg-in{animation:rgFade .1s linear both!important}
+@media (prefers-reduced-motion:reduce){html body .rg-sheet .rg-sheet-in,html body .view.rg-in,.toast{animation:none!important}}

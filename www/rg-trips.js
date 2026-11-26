@@ -41,12 +41,12 @@
   }
   function open(id, tab) {
     if (!me()) { Cl.openAuth(false); return; }
-    Cl.sheet(head('Salida') + '<p class="muted">Cargando…</p>', 'full'); $('#trX').addEventListener('click', Cl.closeSheet);
+    Cl.sheet(head('Salida') + '<p class="muted rg-load">Cargando…</p>', 'full'); $('#trX').addEventListener('click', Cl.closeSheet);
     load(id, tab).then(draw).catch(function (e) { Cl.sheet(head('Salida') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>', 'full'); $('#trX').addEventListener('click', Cl.closeSheet); });
   }
   // Dentro de la página de la salida (pestañas Plan y Gastos): las etapas o los gastos se pintan allí mismo, sin abrir otra página.
   function embed(id, what, host, evTab) {
-    if (!host) return; host.innerHTML = '<p class="muted">Cargando…</p>';
+    if (!host) return; host.innerHTML = '<p class="muted rg-load">Cargando…</p>';
     load(id, what === 'money' ? 'money' : 'plan').then(function () {
       if (!host.isConnected) return;
       T.embed = evTab || 'plan'; var old = document.getElementById('trPane'); if (old && old !== host) old.removeAttribute('id');
@@ -154,7 +154,7 @@
 
   /* ---------- gastos: presupuesto, pagos al organizador y gastos compartidos ---------- */
   function paneMoney() {
-    var host = $('#trPane'); host.innerHTML = '<p class="muted">Cargando…</p>';
+    var host = $('#trPane'); host.innerHTML = '<p class="muted rg-load">Cargando…</p>';
     var jobs = [sb.from('trip_expenses').select('id,payer_id,label,amount,split,created_at').eq('event_id', T.ev.id).order('id'), sb.from('trip_paid').select('who,amount,note').eq('event_id', T.ev.id)];
     if (T.admin) jobs.push(sb.rpc('event_manage', { p_event: T.ev.id }));
     Promise.all(jobs).then(function (r) {
@@ -311,7 +311,7 @@
   /* ---------- mis viajes, crear y unirse ---------- */
   function list() {
     if (!me()) { Cl.openAuth(false); return; }
-    Cl.sheet(head('Mis viajes') + '<p class="muted">Cargando…</p>'); $('#trX').addEventListener('click', Cl.closeSheet);
+    Cl.sheet(head('Mis viajes') + '<p class="muted rg-load">Cargando…</p>'); $('#trX').addEventListener('click', Cl.closeSheet);
     sb.rpc('my_trips').then(function (r) {
       var rows = ok(r) || [], now = Date.now();
       Cl.sheet(head('Mis viajes') + '<p class="muted" style="text-align:left;margin:0">Escapadas de varios días. Las puedes organizar entre amigos, con un código para invitar, o publicarlas en tu comunidad desde su botón «Crear».</p>' +

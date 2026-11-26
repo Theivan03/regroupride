@@ -43,7 +43,7 @@
   function album(e) { if (window.RGClub && RGClub.openEvent) RGClub.openEvent(e.id, 'fotos'); }
   function albumPane(e, host) {
     var x = e.extra || {};
-    host.innerHTML = '<div class="al-grid" id="alGrid"><div class="empty"><b>Cargando…</b></div></div><button class="btn big primary" id="alAdd" type="button">' + ic('plus') + 'Añadir fotos</button>' + (x.gallery ? '<a class="btn" href="' + esc(x.gallery) + '" target="_blank" rel="noopener">' + ic('camera') + 'Galería del fotógrafo</a>' : '');
+    host.innerHTML = '<div class="al-grid" id="alGrid"><div class="empty rg-load"><b>Cargando…</b></div></div><button class="btn big primary" id="alAdd" type="button">' + ic('plus') + 'Añadir fotos</button>' + (x.gallery ? '<a class="btn" href="' + esc(x.gallery) + '" target="_blank" rel="noopener">' + ic('camera') + 'Galería del fotógrafo</a>' : '');
     var load = function () {
       sb.from('event_photos').select('id,user_id,url,created_at').eq('event_id', e.id).order('created_at', { ascending: false }).limit(200).then(function (r) {
         var el = $('#alGrid', host); if (!el) return; var rows = r.error ? [] : (r.data || []);
@@ -111,7 +111,7 @@
   function ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function myValue(ch) { var a = new Date(ch.starts_on + 'T00:00:00').getTime(), b = new Date(ch.ends_on + 'T23:59:59').getTime(), rs = (A.rides() || []).filter(function (r) { return !r.trip && r.start >= a && r.start <= b; }); return ch.kind === 'km' ? Math.round(rs.reduce(function (s, r) { return s + (r.dist || 0); }, 0) * 10) / 10 : rs.length; }
   function challenges(c, admin) {
-    var s = Cl.sheet(head('Retos') + '<p class="muted" style="margin:0;text-align:left">Kilómetros o salidas entre los miembros de ' + esc(c.name) + '. Cuenta lo que grabas con la app; nunca la velocidad ni la inclinación.</p><div id="chL" class="rd-list"><div class="empty">Cargando…</div></div>' + (admin ? '<button class="btn primary" id="chNew" type="button">' + ic('plus') + 'Nuevo reto</button>' : ''));
+    var s = Cl.sheet(head('Retos') + '<p class="muted" style="margin:0;text-align:left">Kilómetros o salidas entre los miembros de ' + esc(c.name) + '. Cuenta lo que grabas con la app; nunca la velocidad ni la inclinación.</p><div id="chL" class="rd-list"><div class="empty rg-load">Cargando…</div></div>' + (admin ? '<button class="btn primary" id="chNew" type="button">' + ic('plus') + 'Nuevo reto</button>' : ''));
     $('#scX', s).addEventListener('click', Cl.closeSheet);
     if ($('#chNew', s)) $('#chNew', s).addEventListener('click', function () { chForm(c); });
     var today = ymd(new Date());

@@ -31,7 +31,7 @@
     var ids = clubs().map(function (c) { return c.id; });
     if (CAT.rows && Date.now() - CAT.at < 120000) { catDraw(list, q); return; }
     if (!sb || !Cl.user() || !ids.length) { CAT.rows = []; catDraw(list, q); return; }
-    list.innerHTML = '<div class="empty">Cargando…</div>';
+    list.innerHTML = '<div class="empty rg-load">Cargando…</div>';
     sb.from('community_routes').select('id,community_id,name,kind,level,start_name,dist,dur,created_at').in('community_id', ids).order('created_at', { ascending: false }).limit(200).then(function (r) {
       CAT.rows = r.error ? [] : (r.data || []); CAT.at = Date.now(); if ($('#ridesFilters [data-f=catalog]').getAttribute('aria-pressed') === 'true') catDraw(list, q);
     }, function () { list.innerHTML = '<div class="empty">No se ha podido cargar. Revisa la conexión.</div>'; });
@@ -44,7 +44,20 @@
   function isChat(x) { return /^chat-|^grp-/.test(String(x.id || '')); }
   function unread() { var s = seen(); return B.items.filter(function (x) { return x.at > s && !isChat(x); }).length; }
   function chatSeen() { var v = +store('rg.chat.seen'); if (!v) { v = Date.now() - 864e5; store('rg.chat.seen', String(v)); } return v; }
-  function chatUnread() { var s = chatSeen(); return B.items.filter(function (x) { return x.at > s && isChat(x); }); }
+  // Cada conversación tiene su propia marca de «leído»: al abrir un chat se apaga SU aviso, esté donde esté (antes solo se apagaban
+  // todos a la vez al pasar por Comunidad › Chats, y el número se quedaba encendido aunque ya lo hubieras leído).
+  function chatKey(x) { var id = String(x.id || ''); if (x.event) return String(x.event); var m = /^(?:chat|grp)-(.+)-\d+$/.exec(id); return m ? m[1] : id; }
+  function seenMap() { try { return JSON.parse(store('rg.chat.seenmap') || '{}') || {}; } catch (e) { return {}; } }
+  var liveChat = null;                                // función que dice qué chat hay ahora mismo en pantalla
+  function chatUnread() {
+    var s = chatSeen(), mp = seenMap(), live = null; try { live = liveChat && liveChat(); } catch (e) {}
+    return B.items.filter(function (x) { if (!isChat(x)) return false; var k = chatKey(x); if (live && k === String(live)) return false; return x.at > Math.max(s, mp[k] || 0); });
+  }
+  function chatSeenFor(key) {
+    if (!key) return; var mp = seenMap(), now = Date.now(); mp[String(key)] = now;
+    Object.keys(mp).forEach(function (k) { if (now - mp[k] > 30 * 864e5) delete mp[k]; });       // no crece sin fin
+    store('rg.chat.seenmap', JSON.stringify(mp)); badge();
+  }
   function badge() {
     var n = unread() + mine().filter(function (e) { return e.status === 'offered'; }).length;
     $$('.rg-bell-n').forEach(function (i) { i.hidden = !n; i.textContent = n > 9 ? '9+' : String(n); });
@@ -160,5 +173,5 @@
   }
   function privHtml() { return '<div class="seg" id="privTrim">' + [[0, 'No'], [300, '300 m'], [500, '500 m'], [1000, '1 km']].map(function (x) { return '<button type="button" data-m="' + x[0] + '" aria-pressed="' + (trimM() === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>'; }
   function privBind(root) { $$('#privTrim button', root).forEach(function (b) { b.addEventListener('click', function () { store('rg.priv.trim', b.dataset.m); $$('#privTrim button', root).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); }); }
-  window.RGShell = { privHtml: privHtml, privBind: privBind, catalog: catalog, plan: function () { if (window.RGUI) RGUI.draw(); }, trim: trim, pickPhoto: pickPhoto, upload: upload, clubs: clubs, mine: mine, esc: esc, ic: ic, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, chatUnread: chatUnread, chatSeen: function (now) { if (now) { store('rg.chat.seen', String(Date.now())); badge(); } return chatSeen(); }, items: function () { return B.items; }, load: bellLoad, head: head, openSheet: openSheet, when: when, ago: ago };
+  window.RGShell = { privHtml: privHtml, privBind: privBind, catalog: catalog, plan: function () { if (window.RGUI) RGUI.draw(); }, trim: trim, pickPhoto: pickPhoto, upload: upload, clubs: clubs, mine: mine, esc: esc, ic: ic, bell: bellOpen, refresh: function () { bellLoad(true); today(); }, today: today, chatUnread: chatUnread, chatSeen: function (now) { if (now) { store('rg.chat.seen', String(Date.now())); badge(); } return chatSeen(); }, chatSeenFor: chatSeenFor, setLiveChat: function (f) { liveChat = f; }, items: function () { return B.items; }, load: bellLoad, head: head, openSheet: openSheet, when: when, ago: ago };
 })();

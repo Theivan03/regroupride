@@ -129,7 +129,13 @@
 
   /* ---------- pantalla: Salidas, Chats e Info ---------- */
   S.top = 'events';
+  var PANES = {}, paneT = null;
+  if (box && window.MutationObserver) new MutationObserver(function () {
+    clearTimeout(paneT); paneT = setTimeout(function () { var p = mainPane(); if (p && p.dataset.k && !p.querySelector('.rg-load') && p.children.length) PANES[p.dataset.k] = p.innerHTML; }, 250);
+  }).observe(box, { childList: true, subtree: true });
+  if (Cl.onChange) Cl.onChange(function () { PANES = {}; });
   function mainPane() { return $('#clPane', box) || $('#clMain', box); }
+  if (window.RGShell && RGShell.setLiveChat) RGShell.setLiveChat(function () { var pg = $('#rgPage'); return pg && !pg.hidden && EVP.e && EVP.tab === 'chat' && $('#evTabs', pg) ? EVP.e.id : (pg && !pg.hidden && pg.dataset.grp) || null; });
   function unreadOf(test) { var it = window.RGShell && RGShell.chatUnread ? RGShell.chatUnread() : []; return it.filter(test).length; }
   function nTag(n) { return n ? '<i class="as-n">' + (n > 9 ? '9+' : n) + '</i>' : ''; }
   function dateBlock(t) { var d = new Date(t); return '<span class="as-date"><b>' + d.getDate() + '</b><small>' + d.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '') + '</small></span>'; }
@@ -143,13 +149,15 @@
     if (plus) plus.hidden = !S.user;
     if (!sb) { box.innerHTML = '<div class="empty"><b>Sin conexión</b>No se ha podido conectar con el servidor.</div>'; return; }
     if (!S.user) { box.innerHTML = '<div class="empty"><b>Tu comunidad, en un solo sitio</b>Salidas, chats, normas y descuentos. Entra en tu cuenta para unirte con el código que te pase el organizador.</div><button class="btn big primary" id="clLogin" type="button">Entrar o crear cuenta</button>'; $('#clLogin').addEventListener('click', function () { Cl.openAuth(false); }); return; }
-    if (!S.loaded) { box.innerHTML = '<div class="empty"><b>Cargando…</b></div>'; return; }
+    if (!S.loaded) { box.innerHTML = '<div class="empty rg-load"><b>Cargando…</b></div>'; return; }
     if (S.missing) { box.innerHTML = '<div class="notice">Las comunidades aún no están activadas en el servidor.</div>'; return; }
     if (!c) S.top = 'events';
     S.tab = S.top === 'events' ? 'events' : '';
     var cn = unreadOf(function () { return true; });
+    // mientras llegan los datos se enseña lo último que se vio en esta pestaña, no un «Cargando…» que parpadea
+    var pkey = (c ? c.id : 'none') + ':' + S.top;
     box.innerHTML = (c ? '<div class="as-tabs" id="clTabs">' + [['events', 'Salidas'], ['chats', 'Chats' + nTag(cn)], ['info', 'Info']].map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (S.top === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' : '') +
-      '<div id="' + (S.top === 'events' ? 'clPane' : 'clMain') + '" class="as-col"><div class="empty"><b>Cargando…</b></div></div>';
+      '<div id="' + (S.top === 'events' ? 'clPane' : 'clMain') + '" class="as-col" data-k="' + pkey + '">' + (PANES[pkey] || '<div class="empty rg-load"><b>Cargando…</b></div>') + '</div>';
     $$('#clTabs button', box).forEach(function (b) { b.addEventListener('click', function () { S.top = b.dataset.t; render(); }); });
     if (S.top === 'events') { if (c) paneEvents(c, true).catch(function (e) { var p = mainPane(); if (p) p.innerHTML = '<div class="empty">' + esc(Cl.msg(e)) + '</div>'; }); else drawEvents(null, [], []); }
     else if (S.top === 'chats') paneChats(c);
@@ -165,7 +173,7 @@
   // Una pantalla completa con su flecha de volver; dentro, un #clPane para los paneles de siempre.
   function sub(title, tab, extra) {
     S.tab = tab;
-    var s = Cl.sheet('<div class="head"><h1>' + esc(title) + '</h1><button class="btn small icon" id="clX" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>' + (extra || '') + '<div id="clPane" class="as-col"><div class="empty"><b>Cargando…</b></div></div>', 'full');
+    var s = Cl.sheet('<div class="head"><h1>' + esc(title) + '</h1><button class="btn small icon" id="clX" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>' + (extra || '') + '<div id="clPane" class="as-col"><div class="empty rg-load"><b>Cargando…</b></div></div>', 'full');
     $('#clX', s).addEventListener('click', Cl.closeSheet); return s;
   }
 
@@ -176,7 +184,7 @@
     var row = function (attr, icon, t, sub2, n, ink) { return '<button class="as-row" type="button" ' + attr + '><span class="as-ico' + (ink ? ' ink' : '') + '">' + icn(icon) + '</span><span><b>' + esc(t) + '</b><small>' + esc(sub2) + '</small></span>' + nTag(n) + icn('chev') + '</button>'; };
     host.innerHTML = '<div class="as-rows">' + row('data-ch="board"', 'bell', 'Avisos', 'Lo que publican los administradores de ' + c.name, unreadOf(function (x) { return x.kind === 'post' && x.community === c.name; }), true) + '</div>' +
       (ev.length ? '<span class="label">De tus salidas</span><div class="as-rows">' + ev.map(function (e) { return row('data-ch="ev" data-id="' + e.id + '"', 'chat', e.title, fmtWhen(e.starts_at) + (e.community ? ' · ' + e.community : ''), unreadOf(function (x) { return x.event === e.id; })); }).join('') + '</div>' : '') +
-      '<span class="label">Grupos</span><div id="clGroups" class="as-col"><div class="empty small"><b>Cargando…</b></div></div>';
+      '<span class="label">Grupos</span><div id="clGroups" class="as-col"><div class="empty small rg-load"><b>Cargando…</b></div></div>';
     $('[data-ch=board]', host).addEventListener('click', function () { sub('Avisos', 'board'); paneBoard(c, true).catch(fail); });
     $$('[data-ch=ev]', host).forEach(function (b) { b.addEventListener('click', function () { openEvent(b.dataset.id, 'chat'); }); });
     if (window.RGGroups) RGGroups.pane(c, $('#clGroups', host)).catch(function () { var g = $('#clGroups'); if (g) g.innerHTML = '<div class="empty small"><b>No se ha podido cargar</b></div>'; });
@@ -268,7 +276,7 @@
     });
   }
   function catalogSheet(cid, name) {
-    Cl.sheet('<div class="head"><h1>Rutas de ' + esc(name || ((S.list.filter(function (x) { return x.id === cid; })[0] || {}).name) || 'la comunidad') + '</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><div id="rtCat"><p class="muted">Cargando…</p></div>');
+    Cl.sheet('<div class="head"><h1>Rutas de ' + esc(name || ((S.list.filter(function (x) { return x.id === cid; })[0] || {}).name) || 'la comunidad') + '</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><div id="rtCat"><p class="muted rg-load">Cargando…</p></div>');
     $('#clX').addEventListener('click', Cl.closeSheet);
     sb.from('community_routes').select(RT_COLS).eq('community_id', cid).order('created_at', { ascending: false }).then(function (r) {
       var rows = ok(r) || [], host = $('#rtCat'); if (!host) return;
@@ -563,7 +571,7 @@
     EVP.tab = tab || 'plan';
     var cached = LASTEV && LASTEV.evs.filter(function (x) { return x.id === id; })[0];
     if (cached) { EVP.id = id; EVP.e = cached; EVP.att = LASTEV.att.filter(function (x) { return x.event_id === id; }); eventPage(); }
-    else if (EVP.id !== id || !EVP.e) { EVP.id = id; EVP.e = null; EVP.att = []; Cl.sheet('<div class="head"><h1>' + esc(inb ? inb.title : 'Salida') + '</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><div class="empty"><b>Cargando…</b></div>', 'full'); $('#clX').addEventListener('click', Cl.closeSheet); }
+    else if (EVP.id !== id || !EVP.e) { EVP.id = id; EVP.e = null; EVP.att = []; Cl.sheet('<div class="head"><h1>' + esc(inb ? inb.title : 'Salida') + '</h1><button class="btn small icon" id="clX" type="button"><svg><use href="#i-close"/></svg></button></div><div class="empty rg-load"><b>Cargando…</b></div>', 'full'); $('#clX').addEventListener('click', Cl.closeSheet); }
     else eventPage();
     fetchEvent(id).then(function (d) { if (EVP.id !== id) return; var was = !!EVP.e; EVP.e = d.e; EVP.att = d.att; var pg = $('#rgPage'); if (pg && !pg.hidden && (!was || $('#evTabs'))) eventPage(true); }).catch(function (x) { if (!EVP.e) { Cl.closeSheet(); fail(x); } });
   }
@@ -572,7 +580,8 @@
     var c = S.list.filter(function (x) { return x.id === e.community_id; })[0] || null, admin = !!(c && c.role === 'admin'), routeAdm = (S.evAdmins[e.id] || []).indexOf(uid) >= 0, canRun = admin || routeAdm;
     var mine = att.filter(function (x) { return x.user_id === uid; })[0], st = mine ? mine.status : 'no', going = att.filter(function (x) { return x.status === 'going'; });
     var taken = takenOf(att, e), cap = e.capacity || 0, full = cap > 0 && taken.length >= cap, m = meetOf(e), days = e.trip && e.trip.days ? e.trip.days.length : 0;
-    var d = new Date(e.starts_at), today = d.toDateString() === new Date().toDateString(), n = unreadOf(function (x) { return x.event === e.id; });
+    if (EVP.tab === 'chat' && window.RGShell && RGShell.chatSeenFor) RGShell.chatSeenFor(e.id);      // lo estás leyendo: su aviso se apaga
+    var d = new Date(e.starts_at), today = d.toDateString() === new Date().toDateString(), n = EVP.tab === 'chat' ? 0 : unreadOf(function (x) { return x.event === e.id; });
     var tabs = [['plan', 'Plan'], ['chat', 'Chat' + nTag(n)], ['fotos', 'Fotos'], ['gente', 'Gente']]; if (days > 1 || e.trip) tabs.push(['gastos', 'Gastos']);
     if (EVP.tab === 'chat' && !(st === 'going' || st === 'waiting' || st === 'offered' || canRun)) EVP.tab = 'plan';
     var cover = COVERS[e.id];
@@ -582,7 +591,7 @@
     else if (st === 'waiting') fixed = '<div class="as-vas"><span>' + icn('clock') + 'En lista de espera</span><button class="btn small" data-f="no" type="button">Salir de la lista</button></div>';
     else fixed = '<button class="btn big primary" data-f="go" type="button">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button>';
     var keepTop = keep && $('#rgPage .rg-sheet-in') ? $('#rgPage .rg-sheet-in').scrollTop : 0;
-    var s = Cl.sheet('<div class="as-hero' + (cover ? ' has' : '') + '"' + (cover ? ' style="background-image:url(&quot;' + esc(cover) + '&quot;)"' : '') + '><button class="as-hero-b" id="evBack" type="button" title="Volver">' + icn('back') + '</button>' + (canRun ? '<button class="as-hero-b txt" id="evManage" type="button">' + icn('sliders') + 'Gestionar</button>' : '') + '</div>' +
+    var s = Cl.sheet('<div data-pk="ev-' + EVP.id + '" class="as-hero' + (cover ? ' has' : '') + '"' + (cover ? ' style="background-image:url(&quot;' + esc(cover) + '&quot;)"' : '') + '><button class="as-hero-b" id="evBack" type="button" title="Volver">' + icn('back') + '</button>' + (canRun ? '<button class="as-hero-b txt" id="evManage" type="button">' + icn('sliders') + 'Gestionar</button>' : '') + '</div>' +
       '<div class="as-evhead"><span class="as-evwhen">' + esc(fmtWhen(e.starts_at)) + (days > 1 ? ' · ' + days + ' días' : '') + '</span><h1>' + esc(e.title) + '</h1><small>' + esc((c ? c.name : (EVS[e.id] && EVS[e.id].communities && EVS[e.id].communities.name) || 'Entre amigos') + (e.open_near ? ' · abierta a moteros de fuera' : '')) + '</small></div>' +
       '<div class="as-tabs" id="evTabs">' + tabs.map(function (t) { return '<button type="button" data-t="' + t[0] + '" aria-pressed="' + (EVP.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div id="evPane" class="as-col"></div>' + (EVP.tab === 'plan' || EVP.tab === 'gente' ? '<div class="as-fixed" id="evFixed">' + fixed + '</div>' : ''), 'full');
@@ -750,7 +759,7 @@
       $('#clX', s).addEventListener('click', Cl.closeSheet);
       $$('#mgTabs button', s).forEach(function (b) { b.addEventListener('click', function () { manageSheet(e, b.dataset.t); }); });
     };
-    if (!$('#mgPane')) shell('<div class="empty"><b>Cargando…</b></div>');
+    if (!$('#mgPane')) shell('<div class="empty rg-load"><b>Cargando…</b></div>');
     rpcOk('event_manage', { p_event: e.id }).then(function (d) {
       var rows = d.members.map(function (m) { m.kind = 'm'; return m; }).concat(d.guests.map(function (g) { g.kind = 'g'; return g; }));
       rows.sort(function (a, b) { return MORD.indexOf(a.status) - MORD.indexOf(b.status) || a.joined_at - b.joined_at; });
@@ -843,7 +852,7 @@
   var chatT = 0;
   function chatSheet(e) { openEvent(e.id, 'chat'); }
   function chatHtml(e) {
-    return '<div class="ev-chat" id="chList"><p class="muted">Cargando…</p></div>' +
+    return '<div class="ev-chat" id="chList"><p class="muted rg-load">Cargando…</p></div>' +
       '<form class="ev-chat-form" id="chForm"><input id="chIn" maxlength="1000" autocomplete="off" enterkeyhint="send" placeholder="Escribe un mensaje…" aria-label="Mensaje"><button class="ch-send" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></form>' +
       '<label class="as-switch-row"><span><b>Avisarme de este chat</b><small>Solo lo ven quienes van y los administradores.</small></span><span class="switch"><input type="checkbox" id="chMute"' + (muted(e.id) ? '' : ' checked') + '><span></span></span></label>';
   }
@@ -883,7 +892,7 @@
   }
   function ticketSheet(e, mine) {
     var v = mine || {}, s = Cl.sheet('<div class="head"><h1>Mi entrada</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
-      '<div class="as-ticket"><div class="as-ticket-qr" id="tkQr"><span class="muted">Cargando…</span></div><b>' + esc(e.title) + '</b><span>' + esc(fmtWhen(e.starts_at)) + '</span><span>' + esc(who(S.user.id)) + (v.bike ? ' · ' + esc(v.bike) : '') + ' · ' + (v.companion ? '2 plazas' : '1 plaza') + '</span></div>' +
+      '<div class="as-ticket"><div class="as-ticket-qr" id="tkQr"><span class="muted rg-load">Cargando…</span></div><b>' + esc(e.title) + '</b><span>' + esc(fmtWhen(e.starts_at)) + '</span><span>' + esc(who(S.user.id)) + (v.bike ? ' · ' + esc(v.bike) : '') + ' · ' + (v.companion ? '2 plazas' : '1 plaza') + '</span></div>' +
       '<p class="muted" style="margin:0;text-align:center">Enséñalo al llegar al punto de salida: el organizador lo lee y marca tu llegada.</p>' +
       '<button class="btn big" id="tkBright" type="button">' + icn('screen') + 'Subir el brillo</button>', 'full');
     var bright = false, setB = function (on) { bright = on; s.classList.toggle('as-bright', on); try { if (P.ScreenBrightness) P.ScreenBrightness.setBrightness({ brightness: on ? 1 : -1 }).catch(function () {}); } catch (x) {} var b = $('#tkBright'); if (b) b.innerHTML = icn('screen') + (on ? 'Brillo normal' : 'Subir el brillo'); };

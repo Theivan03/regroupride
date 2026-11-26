@@ -31,7 +31,7 @@
     if (!me()) { Cl.openAuth(false); return; }
     if (t === 'spots' || t === 'people' || !t) { D = null; if (window.RGUI) { RGUI.near('fotos'); return; } }
     tab = t === 'admin' ? 'admin' : 'mine';
-    Cl.sheet(head('Soy fotógrafo') + '<p class="muted">Cargando…</p>', 'full'); $('#phX').addEventListener('click', Cl.closeSheet);
+    Cl.sheet(head('Soy fotógrafo') + '<p class="muted rg-load">Cargando…</p>', 'full'); $('#phX').addEventListener('click', Cl.closeSheet);
     load().then(draw).catch(function (e) { Cl.sheet(head('Soy fotógrafo') + '<p class="muted">' + esc(Cl.msg ? Cl.msg(e) : e.message) + '</p>', 'full'); $('#phX').addEventListener('click', Cl.closeSheet); });
   }
   // Pestaña «Fotos» de «Cerca de ti»
@@ -43,7 +43,7 @@
     if (!me()) { shell('<div class="empty"><b>Entra en tu cuenta</b>Para ver dónde van a estar los fotógrafos.</div>'); return; }
     var paint = function () { if (!el.isConnected) return; shell(''); if (nearF === 'hoy') paneSpots(); else panePeople(); };
     if (D && Date.now() - (D._at || 0) < 120000) { paint(); return; }
-    shell('<div class="empty"><b>Cargando…</b></div>');
+    shell('<div class="empty rg-load"><b>Cargando…</b></div>');
     load().then(function () { D._at = Date.now(); paint(); }).catch(function () { shell('<div class="empty"><b>No se ha podido cargar</b>Revisa la conexión.</div>'); });
   }
   function draw() {

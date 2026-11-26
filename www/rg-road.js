@@ -197,7 +197,7 @@
   setInterval(function () { routeCheck(false); }, 5000);
   // Pestaña «Peligros» de «Cerca de ti». Con ruta cargada, primero los que caen sobre la ruta.
   function hazPane(el) {
-    el.innerHTML = '<div id="inList" class="as-rows"><div class="empty"><b>Cargando…</b></div></div><button class="btn big as-amber" id="inAdd" type="button">' + ic('warn') + 'Avisar de un peligro aquí</button><p class="muted rg-small" style="text-align:left">Incidencias oficiales de la DGT (no cubre Cataluña ni el País Vasco) y avisos de otros moteros, que caducan a las pocas horas.</p>';
+    el.innerHTML = '<div id="inList" class="as-rows"><div class="empty rg-load"><b>Cargando…</b></div></div><button class="btn big as-amber" id="inAdd" type="button">' + ic('warn') + 'Avisar de un peligro aquí</button><p class="muted rg-small" style="text-align:left">Incidencias oficiales de la DGT (no cubre Cataluña ni el País Vasco) y avisos de otros moteros, que caducan a las pocas horas.</p>';
     $('#inAdd', el).addEventListener('click', hazard);
     hzLoad(true).then(function () {
       var l = $('#inList', el); if (!l || !l.isConnected) return; var p = plan(), on = function (x, m) { return p && toLine(x.lat, x.lon, p.coords) <= m ? 1 : 0; };

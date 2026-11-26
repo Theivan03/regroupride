@@ -157,7 +157,7 @@
   }
   function stolenList() {
     if (!sb || !Cl.user()) { Cl.openAuth(false); return; }
-    var f = A.anyFix && A.anyFix(), s = Cl.sheet(head('Motos robadas') + '<p class="muted" style="margin:0;text-align:left">Avisos de moteros de tus comunidades y de tu zona. Si ves una, llama a su dueño o a la policía; no te la juegues.</p><button class="btn primary" id="stAdd" type="button">' + ic('warn') + 'Avisar de que me han robado la moto</button><div class="rd-list" id="stL"><div class="empty">Cargando…</div></div>');
+    var f = A.anyFix && A.anyFix(), s = Cl.sheet(head('Motos robadas') + '<p class="muted" style="margin:0;text-align:left">Avisos de moteros de tus comunidades y de tu zona. Si ves una, llama a su dueño o a la policía; no te la juegues.</p><button class="btn primary" id="stAdd" type="button">' + ic('warn') + 'Avisar de que me han robado la moto</button><div class="rd-list" id="stL"><div class="empty rg-load">Cargando…</div></div>');
     $('#stAdd', s).addEventListener('click', stolenNew);
     $('#gxX', s).addEventListener('click', Cl.closeSheet);
     sb.rpc('stolen_near', { p_lat: f ? f.lat : null, p_lon: f ? f.lon : null }).then(function (r) {

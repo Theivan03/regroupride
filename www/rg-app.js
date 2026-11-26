@@ -542,14 +542,20 @@
     if (!kind && (/^<div class="rg-logo"/.test(html) || /<h1>(Un permiso más|Falta algo para rodar|Permiso de ubicación)<\/h1>/.test(html))) kind = 'page';
     var t = titleOf(html);
     if (!kind && (FULL.test(t) || /data-full/.test(html.slice(0, 300)))) kind = 'full';
+    var pk = /data-pk="([^"]+)"/.exec(html.slice(0, 400)); if (pk) t = pk[1];      // identidad propia de la pantalla (una salida es la misma aunque le cambie el título)
     if (kind === 'full') {
       var p = pageEl(), cur = p.firstChild, sh = $('#rgSheet'); if (!sh.hidden) { sh.hidden = true; sh.innerHTML = ''; }
       var at = -1; pageStack.forEach(function (x, i) { if (x.t === t) at = i; });
       if (at >= 0) pageStack.length = at;                                              // se vuelve a una pantalla que estaba debajo
       else if (cur && !p.hidden && p.dataset.t !== t && !(cur.children.length <= 2 && /Cargando…/.test(cur.textContent))) pageStack.push({ t: p.dataset.t, el: cur, top: cur.scrollTop });   // otra pantalla encima
+      // ¿Es la misma pantalla que se redibuja (cambio de pestaña, datos que llegan) o la que sustituye a su «Cargando…»? Entonces no se anima:
+      // animarla otra vez es el «pantallazo» que se veía al moverse por una salida.
+      var wasLoading = !!(cur && !p.hidden && cur.children.length <= 2 && /Cargando…/.test(cur.textContent));
+      var still = !!(cur && !p.hidden && (p.dataset.t === t || wasLoading || at >= 0));
       var keep = cur && !p.hidden && p.dataset.t === t ? cur.scrollTop : 0;
       var inn = document.createElement('div'); inn.className = 'rg-sheet-in'; inn.innerHTML = html.replace(/(<div class="head"[^>]*>)([\s\S]*?)(<button[^>]*class="btn small icon"[^>]*>)\s*<svg><use href="#i-close"\/><\/svg>\s*(<\/button>)/, function (m, a, mid, b, c) { return a + b.replace('title="Cerrar"', 'title="Volver"') + '<svg><use href="#i-back"/></svg>' + c + mid; });
-      p.innerHTML = ''; p.appendChild(inn); p.dataset.t = t; p.className = 'rg-sheet rg-full' + (pageStack.length ? ' rg-deep' : ''); p.hidden = false; inn.scrollTop = keep;
+      p.innerHTML = ''; p.appendChild(inn); p.dataset.t = t; if (/Cargando…/.test(inn.textContent) && inn.children.length <= 2) inn.classList.add('rg-wait');
+      p.className = 'rg-sheet rg-full' + (pageStack.length ? ' rg-deep' : '') + (still ? ' rg-still' : ''); p.hidden = false; inn.scrollTop = keep;
       document.body.classList.add('rg-has-page'); return p;
     }
     var s = $('#rgSheet'), v = document.querySelector('.app > .view:not([hidden])'), eq = !!(v && (v.id === 'view-map' || v.id === 'view-club')) && kind !== 'page';
@@ -562,7 +568,7 @@
     var s = $('#rgSheet'); if (!s.hidden) { s.hidden = true; s.innerHTML = ''; return; }
     var p = $('#rgPage'); if (!p || p.hidden) return;
     var prev = pageStack.pop();
-    if (prev) { p.innerHTML = ''; p.appendChild(prev.el); p.dataset.t = prev.t; prev.el.scrollTop = prev.top || 0; p.className = 'rg-sheet rg-full' + (pageStack.length ? ' rg-deep' : ''); try { document.dispatchEvent(new CustomEvent('rg:page', { detail: prev.t })); } catch (e) {} return; }
+    if (prev) { p.innerHTML = ''; p.appendChild(prev.el); p.dataset.t = prev.t; prev.el.scrollTop = prev.top || 0; p.className = 'rg-sheet rg-full rg-still' + (pageStack.length ? ' rg-deep' : ''); try { document.dispatchEvent(new CustomEvent('rg:page', { detail: prev.t })); } catch (e) {} return; }
     p.hidden = true; p.innerHTML = ''; p.dataset.t = ''; document.body.classList.remove('rg-has-page');
     try { document.dispatchEvent(new CustomEvent('rg:page', { detail: '' })); } catch (e) {}
   }
@@ -776,7 +782,7 @@
       '<div class="seg rg-wide" id="rgKind"><button type="button" data-k="fallo" aria-pressed="true">Algo falla</button><button type="button" data-k="mejora" aria-pressed="false">Una mejora</button></div>' +
       '<div class="rg-form"><label>¿Qué ha pasado o qué propones?<textarea id="rgMsg" class="note" maxlength="4000" placeholder="Cuanto más concreto, mejor: qué pantalla, qué tocaste, qué esperabas…"></textarea></label>' +
       '<button class="btn big primary" id="rgSend" type="button">Enviar</button></div>' +
-      '<span class="label">Lo que has enviado</span><div id="rgMine" class="rg-list"><p class="muted">Cargando…</p></div>');
+      '<span class="label">Lo que has enviado</span><div id="rgMine" class="rg-list"><p class="muted rg-load">Cargando…</p></div>');
     $('#rgClose').addEventListener('click', closeSheet);
     s.querySelectorAll('#rgKind button').forEach(function (b) { b.addEventListener('click', function () { kind = b.dataset.k; s.querySelectorAll('#rgKind button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
     function load() {
