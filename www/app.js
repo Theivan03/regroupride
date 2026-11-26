@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.60.0';
+  var APP_VERSION = '0.60.1';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -357,7 +357,11 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
 
   /* ---------- rutas planificadas ---------- */
   var plans = [], planMode = false, pl = { wps: [], markers: [], coords: [], dist: 0, dur: 0, routed: false, pending: false }, activePlan = null, routeTimer = null, routeSeq = 0;
-  function loadPlans() { return DB.get('plans', []).then(function (p) { plans = p || []; plans.forEach(function (x) { if (x.cloudId && x.pub === undefined) x.pub = true; }); activePlan = settings.activePlanId ? plans.filter(function (x) { return x.id === settings.activePlanId; })[0] || null : null; drawPlan(); renderFollow(); }); }
+  function loadPlans() { return DB.get('plans', []).then(function (p) { plans = p || []; plans.forEach(function (x) { if (x.cloudId && x.pub === undefined) x.pub = true; }); activePlan = settings.activePlanId ? plans.filter(function (x) { return x.id === settings.activePlanId; })[0] || null : null;
+    // La ruta de un grupo es prestada: no vive en «Planeadas». Las que se guardaron ahí con versiones anteriores se retiran.
+    var old = plans.filter(function (x) { return x.groupId; });
+    if (old.length) { plans = plans.filter(function (x) { return !x.groupId; }); old.forEach(function (x) { if (x.cloudId && window.RGSync) RGSync.planDeleted(x); }); savePlans(); }
+    return DB.get('groupPlan', null).then(function (gp) { if (!activePlan && gp && settings.activePlanId === gp.id) activePlan = gp; else if (activePlan && activePlan.groupId) activePlan = gp && gp.id === activePlan.id ? gp : null; }, function () {}).then(function () { drawPlan(); renderFollow(); }); }); }
   function savePlans() { return DB.set('plans', plans); }
   function syncSoon() { if (window.RGSync) RGSync.soon(5000); }      // copia en la cuenta
   function enterPlanMode() {
@@ -1349,10 +1353,12 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
       return savePlans().then(function () { syncSoon(); try { renderRides(); } catch (e) {} });
     },
     usePlan: function (p) {   // guarda (o actualiza) una ruta planificada y la deja lista para «Iniciar ruta»
+      if (p.groupId) return DB.set('groupPlan', p).then(function () {}, function () {}).then(function () { if (planMode) exitPlanMode(); showView('map'); followPlan(p, true); });   // prestada: se sigue, pero no se guarda en «Planeadas»
       var i = -1; plans.forEach(function (x, k) { if (x.id === p.id) i = k; });
       if (i >= 0) plans[i] = p; else plans.unshift(p);
       return savePlans().then(function () { syncSoon(); if (planMode) exitPlanMode(); showView('map'); followPlan(p, true); });
     },
+    dropGroupPlan: function () { DB.del('groupPlan').then(function () {}, function () {}); if (activePlan && activePlan.groupId && !rec) followPlan(null, false); },
     setWaypoints: function (pts, name) {
       if (!planMode) enterPlanMode(); if (!planMode) return false;
       clearPlan(); pts.forEach(function (p) { addWaypoint(p.lat, p.lon, p.name); });

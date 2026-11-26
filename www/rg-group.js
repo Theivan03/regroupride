@@ -114,6 +114,7 @@
     if (G.sheetOpen) close();
     A.showView('map'); A.toast((own && own.name ? own.name : 'El organizador') + ' ha iniciado la ruta.', 'ok'); speak('Empieza la ruta.');
     G.autoStart = Date.now(); A.startRide();
+    if (window.RGNav && RGNav.preStart) setTimeout(function () { if (A.isRec()) RGNav.preStart(null, true); }, 1200);
   }
   // Sin ruta en marcha: solo leer, y solo con la app a la vista. Mientras se espera la salida, más a menudo.
   function tick() {
@@ -124,7 +125,8 @@
   }
   function sync() {
     var rec = A.isRec();
-    if (G.s && G.wasRec && !rec) { G.busy = false; call({ p_clear: true }); }   // he parado la ruta: se borra mi posición
+    if (G.s && G.wasRec && !rec) { G.busy = false; call({ p_clear: true }); }
+    if (!G.s && G.wasRec && !rec && A.dropGroupPlan) A.dropGroupPlan();   // salí del grupo en marcha: al parar, su ruta deja de seguirse   // he parado la ruta: se borra mi posición
     // Un administrador inicia a mano: se les inicia a los demás. (Si a mí me la ha iniciado otro, no la reenvío.)
     if (G.s && !G.wasRec && rec && !A.isDemo() && sb) {
       var auto = Date.now() - G.autoStart < 30000; G.autoStart = 0;
@@ -388,7 +390,11 @@
     G.s = { id: d.id, code: d.code, name: d.name, owner: !!d.owner, eventId: d.event_id || null, free: !(d.route && d.route.coords && d.route.coords.length > 1) }; G.rows = []; G.rank = null; G.admin = !!d.owner; save(); sync();
     var rt = d.route, job = Promise.resolve();
     if (rt && rt.coords && rt.coords.length > 1) job = A.usePlan({ id: parseInt(d.id.replace(/-/g, '').slice(0, 12), 16), name: rt.name || d.name, wps: rt.wps || [], pois: rt.pois || [], coords: rt.coords, dist: rt.dist || 0, dur: rt.dur || 0, routed: true, steps: rt.steps || [], created: Date.now(), groupId: d.id });
-    return job.then(function () { G.busy = false; var c = call(); if (opts.start && !A.isRec()) A.startRide(); return c; });
+    return job.then(function () {
+      G.busy = false; var c = call(), go = function () { if (!A.isRec()) A.startRide(); };
+      if (opts.start && !A.isRec()) { if (!(window.RGNav && RGNav.preStart && RGNav.preStart(go))) go(); }   // lejos de la salida: primero, por dónde entrar
+      return c;
+    });
   }
   // «¿Vienes a la ruta?»: rutas de evento que un administrador ha iniciado y a las que estoy apuntado.
   function declined() { try { return JSON.parse(localStorage.getItem('rg.calls.no') || '{}'); } catch (e) { return {}; } }
@@ -417,7 +423,7 @@
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(function () { checkCalls(false); }, 1200); });
 
   if (RA) RA.addListener('action', function (e) { var k = e && e.kind; if (KIND[k]) sendAlert(k); else if (k === 'cancel') sendAlert(null); else if (k === 'ack') dismiss(G.alarm && G.alarm.mode === 'alarm' ? 'seen' : 'ok'); });
-  function leaveLocal(msg) { G.s = null; G.rows = []; G.rank = null; G.groups = null; G.admin = false; if (G.pop === 'groups') unpop(); save(); draw(); sync(); if (msg) A.toast(msg, 'warn'); if (G.sheetOpen) renderSheet(); }
+  function leaveLocal(msg) { if (A.dropGroupPlan) A.dropGroupPlan(); G.s = null; G.rows = []; G.rank = null; G.groups = null; G.admin = false; if (G.pop === 'groups') unpop(); save(); draw(); sync(); if (msg) A.toast(msg, 'warn'); if (G.sheetOpen) renderSheet(); }
 
   /* ---------- mapa ---------- */
   function draw() {

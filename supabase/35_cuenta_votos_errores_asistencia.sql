@@ -167,3 +167,12 @@ begin
 end $$;
 revoke all on function public.community_attendance(uuid) from public, anon;
 grant execute on function public.community_attendance(uuid) to authenticated;
+
+-- ---------- 6) Una salida de la comunidad se inicia para los apuntados aunque no tenga ruta puesta ----------
+do $$
+declare d text;
+begin
+  d := pg_get_functiondef('public.event_start(uuid)'::regprocedure);
+  d := replace(d, 'if e.route is null then raise exception ''Este evento no tiene ruta''; end if;', '');
+  execute d;
+end $$;

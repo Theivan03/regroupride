@@ -106,7 +106,8 @@
     nav.pre = null;
   }
   // Al pulsar «Iniciar ruta» con una ruta cargada y lejos de su salida. Devuelve true si ha abierto la pregunta.
-  function preStart(next) {
+  // live: la ruta ya está en marcha (me la ha iniciado el administrador); se pregunta encima y se aplica al contestar.
+  function preStart(next, live) {
     var p = plan(), fix = A.lastFix() || (A.anyFix && A.anyFix()); nav.pre = null;
     if (!p || !p.coords || p.coords.length < 2 || !fix) return false;
     var d0 = L.dist(fix.lat, fix.lon, p.coords[0][1], p.coords[0][0]); if (d0 < 300) return false;
@@ -115,8 +116,8 @@
       '<button class="btn big primary" id="tsStart" type="button"><svg><use href="#i-gmaps"/></svg>Ir al punto de salida</button><button class="btn big" id="tsNear" type="button"><svg><use href="#i-route"/></svg>Entrar por el punto más cercano</button>' +
       '<p class="muted rg-small" style="text-align:left;margin:0">«Ir al punto de salida» te lleva hasta donde empieza la ruta y, al llegar, sigue con ella.</p>');
     $('#tsX').addEventListener('click', closeSheet);
-    $('#tsNear').addEventListener('click', function () { nav.pre = 'near'; closeSheet(); next(); });
-    $('#tsStart').addEventListener('click', function () { nav.pre = 'start'; closeSheet(); next(); });
+    $('#tsNear').addEventListener('click', function () { nav.pre = 'near'; closeSheet(); if (!live) next(); });
+    $('#tsStart').addEventListener('click', function () { nav.pre = 'start'; closeSheet(); if (live) nav.asked = false; else next(); });
     return true;
   }
   function offAlert(d) {

@@ -616,8 +616,8 @@
         (st === 'going' ? row('ticket', 'qr', 'Mi entrada', 'El QR que se enseña al llegar') : '') +
         (st === 'going' ? '<label class="as-row as-switch-row"><span><b>Voy con acompañante</b></span><span class="switch"><input type="checkbox" id="evComp"' + (mine.companion ? ' checked' : '') + '><span></span></span></label>' : '') +
         row('share', 'share', 'Compartir', 'El enlace de la página pública') + '</div>' +
-        (canRun && e.route ? '<button class="btn big" data-p="start" type="button">' + icn('play') + 'Iniciar la ruta para los apuntados</button>' : '') +
-        ((st === 'going' || st === 'offered') && e.route && !canRun ? '<button class="as-link" data-p="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '');
+        (canRun ? '<button class="btn big" data-p="start" type="button">' + icn('play') + 'Iniciar la ruta para los apuntados</button>' + (e.route ? '' : '<p class="muted rg-small" style="margin:0">Sin ruta puesta: salís en grupo, os veis en el mapa y cada uno graba lo que hace.</p>') : '') +
+        ((st === 'going' || st === 'offered') && !canRun ? '<button class="as-link" data-p="enter" type="button">¿Ya ha empezado? Entrar en la ruta</button>' : '');
       if (e.trip && window.RGTrips && RGTrips.embed) { var stg = document.createElement('div'); stg.className = 'as-stages'; pane.appendChild(document.createElement('span')).className = 'label'; pane.lastChild.textContent = 'Etapas y alojamiento'; pane.appendChild(stg); RGTrips.embed(e.id, 'plan', stg, 'plan'); }
       if (window.RGOpen && RGOpen.fill) RGOpen.fill(pane);
       if ($('#evComp', pane)) $('#evComp', pane).addEventListener('change', function (ev) { set('going', ev.target.checked); });
@@ -919,11 +919,11 @@
       '<label>Día y hora<input id="evWhen" type="datetime-local" required value="' + localInput(e && e.starts_at) + '"></label>' +
       '<label>Punto de salida<input id="evMeet" maxlength="120" value="' + esc(e ? e.meet_name : '') + '" placeholder="Gasolinera de…"></label>' +
       (v6 ? '<div class="as-code"><input id="evMeetUrl" inputmode="url" maxlength="600" value="' + esc(link0) + '" placeholder="Enlace de Google Maps (opcional)" aria-label="Enlace de Google Maps del punto de salida"><button class="btn" id="evHere" type="button" title="Usar donde estoy ahora">' + icn('locate') + '</button></div>' : '') +
+      '<label>Ruta<select id="evRoute"><option value="">Sin ruta (se puede salir igual)</option>' + keep + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
       (e ? '' : '<span class="label">Duración</span><div class="seg" id="evDur"><button type="button" data-d="1" aria-pressed="true">Un día</button><button type="button" data-d="n" aria-pressed="false">Varios días</button></div>') +
       (v6 ? '<label>Plazas<input id="evCap" type="number" inputmode="numeric" min="1" max="1000" value="' + (e && e.capacity ? e.capacity : '') + '" placeholder="Sin límite"></label>' +
         '<label class="rg-check ev-opencheck"><input type="checkbox" id="evOpenNear"' + (e && e.open_near ? ' checked' : '') + '><span><b>Abierta a moteros de fuera</b><small>Sale en «Abiertas cerca» y pueden pedir sitio. Tú decides a quién aceptas.</small></span></label>' : '') +
       '<details class="as-fold" id="evMore"><summary>Más opciones</summary><div class="rg-form">' +
-      '<label>Ruta<select id="evRoute"><option value="">Sin ruta</option>' + keep + plans.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' · ' + String(p.dist).replace('.', ',') + ' km</option>'; }).join('') + '</select></label>' +
       (v6 ? '<label>Enlace de la ruta en Google Maps<input id="evRouteUrl" inputmode="url" maxlength="600" value="' + esc(e && e.route_url ? e.route_url : '') + '" placeholder="Opcional"></label>' : '') +
       '<label>Descripción<textarea id="evDesc" maxlength="4000" placeholder="Paradas, nivel, normas, lo que quieras contar">' + esc(e ? e.description : '') + '</textarea></label>' +
       '<label>Foto de portada<input id="evCover" type="file" accept="image/*"></label>' +
