@@ -459,7 +459,7 @@ details.fold>summary,.as-fold>summary{min-height:56px;display:flex;align-items:c
 .rg-tour-bub{background:var(--superficie)!important;color:var(--texto)!important;border:1px solid var(--linea)!important;border-radius:20px!important;box-shadow:none!important}
 .rg-tour-n{color:var(--marca)!important;font:700 13px/1 var(--font-texto)!important;letter-spacing:.04em;text-transform:uppercase}
 .rg-tour-bub b{font:700 24px/1.05 var(--font-titulo)!important;text-transform:uppercase;letter-spacing:.02em}
-body.rg-touring .btn.primary:not(.rg-tour .btn),body.rg-touring .btn.rec{background:var(--superficie-2)!important;border-color:transparent!important}
+/* (durante el recorrido los botones conservan su color: el velo ya apaga lo demás) */
 
 /* ---------- retoques ---------- */
 .rg-sheet .head .btn.small.icon,.rg-sheet.rg-eq .head .btn.small.icon{color:var(--texto)!important;background:var(--superficie-2)!important}
@@ -703,3 +703,16 @@ html body .rg-split .art{transition:transform .42s cubic-bezier(.3,.7,.2,1),left
 html body .rg-split button[aria-pressed=true] .art svg,html body .rg-split button[aria-pressed=true] .tx{animation:none!important}
 html body .rg-split .tx b{transition:font-size .3s ease}
 @media (prefers-reduced-motion:reduce){html body .rg-sheet .rg-sheet-in,html body .view.rg-in,html body .rg-tab-l,html body .rg-tab-r,.toast{animation:none!important}}
+
+/* recorrido: velo según el tema y borde que palpita (blanco en oscuro, negro en claro) */
+html body .rg-tour-hole{box-shadow:0 0 0 9999px var(--tour-velo,rgba(246,243,251,.82))!important;transition:left .45s cubic-bezier(.3,.8,.3,1),top .45s cubic-bezier(.3,.8,.3,1),width .45s cubic-bezier(.3,.8,.3,1),height .45s cubic-bezier(.3,.8,.3,1),border-radius .3s!important;border:0!important}
+html body .rg-tour-hole::after{content:"";position:absolute;inset:-3px;border:3px solid var(--texto);border-radius:inherit;animation:rgTourPulse 1.4s ease-in-out infinite;pointer-events:none}
+@keyframes rgTourPulse{0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 0 0 color-mix(in srgb,var(--texto) 55%,transparent)}50%{opacity:.55;transform:scale(1.035);box-shadow:0 0 0 7px transparent}}
+html[data-theme="dark"]:root{--tour-velo:rgba(0,0,0,.74)}
+@media (prefers-color-scheme:dark){html:not([data-theme="light"]):root{--tour-velo:rgba(0,0,0,.74)}}
+@media (prefers-reduced-motion:reduce){html body .rg-tour-hole::after{animation:none}}
+.rg-tour-demo{position:absolute;left:0;right:0;bottom:0;z-index:5;background:var(--fondo);padding:0 16px 16px;display:flex;flex-direction:column;gap:12px;overflow:hidden;pointer-events:none}
+#view-club{position:relative}
+.rg-tour-demo .as-col{display:flex;flex-direction:column;gap:10px}
+.rg-tour-tag{align-self:flex-start;font:700 11px/1 var(--font-texto);letter-spacing:.08em;text-transform:uppercase;color:var(--texto-2);border:1px solid var(--linea);border-radius:999px;padding:5px 9px}
+.rg-tour-demo .as-ev .btn{display:flex;align-items:center;justify-content:center}
