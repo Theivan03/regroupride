@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.60.4';
+  var APP_VERSION = '0.60.5';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -618,7 +618,9 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   var toastTimer = null;
   // Los avisos de arriba se reservan para lo que importa: errores, cosas que faltan por hacer y lo que llega de otros
   // (avisos en ruta, novedades, fotógrafos cerca). Las confirmaciones de «hecho» o «guardado» ya no salen: se ve en pantalla.
-  var TOAST_KEEP = /Confirma el correo|enviado un correo|Solicitud enviada|[Aa]viso|ha iniciado la ruta|está a \d+ km|Nuevo evento: |Nueva salida: |Avisos: |Info: |Ruta terminada para todos|Reparto|no te llegarán avisos/;
+  // De los avisos verdes solo salen los que cuentan algo que no se ve en pantalla: lo que hay que hacer a continuación, lo que llega
+  // de otra persona y la confirmación de un SOS, una avería o una petición de gasolina. Lo demás («guardado», «borrado»…) no sale.
+  var TOAST_KEEP = /Confirma el correo|enviado un correo|Solicitud enviada|Aviso enviado: |Aviso cancelado|se encarga del aviso|ha cancelado el aviso|ha visto tu aviso|ha iniciado la ruta|está a \d+ km|Nuevo evento: |Nueva salida: |Avisos: |Info: |descargado\. Cierra|solo se mide tiempo/;
   function toast(msg, kind) { if (kind === 'ok' && !TOAST_KEEP.test(String(msg))) return; var n = $('#toast'); n.textContent = msg; n.className = 'toast notice' + (kind ? ' ' + kind : ''); n.hidden = false; if (toastTimer) clearTimeout(toastTimer); toastTimer = setTimeout(function () { n.hidden = true; }, kind === 'bad' ? 9000 : 5000); }
   function hideNotice() { $('#notice').hidden = true; }
   function render() {

@@ -145,6 +145,10 @@
     var d = nav.detour; if (!d || d.busy) return;
     var p = plan(), back = nav.active && nav.tr && p ? L.rejoinTarget(d.visited ? fix : d.x, nav.tr.line, nav.tr.state.along) : null;
     if (back && back.finished) back = null;
+    // ibas al punto de salida y aún no has llegado: después de repostar se sigue hacia la salida, no al punto más cercano
+    var toStart = !!(back !== undefined && nav.active && nav.tr && p && nav.toStart && !nav.tr.state.started);
+    if (toStart) back = { lat: p.coords[0][1], lon: p.coords[0][0] };
+    d.toStart = toStart;
     var pts = [[fix.lon, fix.lat]]; if (!d.visited) pts.push([d.x.lon, d.x.lat]); if (back) pts.push([back.lon, back.lat]);
     if (pts.length < 2) { endDetour(); return; }
     d.busy = true; d.made = Date.now();
@@ -153,13 +157,13 @@
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctrl) setTimeout(function () { ctrl.abort(); }, 8000);
     var job = (navigator.onLine === false) ? Promise.resolve(straight()) : fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { return r.json(); }).then(function (j) {
       if (!j.routes || !j.routes[0]) throw new Error('sin ruta');
-      var st = L.stepsFromOsrm(j.routes[0]); if (st.length && st[st.length - 1].icon === 'arrive') st[st.length - 1].text = back ? 'vuelves a la ruta' : 'llegas a la gasolinera';
+      var st = L.stepsFromOsrm(j.routes[0]); if (st.length && st[st.length - 1].icon === 'arrive') st[st.length - 1].text = toStart ? 'llegas al punto de salida' : back ? 'vuelves a la ruta' : 'llegas a la gasolinera';
       return { coords: j.routes[0].geometry.coordinates, steps: st, dist: j.routes[0].legs && j.routes[0].legs[0] ? j.routes[0].legs[0].distance : j.routes[0].distance };
     }).catch(straight);
     job.then(function (r) {
       if (nav.detour !== d) return; d.busy = false;
       d.coords = r.coords; d.tr = L.Tracker(r.coords, r.steps, { offDist: 70 }); d.last = d.tr.update(fix, Date.now()); drawRejoin(); renderBanner(nav.last);
-      if (announce) { var km = r.dist ? ' ' + L.cap(L.spokenDist(r.dist)) + '.' : ''; say('Te llevo a la gasolinera.' + km + (back ? ' Después, de vuelta a la ruta.' : '')); A.toast('Te llevo a ' + d.name + (back ? ' y después de vuelta a la ruta.' : '.'), 'ok'); }
+      if (announce) { var km = r.dist ? ' ' + L.cap(L.spokenDist(r.dist)) + '.' : ''; say('Te llevo a la gasolinera.' + km + (toStart ? ' Después, al punto de salida.' : back ? ' Después, de vuelta a la ruta.' : '')); A.toast('Te llevo a ' + d.name + (back ? ' y después de vuelta a la ruta.' : '.'), 'ok'); }
     });
   }
   function detourFix(fix) {
@@ -167,7 +171,7 @@
     if (d.tr) { d.last = d.tr.update(fix, now); for (var i = 0; i < d.last.events.length; i++) if (d.last.events[i].type === 'say') say(d.last.events[i].text); }
     if (!d.visited && L.dist(fix.lat, fix.lon, d.x.lat, d.x.lon) < 90) {
       d.visited = true;
-      if (nav.active && nav.tr && plan()) { say('Has llegado a la gasolinera. Al salir te llevo de vuelta a la ruta.'); A.toast('Gasolinera. Al salir te llevo de vuelta a la ruta.', 'ok'); }
+      if (nav.active && nav.tr && plan()) { say(d.toStart ? 'Has llegado a la gasolinera. Al salir te llevo al punto de salida.' : 'Has llegado a la gasolinera. Al salir te llevo de vuelta a la ruta.'); A.toast('Gasolinera. Al salir te llevo de vuelta a la ruta.', 'ok'); }
       else { endDetour('Has llegado a la gasolinera'); return; }
     }
     if (d.last && d.last.offRoute && !d.busy && now - d.made > 20000) makeDetour(fix, false);   // te has salido del desvío: se recalcula desde donde estás
@@ -217,8 +221,8 @@
     if (nav.detour) {      // desvío a la gasolinera: manda él hasta volver a la ruta
       var dl = nav.detour.last, dn = dl && dl.next; cls = 'to';
       if (dn && dn.dist < 2500 && !dl.offRoute) { ico = dn.icon; dist = L.fmtDist(dn.dist); text = dn.text; }
-      else { dist = L.fmtDist(nav.detour.visited ? (dl ? dl.remaining : 0) : L.dist(nav.detour.at.lat, nav.detour.at.lon, nav.detour.x.lat, nav.detour.x.lon)); text = nav.detour.visited ? 'para volver a la ruta' : 'hasta la gasolinera'; }
-      sub = nav.detour.busy && !dl ? 'Calculando el camino…' : nav.detour.visited ? 'Volviendo a la ruta' : 'Yendo a la gasolinera';
+      else { dist = L.fmtDist(nav.detour.visited ? (dl ? dl.remaining : 0) : L.dist(nav.detour.at.lat, nav.detour.at.lon, nav.detour.x.lat, nav.detour.x.lon)); text = nav.detour.visited ? (nav.detour.toStart ? 'hasta la salida' : 'para volver a la ruta') : 'hasta la gasolinera'; }
+      sub = nav.detour.busy && !dl ? 'Calculando el camino…' : nav.detour.visited ? (nav.detour.toStart ? 'Yendo al punto de salida' : 'Volviendo a la ruta') : 'Yendo a la gasolinera';
     } else if (r) {
       var rj = nav.rejoin && nav.rejoin.last, nx = null;
       if (r.offRoute || !r.started) {
