@@ -17,7 +17,7 @@
     { s: '#yoNav [data-go=security]', v: 'profile', t: 'Seguridad', x: 'Tus contactos de emergencia, el enlace para que tu familia vea por dónde vas y la zona de privacidad de las rutas que publicas.', end: true }
   ];
   var el = null, i = 0, running = false;
-  function stop(done) { running = false; document.body.classList.remove('rg-touring'); if (el) { el.classList.add('out'); var e = el; el = null; setTimeout(function () { e.remove(); }, 260); } window.removeEventListener('resize', place); if (done !== false) store('rg.tour', '1'); if (A.showView) A.showView('map'); }
+  function stop(done) { running = false; document.body.classList.remove('rg-touring'); if (el) { el.classList.add('out'); var e = el; el = null; setTimeout(function () { e.remove(); }, 260); } window.removeEventListener('resize', place); if (done !== false) mark(); if (A.showView) A.showView('map'); }
   function place() {
     if (!el) return;
     var st = STEPS[i], hole = el.querySelector('.rg-tour-hole'), bub = el.querySelector('.rg-tour-bub'), t = st.s ? st.s.split(', ').map($).filter(function (n) { return n && n.getBoundingClientRect().width; })[0] : null, r = t ? t.getBoundingClientRect() : null;
@@ -56,13 +56,32 @@
     window.addEventListener('resize', place);
     show();
   }
-  // Primera vez: cuando ya hay sesión y no queda ninguna ventana abierta (entrada, permisos…).
-  var calm = 0, auto = !navigator.webdriver || store('rg.test.tour') === '1';
-  var timer = setInterval(function () {
-    if (store('rg.tour') === '1' || !auto) { clearInterval(timer); return; }
-    var sh = $('#rgSheet'), ok = Cl && Cl.user && Cl.user() && sh && sh.hidden && !(Cl.pageOpen && Cl.pageOpen()) && !(A.isRec && A.isRec()) && document.visibilityState !== 'hidden' && !$('.rg-crop');
-    calm = ok ? calm + 1 : 0;
-    if (calm >= 3) { clearInterval(timer); start(); }
-  }, 1500);
-  window.RGTour = { start: function () { if (Cl && Cl.closeSheet) Cl.closeSheet(); start(); } };
+  // Una sola vez por CUENTA, la primera vez que entra: queda apuntado en la cuenta (vale en cualquier móvil y tras cerrar sesión).
+  // Para volver a verlo está Ayuda › «Cómo funciona». Las cuentas anteriores a este cambio se dan por vistas.
+  var CUT = Date.parse('2026-11-26T00:00:00Z');
+  function seen(u) {
+    if (!u) return true;
+    var md = u.user_metadata || {};
+    return md.tour === true || store('rg.tour.' + u.id) === '1' || (Date.parse(u.created_at || '') || 0) < CUT;
+  }
+  function mark() {
+    var u = Cl && Cl.user && Cl.user(); if (!u) return;
+    store('rg.tour.' + u.id, '1');
+    if (!(u.user_metadata && u.user_metadata.tour === true) && Cl.sb) { try { Cl.sb.auth.updateUser({ data: { tour: true } }).then(function () {}, function () {}); } catch (e) {} }
+  }
+  var calm = 0, auto = !navigator.webdriver || store('rg.test.tour') === '1', timer = null;
+  function watch() {
+    clearInterval(timer); calm = 0;
+    if (!auto) return;
+    timer = setInterval(function () {
+      var u = Cl && Cl.user && Cl.user();
+      if (!u) { calm = 0; return; }
+      if (seen(u)) { clearInterval(timer); return; }
+      var sh = $('#rgSheet'), ok = sh && sh.hidden && !(Cl.pageOpen && Cl.pageOpen()) && !(A.isRec && A.isRec()) && document.visibilityState !== 'hidden' && !$('.rg-crop');
+      calm = ok ? calm + 1 : 0;
+      if (calm >= 3) { clearInterval(timer); mark(); start(); }       // se apunta al empezar: si lo cierran a medias, no vuelve a salir
+    }, 1500);
+  }
+  if (Cl && Cl.onChange) Cl.onChange(function () { watch(); }); else watch();
+  window.RGTour = { start: function () { if (Cl && Cl.closeSheet) Cl.closeSheet(); start(); }, watch: function () { auto = true; watch(); } };
 })();
