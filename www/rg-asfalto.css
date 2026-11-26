@@ -656,12 +656,12 @@ html body #hudCard .as-hud2 .btn.stop{min-height:48px!important;font-size:17px!i
 @keyframes rgPageOut{from{transform:none}to{transform:translateX(100%)}}
 @keyframes rgSheetDown{from{transform:none}to{transform:translateY(100%)}}
 @keyframes rgFadeOut{from{opacity:1}to{opacity:0}}
-@keyframes rgTabL{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
-@keyframes rgTabR{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
+@keyframes rgTabL{0%{opacity:0;transform:translateX(34px)}60%{opacity:1}100%{opacity:1;transform:none}}
+@keyframes rgTabR{0%{opacity:0;transform:translateX(-34px)}60%{opacity:1}100%{opacity:1;transform:none}}
 /* secciones */
 html body .view.rg-in{animation:rgFade .28s ease-out both!important}
-html body .view.rg-in.rg-fwd{animation:rgTabL .3s cubic-bezier(.2,.8,.2,1) both!important}
-html body .view.rg-in.rg-bck{animation:rgTabR .3s cubic-bezier(.2,.8,.2,1) both!important}
+html body .view.rg-in.rg-fwd{animation:rgTabL .5s cubic-bezier(.22,.61,.36,1) both!important}
+html body .view.rg-in.rg-bck{animation:rgTabR .5s cubic-bezier(.22,.61,.36,1) both!important}
 /* lo que se despliega dentro de una pantalla (formularios, tarjetas) y las tarjetas del mapa */
 @keyframes rgRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 html body #vehicleForm,html body #maintForm,html body #parkCard,html body #planCard,html body #followCard,html body #replay{animation:rgRise .28s cubic-bezier(.2,.8,.2,1) both}
@@ -669,8 +669,8 @@ html body #idleCard,html body #hudCard{animation:rgRise .3s cubic-bezier(.2,.8,.
 html body #lightbox,html body #leanFull,html body .rg-stopask,html body .rg-soloask,html body .rg-crop,html body .rg-tour{animation:rgFade .26s ease-out both!important}
 html body .toast{animation:rgRise .22s ease-out both!important}
 /* pestañas de dentro */
-html body .rg-tab-l{animation:rgTabL .28s cubic-bezier(.2,.8,.2,1) both!important}
-html body .rg-tab-r{animation:rgTabR .28s cubic-bezier(.2,.8,.2,1) both!important}
+html body .rg-tab-l{animation:rgTabL .5s cubic-bezier(.22,.61,.36,1) both!important}
+html body .rg-tab-r{animation:rgTabR .5s cubic-bezier(.22,.61,.36,1) both!important}
 /* pantallas completas */
 html body #rgPage{animation:none!important}
 html body #rgPage.rg-first{background:transparent!important}

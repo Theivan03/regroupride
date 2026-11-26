@@ -382,7 +382,7 @@
       for (var el = nb.nextElementSibling; el; el = el.nextElementSibling) {
         if (el.hidden || el.classList.contains('as-fixed') || el.classList.contains('as-legacy')) continue;
         el.classList.remove('rg-tab-l', 'rg-tab-r'); void el.offsetWidth; el.classList.add('rg-tab-' + dir);
-        (function (e) { setTimeout(function () { e.classList.remove('rg-tab-l', 'rg-tab-r'); }, 320); })(el);
+        (function (e) { setTimeout(function () { e.classList.remove('rg-tab-l', 'rg-tab-r'); }, 560); })(el);
       }
     }, 0);
   }, true);
