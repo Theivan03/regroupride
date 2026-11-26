@@ -371,6 +371,21 @@
     $$('#langSeg button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.l === I.lang)); b.addEventListener('click', function () { I.setLang(b.dataset.l); }); });
   })();
 
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('.as-tabs button, #trTabs button, #phTabs button'); if (!b || b.disabled) return;
+    var bar = b.parentNode, btns = Array.prototype.slice.call(bar.children), cur = -1, i = btns.indexOf(b);
+    btns.forEach(function (x, k) { if (x.getAttribute('aria-pressed') === 'true' || x.getAttribute('aria-selected') === 'true') cur = k; });
+    if (i === cur) return;
+    var dir = i > cur ? 'l' : 'r', id = bar.id;
+    setTimeout(function () {
+      var nb = id ? document.getElementById(id) : bar; if (!nb || !nb.isConnected) return;
+      for (var el = nb.nextElementSibling; el; el = el.nextElementSibling) {
+        if (el.hidden || el.classList.contains('as-fixed') || el.classList.contains('as-legacy')) continue;
+        el.classList.remove('rg-tab-l', 'rg-tab-r'); void el.offsetWidth; el.classList.add('rg-tab-' + dir);
+        (function (e) { setTimeout(function () { e.classList.remove('rg-tab-l', 'rg-tab-r'); }, 320); })(el);
+      }
+    }, 0);
+  }, true);
   window.RGUI = UI;
   UI.beforeStart = beforeStart; UI.who = who; UI.near = near; UI.snack = snack; UI.draw = draw; UI.sync = sync; UI.ruTab = ruTab; UI.yo = yo;
   sync();

@@ -535,7 +535,16 @@
      con flecha de volver (kind 'full', o por su título). Las pantallas completas se apilan: al abrir otra, la anterior
      se guarda tal cual y vuelve al cerrar. Nunca hay una hoja sobre otra hoja. */
   var FULL = /^(Retos|Nuevo reto|Repostajes y gastos|Moto robada|Motos robadas|Reportar|Reporte enviado|Editar grupo|Nuevo grupo|Editar página|Editar sitio|Avisar de un robo|Administradores de esta ruta|Mi entrada|Chat|Fotos|Gestionar|Comunidades|Mis viajes|Viaje|Sugerencias|Normas|Descuentos|Retos|Sitios|Catálogo|Rutas de|Documentos|Papeles|Gastos|Me han robado|Motos robadas|Diagnóstico|Lista antes de salir|Nueva salida|Editar salida|Nueva comunidad|Editar comunidad|Nuevo viaje|Editar viaje|Mapas sin conexión|Fotógrafos|Soy fotógrafo|Proponer un sitio|Entrada QR|Control de entrada|Asistentes|Grupos|Organizar por grupos|Personas que no veo|Nueva página|Info)/;
-  var pageStack = [];
+  var pageStack = [], IN_MS = 300, OUT_MS = 260, firstT = null, firstUntil = 0;
+  // Lo que se va (una pantalla al volver, una hoja al cerrarse) no desaparece de golpe: se lleva a una capa aparte, hace su salida y se quita.
+  function ghost(from, cls, ms) {
+    var el = from.firstChild; if (!el || document.hidden) return;
+    try {
+      var top = el.scrollTop, g = document.createElement('div'); g.className = from.className.replace(/\brg-(still|first)\b/g, '') + ' rg-ghost ' + cls; g.setAttribute('aria-hidden', 'true');
+      g.appendChild(el); document.body.appendChild(g); el.scrollTop = top; el.style.removeProperty('--rg-d');
+      setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, ms + 40);
+    } catch (e) {}
+  }
   function titleOf(html) { var m = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html); return m ? m[1].replace(/<[^>]+>/g, '').trim() : ''; }
   function pageEl() { var p = $('#rgPage'); if (!p) { p = document.createElement('div'); p.id = 'rgPage'; p.className = 'rg-sheet rg-full'; p.hidden = true; var sh = $('#rgSheet'); sh.parentNode.insertBefore(p, sh); } return p; }
   function sheet(html, kind) {
@@ -553,9 +562,18 @@
       var wasLoading = !!(cur && !p.hidden && cur.children.length <= 2 && /Cargando…/.test(cur.textContent));
       var still = !!(cur && !p.hidden && (p.dataset.t === t || wasLoading || at >= 0));
       var keep = cur && !p.hidden && p.dataset.t === t ? cur.scrollTop : 0;
+      var first = p.hidden, now = Date.now(), elapsed = cur && cur._inAt ? now - cur._inAt : 1e9, under = null;
+      if (!still && !first && cur) { under = cur.cloneNode(true); under.classList.add('rg-under'); under._top = cur.scrollTop; }    // la pantalla anterior se queda debajo mientras entra la nueva
       var inn = document.createElement('div'); inn.className = 'rg-sheet-in'; inn.innerHTML = html.replace(/(<div class="head"[^>]*>)([\s\S]*?)(<button[^>]*class="btn small icon"[^>]*>)\s*<svg><use href="#i-close"\/><\/svg>\s*(<\/button>)/, function (m, a, mid, b, c) { return a + b.replace('title="Cerrar"', 'title="Volver"') + '<svg><use href="#i-back"/></svg>' + c + mid; });
-      p.innerHTML = ''; p.appendChild(inn); p.dataset.t = t; if (/Cargando…/.test(inn.textContent) && inn.children.length <= 2) inn.classList.add('rg-wait');
-      p.className = 'rg-sheet rg-full' + (pageStack.length ? ' rg-deep' : '') + (still ? ' rg-still' : ''); p.hidden = false; inn.scrollTop = keep;
+      var oldUnder = still && elapsed < IN_MS ? p.querySelector('.rg-under') : null;
+      p.innerHTML = ''; p.appendChild(inn); p.dataset.t = t;
+      if (still && elapsed < IN_MS) { still = false; inn._inAt = cur._inAt; inn.style.setProperty('--rg-d', -elapsed + 'ms'); if (oldUnder) p.appendChild(oldUnder); }   // se redibuja a media entrada: sigue por donde iba
+      else if (!still) {
+        inn._inAt = now;
+        if (under) { p.appendChild(under); under.scrollTop = under._top || 0; setTimeout(function () { if (under.parentNode) under.parentNode.removeChild(under); }, IN_MS + 40); }
+        if (first) { firstUntil = now + IN_MS + 40; clearTimeout(firstT); firstT = setTimeout(function () { p.classList.remove('rg-first'); }, IN_MS + 40); }
+      } if (/Cargando…/.test(inn.textContent) && inn.children.length <= 2) inn.classList.add('rg-wait');
+      p.className = 'rg-sheet rg-full' + (pageStack.length ? ' rg-deep' : '') + (still ? ' rg-still' : '') + (Date.now() < firstUntil ? ' rg-first' : ''); p.hidden = false; inn.scrollTop = keep;
       document.body.classList.add('rg-has-page'); return p;
     }
     var s = $('#rgSheet'), v = document.querySelector('.app > .view:not([hidden])'), eq = !!(v && (v.id === 'view-map' || v.id === 'view-club')) && kind !== 'page';
@@ -565,9 +583,10 @@
   }
   // Cierra lo que esté encima: la hoja si hay una; si no, la pantalla completa (y vuelve a la que hubiera debajo).
   function closeSheet() {
-    var s = $('#rgSheet'); if (!s.hidden) { s.hidden = true; s.innerHTML = ''; return; }
+    var s = $('#rgSheet'); if (!s.hidden) { ghost(s, 'rg-ghost-sheet', OUT_MS); s.hidden = true; s.innerHTML = ''; document.documentElement.classList.remove('rg-gate'); return; }
     var p = $('#rgPage'); if (!p || p.hidden) return;
     var prev = pageStack.pop();
+    ghost(p, 'rg-ghost-page', OUT_MS);
     if (prev) { p.innerHTML = ''; p.appendChild(prev.el); p.dataset.t = prev.t; prev.el.scrollTop = prev.top || 0; p.className = 'rg-sheet rg-full rg-still' + (pageStack.length ? ' rg-deep' : ''); try { document.dispatchEvent(new CustomEvent('rg:page', { detail: prev.t })); } catch (e) {} return; }
     p.hidden = true; p.innerHTML = ''; p.dataset.t = ''; document.body.classList.remove('rg-has-page');
     try { document.dispatchEvent(new CustomEvent('rg:page', { detail: '' })); } catch (e) {}
@@ -596,6 +615,7 @@
   // La cuenta es obligatoria: sin sesión, la pantalla de entrada no se puede cerrar. (Las pruebas automáticas siguen pudiendo entrar sin cuenta.)
   var MUST = !navigator.webdriver; try { if (localStorage.getItem('rg.test.wall')) MUST = true; } catch (e) {}
   function openAuth(first, mode0) {
+    if (first && MUST && !user) document.documentElement.classList.add('rg-gate');
     var mode = mode0 || (first ? 'signup' : 'login');
     try { if (localStorage.getItem('rg.auth.mode') === 'signup') { mode = 'signup'; localStorage.removeItem('rg.auth.mode'); } } catch (e) {}
     var pic = null;
@@ -952,7 +972,7 @@
   var GATE = document.documentElement.classList;
   if (GATE.contains('rg-gate')) {
     if (MUST && sb) { var w0 = false, s0 = false; try { w0 = !!localStorage.getItem('rg.wall'); s0 = localStorage.getItem('rg.welcomed') === '1'; } catch (e) {} openAuth(true, (w0 || s0) ? 'login' : 'signup'); }
-    GATE.remove('rg-gate');
+    else GATE.remove('rg-gate');        // con la pantalla de entrar puesta, la app sigue tapada hasta que se cierre (antes asomaba un instante)
   }
   renderAccount();
   refresh().then(function () {

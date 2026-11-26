@@ -646,19 +646,60 @@ html body #hudCard .as-hud2 .btn.stop{min-height:48px!important;font-size:17px!i
 #rgNoti p{margin:0!important;text-align:left}
 
 /* ================= movimiento: una sola regla para toda la app =================
-   · Una pantalla completa se anima UNA vez, al abrirse. Redibujarla (cambiar de pestaña, llegar los datos) o volver a ella no.
-   · «Cargando…» no aparece si los datos llegan en menos de un tercio de segundo: así no parpadea.
+   · Cambiar de sección (barra de abajo): la pantalla va cogiendo color.
+   · Pestañas de dentro (Hechas / Planeadas, Salidas / Chats…): el contenido entra desde el lado hacia el que vas.
+   · Pantalla completa: entra desde la derecha y, al volver, se va hacia la derecha. Redibujarla no la anima.
+   · Hoja: sube al abrirse y baja al cerrarse.
+   · «Cargando…» no aparece si los datos llegan en menos de un tercio de segundo.
    · Tocar algo responde igual en todas partes: se atenúa un instante, sin rebotes ni cambios de tamaño. */
-@keyframes rgPageIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@keyframes rgPageIn{from{transform:translateX(100%)}to{transform:none}}
+@keyframes rgPageOut{from{transform:none}to{transform:translateX(100%)}}
+@keyframes rgSheetDown{from{transform:none}to{transform:translateY(100%)}}
+@keyframes rgFadeOut{from{opacity:1}to{opacity:0}}
+@keyframes rgTabL{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+@keyframes rgTabR{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
+/* secciones */
+html body .view.rg-in{animation:rgFade .28s ease-out both!important}
+html body .view.rg-in.rg-fwd{animation:rgTabL .3s cubic-bezier(.2,.8,.2,1) both!important}
+html body .view.rg-in.rg-bck{animation:rgTabR .3s cubic-bezier(.2,.8,.2,1) both!important}
+/* lo que se despliega dentro de una pantalla (formularios, tarjetas) y las tarjetas del mapa */
+@keyframes rgRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+html body #vehicleForm,html body #maintForm,html body #parkCard,html body #planCard,html body #followCard,html body #replay{animation:rgRise .28s cubic-bezier(.2,.8,.2,1) both}
+html body #idleCard,html body #hudCard{animation:rgRise .3s cubic-bezier(.2,.8,.2,1) both}
+html body #lightbox,html body #leanFull,html body .rg-stopask,html body .rg-soloask,html body .rg-crop,html body .rg-tour{animation:rgFade .26s ease-out both!important}
+html body .toast{animation:rgRise .22s ease-out both!important}
+/* pestañas de dentro */
+html body .rg-tab-l{animation:rgTabL .28s cubic-bezier(.2,.8,.2,1) both!important}
+html body .rg-tab-r{animation:rgTabR .28s cubic-bezier(.2,.8,.2,1) both!important}
+/* pantallas completas */
 html body #rgPage{animation:none!important}
-html body #rgPage .rg-sheet-in{animation:rgPageIn .16s ease-out both!important}
+html body #rgPage.rg-first{background:transparent!important}
+html body #rgPage .rg-sheet-in{animation:rgPageIn .3s cubic-bezier(.2,.8,.2,1) var(--rg-d,0s) both!important;z-index:1;box-shadow:-1px 0 0 var(--linea)}
 html body #rgPage.rg-still .rg-sheet-in{animation:none!important}
+html body #rgPage .rg-sheet-in.rg-under{animation:none!important;z-index:0;pointer-events:none}
+html body .rg-sheet.rg-ghost{pointer-events:none!important;z-index:2950}
+html body .rg-sheet.rg-full.rg-ghost-page{background:transparent!important;animation:none!important}
+html body .rg-sheet.rg-full.rg-ghost-page:not(.rg-page):not(.rg-win):not(.rg-x) .rg-sheet-in{animation:rgPageOut .26s cubic-bezier(.4,0,.8,.4) forwards!important;box-shadow:-1px 0 0 var(--linea)}
+/* hojas */
+html body #rgSheet:not(.rg-still){animation:rgFade .26s ease-out both!important}
+html body #rgSheet:not(.rg-still):not(.rg-page):not(.rg-win) .rg-sheet-in{animation:rgSheetUp .32s cubic-bezier(.2,.8,.2,1) both!important}
 html body #rgSheet.rg-still,html body #rgSheet.rg-still .rg-sheet-in{animation:none!important}
+html body .rg-sheet.rg-ghost-sheet{animation:rgFadeOut .26s ease-in forwards!important}
+html body .rg-sheet.rg-ghost-sheet:not(.rg-full):not(.rg-page):not(.rg-win):not(.rg-x) .rg-sheet-in{animation:rgSheetDown .26s cubic-bezier(.4,0,.8,.4) forwards!important}
+html body .rg-sheet.rg-ghost-sheet.rg-page .rg-sheet-in,html body .rg-sheet.rg-ghost-sheet.rg-win .rg-sheet-in,html body .rg-sheet.rg-ghost-sheet .rg-sheet-in>*{animation:none!important}
+/* cargando */
 .rg-load{opacity:0;animation:rgFade .2s .35s both!important}
 .rg-wait>p{opacity:0;animation:rgFade .2s .35s both!important}
+/* tocar */
 html body .btn,html body .tab,html body .link,html body .club-card,html body .seg button,html body .as-tabs button,html body .pill,html body .as-row,html body .as-ev,html body .ch-send,html body #tabsHandle{transition:opacity .08s linear,background-color .12s linear,border-color .12s linear,color .12s linear!important}
 html body .btn:active:not(:disabled),html body .tab:active,html body .link:active,html body .club-card:active,html body .seg button:active,html body .as-tabs button:active,html body .pill:active,html body .as-ev:active,html body .ch-send:active,html body #tabsHandle:active{transform:none!important;filter:none!important;opacity:.7}
 html body button.as-row:active,html body .as-row[role=button]:active{opacity:1;background:var(--superficie-2)}
 html body .tabs{transition:transform .2s ease-out,opacity .15s linear!important}
-html body .view.rg-in{animation:rgFade .1s linear both!important}
-@media (prefers-reduced-motion:reduce){html body .rg-sheet .rg-sheet-in,html body .view.rg-in,.toast{animation:none!important}}
+/* entrar / crear cuenta: la diagonal se desplaza sin rebote, sin destello y sin encoger la tarjeta */
+html body .rg-split,html body .rg-split.sw-signup,html body .rg-split.sw-login{animation:none!important}
+html body .rg-split::before{display:none!important;animation:none!important}
+html body .rg-split button{transition:clip-path .42s cubic-bezier(.3,.7,.2,1),filter .42s ease!important}
+html body .rg-split .art{transition:transform .42s cubic-bezier(.3,.7,.2,1),left .42s cubic-bezier(.3,.7,.2,1),right .42s cubic-bezier(.3,.7,.2,1)!important}
+html body .rg-split button[aria-pressed=true] .art svg,html body .rg-split button[aria-pressed=true] .tx{animation:none!important}
+html body .rg-split .tx b{transition:font-size .3s ease}
+@media (prefers-reduced-motion:reduce){html body .rg-sheet .rg-sheet-in,html body .view.rg-in,html body .rg-tab-l,html body .rg-tab-r,.toast{animation:none!important}}

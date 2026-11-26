@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.57.0';
+  var APP_VERSION = '0.58.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -665,10 +665,13 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   var currentView = 'map';
   var inTimer = 0;
   function showView(name) {
-    var changed = name !== currentView;
+    var changed = name !== currentView, prevView = currentView;
     currentView = name;
     for (var k in views) views[k].hidden = k !== name;
-    if (changed) { var vw = views[name]; vw.classList.remove('rg-in'); void vw.offsetWidth; vw.classList.add('rg-in'); clearTimeout(inTimer); inTimer = setTimeout(function () { vw.classList.remove('rg-in'); }, 900); }
+    // Entrar en una pantalla de dentro (Estadísticas, Mi moto, el detalle de una ruta…) llega desde la derecha; volver de ella, desde la izquierda.
+    // Cambiar de sección con la barra de abajo solo funde.
+    var SUB = /^(detail|stats|settings|garage|security|help)$/, way = SUB.test(name) && !SUB.test(prevView) ? 'rg-fwd' : (SUB.test(prevView) && !SUB.test(name) && (name === 'profile' || name === 'rides') ? 'rg-bck' : '');
+    if (changed) { var vw = views[name]; vw.classList.remove('rg-in', 'rg-fwd', 'rg-bck'); void vw.offsetWidth; vw.classList.add('rg-in'); if (way) vw.classList.add(way); clearTimeout(inTimer); inTimer = setTimeout(function () { vw.classList.remove('rg-in'); }, 900); }
     $$('.tab').forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.view === (name === 'detail' ? 'rides' : (/^(stats|settings|garage|security|help)$/.test(name) ? 'profile' : name)))); });
     if (name === 'map') { if (!rec) startGps('fg'); if (map) setTimeout(function () { map.resize(); }, 50); }
     else if (!rec && gpsMode === 'fg' && name !== 'detail') stopGps();
