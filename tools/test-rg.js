@@ -131,6 +131,14 @@ t('fin de ruta y punto de reenganche por delante', function () {
   assert.ok(rj.off > 2000 && rj.lon > -0.33 && !rj.finished, JSON.stringify(rj));
   assert.ok(L.rejoinTarget({ lat: 38.6, lon: -0.35 }, L.makeLine(coords), 0).off < 5);
 });
+t('reenganche hacia el grupo: por delante de donde va', function () {
+  var line = L.makeLine(coords), me = { lat: 38.62, lon: -0.45 };
+  var base = L.rejoinTarget(me, line, 0);
+  assert.equal(L.rejoinGroup(me, line, 0, null), null);
+  assert.equal(L.rejoinGroup(me, line, 0, base.along + 200), null, 'el grupo casi a la par: reenganche normal');
+  var g = L.rejoinGroup(me, line, 0, base.along + 10000);
+  assert.ok(g && g.group && g.along >= base.along + 10000 + 1000 && g.along <= base.along + 10000 + 8000, JSON.stringify(g));
+});
 t('pasos de OSRM a indicaciones', function () {
   var route = { legs: [{ steps: [
     { name: 'A', maneuver: { type: 'depart', location: [0, 0] } },

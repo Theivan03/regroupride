@@ -127,20 +127,28 @@
     var near = fuelAround(f, 25).then(function (d) { return d.rows || []; }, function () { return []; });
     var box = ahead && ahead.length > 1 ? (function () { var bb = bbox(ahead); return sb.rpc('fuel_box', { a_lat: bb[0], a_lon: bb[1], b_lat: bb[2], b_lon: bb[3] }).then(function (r) { return r.error ? [] : (r.data || []); }, function () { return []; }); })() : Promise.resolve([]);
     Promise.all([near, box]).then(function (res) {
+      var routeCheap = null;
       var ok = function (x) { return x[k] != null; }, rows = res[0].filter(ok).sort(function (a, b) { return a.km - b.km; }), nearest = rows[0], cheap = rows.slice().sort(function (a, b) { return (a[k] - b[k]) || (a.km - b.km); })[0], best = null;
       if (ahead) {
         var seen = {}, cum = [0]; for (var i = 1; i < ahead.length; i++) cum.push(cum[i - 1] + dist(ahead[i - 1][1], ahead[i - 1][0], ahead[i][1], ahead[i][0]));
         var cand = res[1].concat(res[0]).filter(ok).filter(function (x) { if (seen[x.id]) return false; seen[x.id] = 1; return true; }).map(function (x) {
           var bi2 = -1, bd2 = 1500, st = Math.max(1, Math.floor(ahead.length / 1200)); for (var j = 0; j < ahead.length; j += st) { var dd = dist(x.lat, x.lon, ahead[j][1], ahead[j][0]); if (dd < bd2) { bd2 = dd; bi2 = j; } }
-          return bi2 < 0 || cum[bi2] > 80000 ? null : Object.assign({}, x, { along: cum[bi2] / 1000, off: bd2 });
+          // minutos que añade: ir desde la ruta y volver (la recta se alarga un 30 % para parecerse a la carretera, a unos 40 km/h)
+          return bi2 < 0 || cum[bi2] > 80000 ? null : Object.assign({}, x, { along: cum[bi2] / 1000, off: bd2, det: Math.round(2 * bd2 * 1.3 / 1000 / 40 * 60) });
         }).filter(Boolean);
-        best = cand.sort(function (a, b) { return (a[k] - b[k]) || (a.along - b.along); })[0] || null;
+        // la que mejor cuadra: la que menos tiempo te hace perder; a igual desvío, la más barata y luego la más próxima
+        best = cand.slice().sort(function (a, b) { return (a.det - b.det) || (a[k] - b[k]) || (a.along - b.along); })[0] || null;
+        // y, si compensa, la más barata de las que quedan junto a la ruta (hasta 6 minutos más de desvío)
+        if (best) { var alt = cand.filter(function (x) { return x.det <= best.det + 6 && x[k] < best[k] - 0.015; }).sort(function (a, b) { return (a[k] - b[k]) || (a.det - b.det); })[0]; if (alt) routeCheap = alt; }
       }
       if (!FCARD || FCARD.hidden) return;
       var map = {}, n = 0, row = function (x, tag, sub) { map[x.id] = x; return '<div class="as-frow"><span class="as-frow-t"><small>' + tag + '</small><b>' + esc(x.name) + '</b><span>' + sub + ' · <b class="cifra">' + eur(x[k]) + '</b> €/l</span></span><button class="btn ' + (n++ ? '' : 'primary') + '" data-fc="' + x.id + '" type="button">Ir</button></div>'; };
       var first = best || nearest, html = '';
-      if (first) html += row(first, best ? 'La mejor en tu ruta' : 'La más cerca', best ? 'a ' + kmTxt(best.along) + ' km por la ruta' : 'a ' + kmTxt(first.km) + ' km');
-      if (cheap && (!first || cheap.id !== first.id)) html += row(cheap, 'La más barata', 'a ' + kmTxt(cheap.km) + ' km');
+      var lose = function (x) { return x.det < 1 ? 'sin desviarte' : 'pierdes ~' + x.det + ' min'; };
+      if (first) html += row(first, best ? 'La que mejor cuadra con tu ruta' : 'La más cerca', best ? 'a ' + kmTxt(best.along) + ' km por la ruta · ' + lose(best) : 'a ' + kmTxt(first.km) + ' km');
+      if (routeCheap) html += row(routeCheap, 'Más barata, también en tu ruta', 'a ' + kmTxt(routeCheap.along) + ' km por la ruta · ' + lose(routeCheap));
+      else if (cheap && (!first || cheap.id !== first.id)) html += row(cheap, 'La más barata', 'a ' + kmTxt(cheap.km) + ' km');
+      if (best && nearest && nearest.id !== best.id && (!routeCheap || nearest.id !== routeCheap.id)) html += row(nearest, 'La más cerca', 'a ' + kmTxt(nearest.km) + ' km');
       FCARD.innerHTML = hd + (html || '<span class="muted">No encuentro gasolineras con precio a menos de 25 km' + (p ? ' ni junto a tu ruta' : '') + '.</span>');
       FCARD.onclick = function (ev) {
         var b = ev.target.closest('[data-fc]'); if (!b) return; FCARD.hidden = true; FCARD.dataset.on = ''; if (b.dataset.fc === 'x') return;

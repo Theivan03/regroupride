@@ -87,9 +87,26 @@
           '<div class="tr-kpis">' + k(s.dau, 'hoy') + k(s.wau, '7 días') + k(s.mau, '30 días') + k(s.accounts, 'cuentas') + '</div>' +
           '<div class="tr-kpis">' + k(s.devices, 'aparatos') + k(s.returning_30, 'vuelven') + k(s.communities, 'comunid.') + k(s.feedback_unanswered, 'sin contestar') + '</div>' +
           '<p class="muted rg-small">Activos ayer: ' + s.dau_prev + ' · Cuentas nuevas en 7 días: ' + s.accounts_7 + ' · Eventos próximos: ' + s.events_next + ' · Inscripciones: ' + s.signups + ' · Rutas grabadas: ' + s.rides + ' (' + Number(s.km).toLocaleString('es-ES') + ' km)</p>' +
-          '<div class="rg-row"><a class="btn small primary" href="https://regroupride-eventos.netlify.app/?dev=1" target="_blank" rel="noopener">Panel completo</a><button class="btn small" id="devPh" type="button">Altas de fotógrafos</button><button class="btn small" id="devRl" type="button">Actualizar</button></div>';
+          '<div class="rg-row"><a class="btn small primary" href="https://regroupride-eventos.netlify.app/?dev=1" target="_blank" rel="noopener">Panel completo</a><button class="btn small" id="devPh" type="button">Altas de fotógrafos</button><button class="btn small" id="devEr" type="button">Errores de la app</button><button class="btn small" id="devRl" type="button">Actualizar</button></div>';
+        dev.querySelector('#devEr').addEventListener('click', devErrors);
         dev.querySelector('#devRl').addEventListener('click', function () { devLoad(true); });
         dev.querySelector('#devPh').addEventListener('click', function () { if (window.RGPhoto) RGPhoto.open('admin'); });
+      }, function () {});
+    }
+    // Errores que la app ha registrado sola en los móviles de la gente: qué, dónde, en qué versión y cuántas veces.
+    function devErrors() {
+      var esc = Cl.esc, ago = function (ms) { var m = Math.round((Date.now() - ms) / 60000); return m < 60 ? 'hace ' + Math.max(1, m) + ' min' : m < 1440 ? 'hace ' + Math.round(m / 60) + ' h' : 'hace ' + Math.round(m / 1440) + ' d'; };
+      Cl.sheet('<div class="head" data-full><h1>Errores de la app</h1><button class="btn small icon" id="deX" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div><div id="deList"><p class="muted rg-load">Cargando…</p></div>', 'full');
+      document.getElementById('deX').addEventListener('click', Cl.closeSheet);
+      Cl.sb.rpc('dev_errors').then(function (r) {
+        var box = document.getElementById('deList'); if (!box) return;
+        if (r.error) { box.innerHTML = '<div class="empty">' + esc(Cl.msg(r.error)) + '</div>'; return; }
+        var rows = r.data || [];
+        box.innerHTML = rows.length ? '<p class="muted rg-small" style="text-align:left;margin:0 0 8px">Los últimos ' + rows.length + '. Un mismo error en la misma versión se cuenta, no se repite. Se borran solos a los 60 días.</p>' + rows.map(function (e) {
+          return '<details class="rg-err" data-raw><summary><b>' + esc(e.message) + '</b><small>' + esc([e.hits + (e.hits === 1 ? ' vez' : ' veces'), ago(e.last), 'v' + (e.version || '?'), e.platform, e.view].filter(Boolean).join(' · ')) + '</small></summary>' +
+            '<p class="muted rg-small">' + esc([e.source, e.device, e.who ? 'último: ' + e.who : ''].filter(Boolean).join(' · ')) + '</p>' + (e.stack ? '<pre>' + esc(e.stack) + '</pre>' : '') + '</details>';
+        }).join('') + '<button class="btn" id="deClear" type="button">Vaciar la lista</button>' : '<div class="empty"><b>Sin errores registrados</b>Cuando la app falle en el móvil de alguien, aparecerá aquí.</div>';
+        var c = document.getElementById('deClear'); if (c) c.addEventListener('click', function () { Cl.busy(c, function () { return Cl.sb.rpc('dev_errors_clear').then(function (q) { if (q.error) throw q.error; devErrors(); }); }); });
       }, function () {});
     }
     setTimeout(devLoad, 4000); setInterval(devLoad, 15000);

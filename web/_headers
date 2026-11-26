@@ -4,3 +4,9 @@
   Cache-Control: no-cache
 /rg-art.js
   Cache-Control: no-cache
+/rg-i18n.js
+  Cache-Control: no-cache
+/rg-i18n-en.js
+  Cache-Control: no-cache
+/i18n-web-en.js
+  Cache-Control: no-cache

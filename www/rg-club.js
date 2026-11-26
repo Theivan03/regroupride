@@ -236,7 +236,6 @@
     $('#clCreate', s).addEventListener('click', function () { editCommunity(null); });
   }
   function renderJoin() { communities(); }
-  function mineBlock() {}
 
   /* ---------- catálogo de rutas de la comunidad: las suben los administradores y cualquiera puede cargarlas ---------- */
   var LEVELS = { facil: 'Fácil', media: 'Media', exigente: 'Exigente' }, RT_COLS = 'id,name,description,kind,level,start_name,dist,dur,created_at,warnings,tips';
@@ -390,22 +389,12 @@
   /* ---------- eventos ---------- */
   // Las plazas y la lista de espera las decide el servidor (supabase/06_plazas_y_salida.sql); aquí se pide y se enseña.
   function takenOf(att, e) { return att.filter(function (x) { return x.event_id === e.id && (x.status === 'going' || x.status === 'offered'); }); }
-  function queueOf(att, e) {
-    return att.filter(function (x) { return x.event_id === e.id && x.status === 'waiting'; }).sort(function (a, b) {
-      return (a.offered_at ? 1 : 0) - (b.offered_at ? 1 : 0) || new Date(a.offered_at || a.joined_at) - new Date(b.offered_at || b.joined_at) || new Date(a.joined_at) - new Date(b.joined_at);
-    });
-  }
   // Punto de salida: el que puso el organizador o, si no, donde empieza la ruta. Siempre con su enlace de Maps.
   function meetOf(e) {
     var lat = e.meet_lat, lon = e.meet_lon, fromRoute = false, r = e.route;
     if ((lat == null || lon == null) && r && r.coords && r.coords.length) { lat = r.coords[0][1]; lon = r.coords[0][0]; fromRoute = true; }
     var has = lat != null && lon != null, name = e.meet_name || (fromRoute && r.wps && r.wps[0] && r.wps[0][2]) || '';
     return { lat: has ? lat : null, lon: has ? lon : null, name: name, url: e.meet_url || L.mapsPointUrl(has ? lat : null, has ? lon : null, e.meet_name) };
-  }
-  function deadlineOf(e, a) {   // misma cuenta que el servidor: 12 h o la mitad de lo que falte, lo que sea menos
-    if (!a || !a.offered_at) return null;
-    var o = new Date(a.offered_at).getTime(), st = new Date(e.starts_at).getTime();
-    return o + Math.min(12 * 3600e3, Math.max((st - o) / 2, 600e3));
   }
   /* Portada de los eventos (supabase/11): la foto que se subió o, si no hay, el mapa de donde sale la ruta. */
   var COVERS = {};
@@ -450,8 +439,8 @@
       im.src = u;
     });
   }
-  function setStatus(e, mine, status, companion, bike) {
-    var row = { status: status, companion: !!companion }; if (bike) row.bike = String(bike).slice(0, 80);
+  function setStatus(e, mine, status, companion, bike, answers) {
+    var row = { status: status, companion: !!companion }; if (bike) row.bike = String(bike).slice(0, 80); if (answers) row.answers = answers;
     var q = mine ? sb.from('event_attendees').update(row).eq('event_id', e.id).eq('user_id', S.user.id).select('status')
       : sb.from('event_attendees').insert(Object.assign({ event_id: e.id, user_id: S.user.id }, row)).select('status');
     return q.then(function (r) { var d = ok(r); return d && d[0] ? d[0].status : status; });
@@ -459,7 +448,7 @@
   // Una sola petición para la pestaña: los eventos con sus apuntados y sus administradores. La ruta completa de cada
   // evento (decenas de KB) no se baja aquí: solo su nombre, sus km y dónde empieza; el resto, al pulsar «Cargar ruta».
   var EVS = {};
-  var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon,route_url,trip,open_near,extra',
+  var EV_COLS = 'id,community_id,title,description,starts_at,meet_name,luma_url,created_by', EV_V6 = ',capacity,meet_url,meet_lat,meet_lon,route_url,trip,open_near,extra,questions',
     EV_ROUTE = ',route_name:route->>name,route_dist:route->dist,route_start:route->coords->0,route_wp0:route->wps->0', EV_EMBED = ',event_attendees(*),event_admins(user_id)';
   function fetchEvents(c) {
     var since = new Date(Date.now() - 12 * 3600e3).toISOString();
@@ -523,13 +512,13 @@
   }
   var LASTEV = null;
   function joinEvent(e, mine, btn, after) {
-    askRideInfo(e, function (bike) {
-      setStatus(e, mine, 'going', mine && mine.companion, bike).then(function (got) {
+    askRideInfo(e, function (bike, ans) {
+      setStatus(e, mine, 'going', mine && mine.companion, bike, ans).then(function (got) {
         ring(e.community_id, { kind: 'att', eid: e.id });
         if (got === 'waiting') { A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn'); setTimeout(closedHelp, 1800); }
         inbox(true); var c = cur(); return (c && c.id === e.community_id ? paneEvents(c) : Promise.resolve()).then(function () { if (after) after(); else openEvent(e.id); });
       }).catch(fail);
-    }, mine && mine.bike);
+    }, mine && mine.bike, mine && mine.answers);
   }
   // Salidas de otras comunidades abiertas a gente de fuera: comunidad, distancia y plazas. Abre «Pedir sitio».
   function openNear() {
@@ -601,11 +590,11 @@
     if ($('#evManage', s)) $('#evManage', s).addEventListener('click', function () { manageSheet(e); });
     $$('#evTabs button', s).forEach(function (b) { b.addEventListener('click', function () { clearInterval(chatT); EVP.tab = b.dataset.t; eventPage(); }); });
     var again = function () { inbox(true); return fetchEvent(e.id).then(function (d2) { EVP.e = d2.e; EVP.att = d2.att; var cc = cur(); if (cc && cc.id === e.community_id) paneEvents(cc).catch(function () {}); if ($('#evTabs')) eventPage(true); }); };
-    var set = function (status, companion, bike) { return setStatus(e, mine, status, companion, bike).then(function (got) { ring(e.community_id, { kind: 'att', eid: e.id }); if (got === 'waiting' && st !== 'waiting') { A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn'); setTimeout(closedHelp, 1800); } return again(); }).catch(fail); };
+    var set = function (status, companion, bike, ans) { return setStatus(e, mine, status, companion, bike, ans).then(function (got) { ring(e.community_id, { kind: 'att', eid: e.id }); if (got === 'waiting' && st !== 'waiting') { A.toast('Está completo: te he puesto en la lista de espera. Si queda una plaza, te aviso.', 'warn'); setTimeout(closedHelp, 1800); } return again(); }).catch(fail); };
     $$('#evFixed [data-f]', s).forEach(function (b) { b.addEventListener('click', function () {
       var f = b.dataset.f;
-      if (f === 'go') askRideInfo(e, function (bike) { set('going', false, bike); });
-      else if (f === 'confirm') askRideInfo(e, function (bike) { set('going', mine && mine.companion, bike); }, mine && mine.bike);
+      if (f === 'go') askRideInfo(e, function (bike, ans) { set('going', false, bike, ans); }, null, mine && mine.answers);
+      else if (f === 'confirm') askRideInfo(e, function (bike, ans) { set('going', mine && mine.companion, bike, ans); }, mine && mine.bike, mine && mine.answers);
       else if (f === 'gomeet') { Cl.closePages(); goMeet(e, b); }
       else if (f === 'no') armed(b, '¿Seguro? Toca otra vez', function () { set('no', false); });
     }); });
@@ -725,24 +714,41 @@
   function qrSvg(text) { try { var q = window.qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }); } catch (x) { return ''; } }
   // Al apuntarse: con qué moto viene y un teléfono para que el administrador pueda llamarle.
   // Con una sola moto en el garaje y el teléfono ya puesto no se pregunta nada.
-  function askRideInfo(e, then, already) {
+  // Al apuntarse: la moto, el teléfono si falta y las preguntas que haya puesto el organizador (bocadillo, talla…).
+  // then(moto, respuestas). «prev» son las respuestas que ya dio, por si vuelve a apuntarse o las cambia.
+  function qsOf(e) { return (e && Array.isArray(e.questions) ? e.questions : []).filter(function (q) { return q && q.label; }); }
+  function qFields(qs, prev) {
+    prev = prev || {};
+    return qs.map(function (q, i) {
+      var v = prev[q.id], rq = q.required ? ' required' : '', lb = '<span data-raw>' + esc(q.label) + '</span>' + (q.required ? '' : ' <span class="muted">(opcional)</span>');
+      if (q.type === 'check') return '<label class="rg-check"><input type="checkbox" data-q="' + i + '"' + (v === true ? ' checked' : '') + rq + '><span data-raw>' + esc(q.label) + '</span></label>';
+      if (q.type === 'select') return '<label>' + lb + '<select data-q="' + i + '"' + rq + '><option value="">Elige…</option>' + (q.options || []).map(function (o) { return '<option data-raw' + (v === o ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select></label>';
+      return '<label>' + lb + '<input data-q="' + i + '" data-raw maxlength="300" value="' + esc(typeof v === 'string' ? v : '') + '"' + rq + '></label>';
+    }).join('');
+  }
+  function qRead(qs, root) { var ans = {}; $$('[data-q]', root).forEach(function (el) { var q = qs[+el.dataset.q]; if (q) ans[q.id] = el.type === 'checkbox' ? el.checked : el.value.trim(); }); return ans; }
+  function qText(qs, answers) { answers = answers || {}; return qs.map(function (q) { var v = answers[q.id]; return v === '' || v == null || v === false ? '' : q.label + ': ' + (v === true ? 'sí' : v); }).filter(Boolean).join(' · '); }
+  function askRideInfo(e, then, already, prev) {
     var motos = A.vehicles().filter(function (v) { return (v.type || 'moto') !== 'coche'; }), name = function (v) { return (v.name || [v.make, v.model].filter(Boolean).join(' ') || 'Mi moto').trim(); };
-    var phone = Cl.ridePhone ? Cl.ridePhone() : null, needPhone = phone === '';
-    if (already && !needPhone) { then(already); return; }
-    if (motos.length === 1 && !needPhone) { then(name(motos[0])); return; }
+    var phone = Cl.ridePhone ? Cl.ridePhone() : null, needPhone = phone === '', qs = qsOf(e);
+    if (!qs.length) {
+      if (already && !needPhone) { then(already, null); return; }
+      if (motos.length === 1 && !needPhone) { then(name(motos[0]), null); return; }
+    }
     var main = motos.filter(function (v) { return v.principal; })[0] || motos[0];
-    Cl.sheet('<div class="head"><h1>Apuntarme</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p class="muted" style="text-align:left;margin:0">' + esc(e.title) + '</p><form class="rg-form" id="riForm">' +
+    Cl.sheet('<div class="head"><h1>Apuntarme</h1><button class="btn small icon" id="clX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p class="muted" style="text-align:left;margin:0" data-raw>' + esc(e.title) + '</p><form class="rg-form" id="riForm">' +
       (already ? '' : motos.length > 1 ? '<label>¿Con qué moto vienes?<select id="riBike">' + motos.map(function (v) { return '<option' + (v === main ? ' selected' : '') + '>' + esc(name(v)) + '</option>'; }).join('') + '</select></label>'
         : motos.length === 1 ? '<p style="text-align:left;margin:0">Moto: <b>' + esc(name(motos[0])) + '</b></p>'
         : '<label>¿Con qué moto vienes?<input id="riBikeTxt" required minlength="2" maxlength="80" placeholder="Marca y modelo, p. ej. Zontes 703 RR"></label><p class="muted rg-small" style="text-align:left">Si la añades en Yo › Mi moto, la próxima vez no te lo pregunto.</p>') +
       (needPhone ? '<label>Tu teléfono<input id="riPhone" type="tel" inputmode="tel" required minlength="9" maxlength="20" pattern="[0-9+ ]{9,20}" autocomplete="tel" placeholder="600 000 000"></label><p class="muted rg-small" style="text-align:left">Solo lo ven los administradores de la ruta, para llamarte si no apareces a la salida.</p>' : '') +
-      '<button class="btn big primary" type="submit">Apuntarme</button></form>');
+      (qs.length ? '<span class="label">Lo que pregunta el organizador</span>' + qFields(qs, prev) : '') +
+      '<button class="btn big primary" type="submit">Apuntarme</button></form>', qs.length > 2 ? 'tall' : undefined);
     $('#clX').addEventListener('click', Cl.closeSheet);
     $('#riForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
-      var bike = already || ($('#riBike') ? $('#riBike').value : $('#riBikeTxt') ? $('#riBikeTxt').value.trim() : name(motos[0]));
+      var bike = already || ($('#riBike') ? $('#riBike').value : $('#riBikeTxt') ? $('#riBikeTxt').value.trim() : name(motos[0])), ans = qs.length ? qRead(qs, ev.target) : null;
       Cl.busy(ev.target.querySelector('button[type=submit]'), function () {
-        return (needPhone ? Cl.savePhone($('#riPhone').value.trim()) : Promise.resolve()).then(function () { Cl.closeSheet(); then(bike); });
+        return (needPhone ? Cl.savePhone($('#riPhone').value.trim()) : Promise.resolve()).then(function () { Cl.closeSheet(); then(bike, ans); });
       });
     });
   }
@@ -766,7 +772,7 @@
       rows.sort(function (a, b) { return MORD.indexOf(a.status) - MORD.indexOf(b.status) || a.joined_at - b.joined_at; });
       var again = function () { manageSheet(e); }, of = function (f) { return rows.filter(f); };
       var act = function (x, a, bt) { Cl.busy(bt, function () { return (x.kind === 'g' ? rpcOk('guest_set', { p_guest: x.id, p_action: a }) : a === 'kick' ? sb.from('event_attendees').update({ status: 'no' }).eq('event_id', e.id).eq('user_id', x.id).then(ok) : rpcOk('member_checkin', { p_event: e.id, p_user: x.id, p_on: a === 'checkin' })).then(again); }); };
-      var who2 = function (x) { return '<span><b>' + esc(x.name) + (x.kind === 'g' ? '<i class="as-tag">web</i>' : '') + (x.companion ? '<i class="as-tag">+1</i>' : '') + '</b><small>' + esc(x.bike || 'Moto sin indicar') + (x.phone ? ' · ' + esc(x.phone) : '') + '</small></span>'; };
+      var who2 = function (x) { return '<span><b>' + esc(x.name) + (x.kind === 'g' ? '<i class="as-tag">web</i>' : '') + (x.companion ? '<i class="as-tag">+1</i>' : '') + '</b><small>' + esc(x.bike || 'Moto sin indicar') + (x.phone ? ' · ' + esc(x.phone) : '') + '</small>' + (function () { var t = qText(qsOf(e), x.answers); return t ? '<small class="as-ans" data-raw>' + esc(t) + '</small>' : ''; })() + '</span>'; };
       var body;
       if (MG.tab === 'att') {
         var pend = of(function (x) { return x.status === 'pending'; }), go = of(function (x) { return x.status === 'going' || x.status === 'offered'; });
@@ -839,7 +845,6 @@
   // Avisos del chat: cada uno los quita o los pone por evento (la campana de la tarjeta y la del propio chat).
   var MUTES = null, BELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7 2.5 7h-17S6 15 6 9"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>';
   function muted(id) { return !!(MUTES && MUTES[id]); }
-  function bellHtml(id) { var on = !muted(id); return '<button class="ev-bell" data-act="bell" data-bell="' + id + '" type="button" aria-pressed="' + on + '" aria-label="Avisos del chat" title="' + (on ? 'Avisos del chat activados' : 'Avisos del chat silenciados') + '">' + BELL + '</button>'; }
   function paintBells() { $$('[data-bell]').forEach(function (b) { var on = !muted(b.dataset.bell); b.setAttribute('aria-pressed', String(on)); b.title = on ? 'Avisos del chat activados' : 'Avisos del chat silenciados'; }); var t = $('#chMuteTx'); if (t) t.textContent = muted(t.dataset.ev) ? 'Avisos de este chat: silenciados' : 'Avisos de este chat: activados'; }
   function loadMutes() { if (!S.user) return; sb.from('event_chat_mutes').select('event_id').eq('user_id', S.user.id).then(function (r) { if (r.error) return; MUTES = {}; (r.data || []).forEach(function (x) { MUTES[x.event_id] = 1; }); paintBells(); }, function () {}); }
   function toggleMute(id) {
@@ -905,7 +910,6 @@
       if (svg) box2.innerHTML = svg; else box2.innerHTML = '<span class="muted">' + (r.error ? 'No se ha podido cargar la entrada. Revisa la conexión.' : 'La entrada aparece cuando tienes la plaza confirmada.') + '</span>';
     });
   }
-  function whoGoes(e) { openEvent(e.id, 'gente'); }
 
   function eventForm(c, e, focus) {
     var plans = A.plans(), keep = e && e.route ? '<option value="keep" selected>' + esc('Mantener: ' + (e.route.name || 'ruta actual')) + '</option>' : '';
@@ -925,8 +929,25 @@
       '<label>Foto de portada<input id="evCover" type="file" accept="image/*"></label>' +
       (v6 ? '<div id="evExtra" class="rg-form">' + (window.RGEventExtra ? RGEventExtra.form(e) : '') + '</div>' : '') +
       '<label>Enlace de Luma<input id="evLuma" inputmode="url" maxlength="300" value="' + esc(e && e.luma_url ? e.luma_url : '') + '" placeholder="Opcional"></label>' +
-      '<p class="muted rg-small" style="text-align:left;margin:0">Las preguntas a los inscritos y la aprobación se configuran en la web.</p></div></details>' +
+      '<span class="label">Preguntas al apuntarse</span><p class="muted rg-small" style="text-align:left;margin:0">Lo que quieras saber de cada uno: el bocadillo, la talla de camiseta, si viene a comer… Se contesta al apuntarse, en la app y en la web.</p><div id="evQs" class="ev-qs"></div><button class="btn" id="evQAdd" type="button">' + icn('plus') + 'Añadir pregunta</button>' +
+      '<p class="muted rg-small" style="text-align:left;margin:0">La aprobación de inscritos y la descarga de la lista se configuran en la web.</p></div></details>' +
       '<div class="as-fixed"><button class="btn big primary" type="submit">' + (e ? 'Guardar cambios' : 'Publicar') + '</button></div></form>', 'full');
+    var QS = qsOf(e).map(function (q) { return { id: q.id, label: q.label, type: q.type || 'text', options: (q.options || []).slice(), required: !!q.required }; });
+    var qid = function () { return 'q' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); };
+    var qDraw = function () {
+      var box = $('#evQs'); if (!box) return;
+      box.innerHTML = QS.map(function (q, i) {
+        return '<div class="ev-q" data-i="' + i + '"><div class="ev-q-top"><input data-k="label" data-raw maxlength="120" placeholder="' + (window.RGI18N && RGI18N.lang === 'en' ? 'Question (e.g. Which sandwich do you want?)' : 'Pregunta (p. ej. ¿Qué bocadillo quieres?)') + '" value="' + esc(q.label) + '"><button class="btn small icon" type="button" data-qdel title="Quitar">' + icn('trash') + '</button></div>' +
+          '<div class="ev-q-row"><select data-k="type"><option value="text"' + (q.type === 'text' ? ' selected' : '') + '>Respuesta escrita</option><option value="select"' + (q.type === 'select' ? ' selected' : '') + '>Elegir una opción</option><option value="check"' + (q.type === 'check' ? ' selected' : '') + '>Sí o no</option></select>' +
+          '<label class="rg-check"><input type="checkbox" data-k="required"' + (q.required ? ' checked' : '') + '><span>Obligatoria</span></label></div>' +
+          (q.type === 'select' ? '<input data-k="options" data-raw placeholder="Opciones separadas por comas: Lomo, Tortilla, Vegetal" value="' + esc(q.options.join(', ')) + '">' : '') + '</div>';
+      }).join('');
+    };
+    var qSync = function () { $$('#evQs .ev-q').forEach(function (row) { var q = QS[+row.dataset.i]; if (!q) return; $$('[data-k]', row).forEach(function (el) { var k = el.dataset.k; if (k === 'required') q.required = el.checked; else if (k === 'options') q.options = el.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 20); else q[k] = el.value; }); }); };
+    qDraw();
+    $('#evQAdd').addEventListener('click', function () { qSync(); if (QS.length >= 10) { A.toast('Como mucho, 10 preguntas.', 'warn'); return; } QS.push({ id: qid(), label: '', type: 'text', options: [], required: false }); qDraw(); var l = $$('#evQs [data-k=label]'); if (l.length) l[l.length - 1].focus(); });
+    $('#evQs').addEventListener('click', function (ev) { var b = ev.target.closest('[data-qdel]'); if (!b) return; qSync(); QS.splice(+b.closest('.ev-q').dataset.i, 1); qDraw(); });
+    $('#evQs').addEventListener('change', function (ev) { if (ev.target.dataset.k === 'type') { qSync(); qDraw(); } });
     $$('#evDur button').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.d === 'n' && window.RGTrips) { var t = $('#evTitle').value; Cl.closeSheet(); RGTrips.create(c.id, t); } }); });
     if (focus === 'cap') setTimeout(function () { var i = $('#evCap'); if (i) { i.scrollIntoView({ block: 'center' }); i.focus(); } }, 150);
     $('#clX').addEventListener('click', Cl.closeSheet);
@@ -938,6 +959,9 @@
     $('#evForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
       var row = { community_id: c.id, title: $('#evTitle').value.trim(), starts_at: new Date($('#evWhen').value).toISOString(), meet_name: $('#evMeet').value.trim(), description: $('#evDesc').value.trim(), luma_url: $('#evLuma').value.trim() || null };
+      qSync(); var goodQ = QS.filter(function (q) { return q.label.trim(); });
+      if (goodQ.some(function (q) { return q.type === 'select' && q.options.length < 2; })) { A.toast('Las preguntas de «elegir una opción» necesitan al menos dos opciones.', 'warn'); $('#evMore').open = true; return; }
+      var hadQ = !!(e && qsOf(e).length);
       var sel = $('#evRoute').value, route = e ? e.route : null;
       if (sel !== 'keep') { var p = plans.filter(function (x) { return String(x.id) === sel; })[0]; row.route = route = p ? { name: p.name, wps: p.wps, pois: p.pois || [], coords: p.coords, steps: p.steps || [], dist: p.dist, dur: p.dur } : null; }
       var link = v6 ? $('#evMeetUrl').value.trim() : '', cap = v6 ? parseInt($('#evCap').value, 10) : NaN, warn = '';
@@ -948,7 +972,7 @@
         var point = !v6 ? Promise.resolve(null) : (link ? (e && link === link0 && e.meet_lat != null ? Promise.resolve({ url: e.meet_url, lat: e.meet_lat, lon: e.meet_lon }) : window.RGNav.resolvePoint(link)) : Promise.resolve({ url: null, lat: null, lon: null }));
         return point.then(function (pt) {
           if (pt) {
-            row.route_url = rurl || null; row.capacity = cap >= 1 ? cap : null; if ($('#evOpenNear')) { row.open_near = $('#evOpenNear').checked; if (row.open_near) { row.allow_guests = true; row.open_reg = true; row.require_approval = true; } } if (window.RGEventExtra) { try { row.extra = RGEventExtra.read(e); } catch (x) {} } row.meet_url = pt.url || null; row.meet_lat = pt.lat != null ? pt.lat : null; row.meet_lon = pt.lon != null ? pt.lon : null;
+            row.route_url = rurl || null; row.capacity = cap >= 1 ? cap : null; if (goodQ.length || hadQ) row.questions = goodQ.map(function (q) { return { id: q.id, label: q.label.trim().slice(0, 120), type: q.type, options: q.type === 'select' ? q.options : [], required: q.required }; }); if ($('#evOpenNear')) { row.open_near = $('#evOpenNear').checked; if (row.open_near) { row.allow_guests = true; row.open_reg = true; row.require_approval = true; } } if (window.RGEventExtra) { try { row.extra = RGEventExtra.read(e); } catch (x) {} } row.meet_url = pt.url || null; row.meet_lat = pt.lat != null ? pt.lat : null; row.meet_lon = pt.lon != null ? pt.lon : null;
             if (pt.url && pt.lat == null) warn = 'El enlace se abrirá en Google Maps, pero no trae coordenadas: no podré marcar la salida en el mapa de la app.';
             if (pt.name && !row.meet_name) row.meet_name = pt.name;
           }
@@ -1027,17 +1051,39 @@
   }
 
   /* ---------- miembros ---------- */
+  // Historial de asistencia (solo administradores): quién se apunta, quién llega y quién falta, y cuánta gente por salida.
+  function attendance(c) {
+    Cl.sheet('<div class="head" data-full><h1>Asistencia</h1><button class="btn small icon" id="atX" type="button" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button></div><p class="muted" style="text-align:left;margin:0" data-raw>' + esc(c.name) + '</p><div id="atBody"><div class="empty rg-load"><b>Cargando…</b></div></div>', 'full');
+    $('#atX').addEventListener('click', Cl.closeSheet);
+    sb.rpc('community_attendance', { p_community: c.id }).then(function (r) {
+      var box = $('#atBody'); if (!box) return;
+      if (r.error) { box.innerHTML = '<div class="empty">' + esc(Cl.msg(r.error)) + '</div>'; return; }
+      var d = r.data || {}, evs = d.events || [], ppl = d.people || [], used = evs.some(function (e) { return e.came > 0; });
+      var day = function (ms) { return new Date(ms).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }); };
+      if (!evs.length) { box.innerHTML = '<div class="empty"><b>Aún no hay salidas pasadas</b>Cuando la comunidad haga su primera salida, aquí verás quién vino.</div>'; return; }
+      box.innerHTML = '<div class="as-figs"><div><b class="cifra">' + evs.length + '</b><small>salidas en 12 meses</small></div><div><b class="cifra">' + Math.round(evs.reduce(function (n, e) { return n + e.going; }, 0) / evs.length) + '</b><small>apuntados de media</small></div></div>' +
+        (used ? '' : '<p class="muted rg-small" style="text-align:left;margin:0">Las llegadas solo cuentan si pasáis lista en la salida (Gestionar › Entrada QR o marcando a mano). Sin eso, aquí solo se ve quién se apuntó.</p>') +
+        '<span class="label">Por persona</span><div class="as-rows">' + ppl.map(function (p) {
+          var sub = p.going ? p.going + (p.going === 1 ? ' salida apuntada' : ' salidas apuntadas') + (used ? ' · ' + p.came + (p.came === 1 ? ' llegada' : ' llegadas') + (p.missed ? ' · ' + p.missed + (p.missed === 1 ? ' falta' : ' faltas') : '') : '') + (p.last ? ' · última: ' + day(p.last) : '') : 'No se ha apuntado a ninguna';
+          return '<div class="as-row"><span class="as-ico">' + icn('user') + '</span><span><b data-raw>' + esc(p.name) + '</b><small>' + sub + '</small></span>' + (p.missed >= 2 ? '<span class="mstatus due">' + p.missed + ' faltas</span>' : '') + '</div>';
+        }).join('') + '</div><span class="label">Por salida</span><div class="as-rows">' + evs.map(function (e) {
+          return '<button class="as-row" type="button" data-ev="' + e.id + '"><span class="as-ico">' + icn('cal') + '</span><span><b data-raw>' + esc(e.title) + '</b><small>' + day(e.at) + ' · ' + e.going + (e.going === 1 ? ' apuntado' : ' apuntados') + (e.came ? ' · ' + e.came + (e.came === 1 ? ' llegó' : ' llegaron') : '') + '</small></span>' + icn('chev') + '</button>';
+        }).join('') + '</div>';
+      $$('[data-ev]', box).forEach(function (b) { b.addEventListener('click', function () { openEvent(b.dataset.ev, 'gente'); }); });
+    }, fail);
+  }
   function paneMembers(c, useCache) {
     return swr('members:' + c.id, function () {
       return sb.from('community_members').select('user_id,role,joined_at').eq('community_id', c.id).order('joined_at').then(function (r) {
         var ms = ok(r); return names(ms.map(function (m) { return m.user_id; })).then(function () { return ms; }); });
     }, function (ms) { (function () {
         var pane = $('#rgPage #clPane') || $('#clPane'); if (!pane || S.tab !== 'members' || !cur() || cur().id !== c.id) return;
-        pane.innerHTML = '<div id="clReqs"></div><span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span><div class="club-card club-people">' + ms.map(function (m) {
+        pane.innerHTML = '<div id="clReqs"></div>' + (isAdmin() ? '<button class="btn" id="clAtt" type="button">' + icn('list') + 'Historial de asistencia</button>' : '') + '<span class="label">' + ms.length + (ms.length === 1 ? ' miembro' : ' miembros') + '</span><div class="club-card club-people">' + ms.map(function (m) {
           var me = m.user_id === S.user.id;
           return '<div class="club-person" data-u="' + m.user_id + '">' + ava(m.user_id, m.role === 'admin' ? 'rol-admin' : 'rol-comp') + '<div><b>' + esc(who(m.user_id)) + (me ? ' (tú)' : '') + (m.role === 'admin' ? ' <span class="mstatus ok"><svg><use href="#i-check"/></svg>admin</span>' : '') + '</b><span class="muted">' + esc(bike(m.user_id)) + '</span></div>' +
             (!me ? '<button class="as-x" data-more="' + m.user_id + '" type="button" title="Más">' + icn('more') + '</button>' : '') + '</div>';
         }).join('') + '</div><button class="as-link danger" id="clLeave" type="button">Salir de esta comunidad</button>';
+        if ($('#clAtt', pane)) $('#clAtt', pane).addEventListener('click', function () { attendance(c); });
         $$('[data-more]', pane).forEach(function (b) { b.addEventListener('click', function () {
           var uid = b.dataset.more, m = ms.filter(function (x) { return x.user_id === uid; })[0];
           var sh = Cl.sheet('<div class="head"><h1>' + esc(who(uid)) + '</h1><button class="btn small icon" id="mmX" type="button"><svg><use href="#i-close"/></svg></button></div><div class="as-rows">' + (isAdmin() ? '<button class="as-row" data-m="role" type="button">' + icn('check') + '<span><b>' + (m.role === 'admin' ? 'Quitar admin' : 'Hacer admin') + '</b></span></button><button class="as-row" data-m="kick" type="button">' + icn('exit') + '<span><b>Expulsar</b></span></button>' : '') + '<button class="as-row danger" data-m="rep" type="button">' + icn('warn') + '<span><b>Reportar</b></span></button></div>');

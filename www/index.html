@@ -13,7 +13,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.webmanifest?v=0.59.1">
+<link rel="manifest" href="manifest.webmanifest?v=0.60.0">
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -124,20 +124,15 @@ h2{font-family:var(--font-display);font-weight:700;font-size:var(--fs-row);line-
 .card{background:var(--color-scrim);border-radius:var(--r-xl);box-shadow:var(--shadow);padding:var(--sp-4)}
 .totals{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
 .totals .fig .val{font-size:var(--fs-figure-s)}
-.idle-actions{display:grid;grid-template-columns:1fr auto;gap:var(--sp-3);margin-top:var(--sp-3)}
 
 /* HUD de grabación */
 .hud{display:grid;grid-template-columns:132px 1fr auto;grid-template-rows:auto auto;gap:var(--sp-1) var(--sp-3);align-items:center}
-.hud .gauge-wrap{grid-column:1;grid-row:1;width:132px}
 .hud .speed{grid-column:2;grid-row:1;text-align:center}
 .hud .speed .val{font-family:var(--font-display);font-weight:800;font-size:72px;line-height:.9;font-variant-numeric:tabular-nums}
 .hud .speed .unit{font-size:var(--fs-label);color:var(--color-text-2);font-weight:600;letter-spacing:.08em;text-transform:uppercase}
-.hud .maxes{grid-column:3;grid-row:1;display:flex;flex-direction:column;gap:var(--sp-2);text-align:center}
-.hud .maxes .val{font-family:var(--font-display);font-weight:700;font-size:34px;line-height:1;font-variant-numeric:tabular-nums}
 .hud .meta{grid-column:1/4;grid-row:2;text-align:center;white-space:nowrap;color:var(--color-text-2);font-weight:600;font-size:var(--fs-body-s);font-variant-numeric:tabular-nums}
 .hud .meta b{color:var(--color-text)}
 .hud .meta .pause{color:var(--color-warn)}
-.hud-actions{display:grid;grid-template-columns:auto 1fr;gap:var(--sp-3);margin-top:var(--sp-3)}
 .gauge-mini{width:100%;display:block}
 .gauge-mini svg{width:100%;height:auto;display:block;overflow:visible}
 .gauge-mini .track{fill:none;stroke:var(--color-line);stroke-width:26}
@@ -175,9 +170,6 @@ h2{font-family:var(--font-display);font-weight:700;font-size:var(--fs-row);line-
 .fig .last{display:block;margin-top:var(--sp-2);font-family:var(--font-display);font-weight:700;font-size:var(--fs-row);line-height:1;color:var(--color-text-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .fig .last small{font-size:var(--fs-label);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-right:6px}
 .fig .last.l b{color:var(--color-left)}.fig .last.r b{color:var(--color-right)}
-.hud .maxes .last{font-family:var(--font-display);font-weight:700;font-size:18px;line-height:1;color:var(--color-text-2);margin-top:3px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.hud .maxes .last small{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
-.hud .maxes .last.l b{color:var(--color-left)}.hud .maxes .last.r b{color:var(--color-right)}
 .minor{text-align:center;color:var(--color-text-2);font-weight:500;font-size:var(--fs-body)}
 
 /* ---------- avisos ---------- */
@@ -294,8 +286,6 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 .photos .add svg{width:26px;height:26px}
 .lightbox{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center}
 .lightbox img{max-width:100%;max-height:100%}
-.sheet-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-2)}
-.sheet-actions .btn{flex-direction:column;gap:4px;font-size:12px;padding:var(--sp-2) 2px;min-height:60px;letter-spacing:.04em}
 .field{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);padding:var(--sp-3) 0;border-bottom:var(--line) solid var(--color-line);min-height:64px}
 .field label{font-weight:600;font-size:var(--fs-body);line-height:1.3}
 .field small{display:block;color:var(--color-text-2);font-weight:500;font-size:var(--fs-help)}
@@ -421,10 +411,10 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
-<link rel="stylesheet" href="rg-theme.css?v=0.59.1">
-<link rel="stylesheet" href="rg-quedada.css?v=0.59.1">
-<link rel="stylesheet" href="rg-plano.css?v=0.59.1">
-<link rel="stylesheet" href="rg-asfalto.css?v=0.59.1">
+<link rel="stylesheet" href="rg-theme.css?v=0.60.0">
+<link rel="stylesheet" href="rg-quedada.css?v=0.60.0">
+<link rel="stylesheet" href="rg-plano.css?v=0.60.0">
+<link rel="stylesheet" href="rg-asfalto.css?v=0.60.0">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -665,7 +655,7 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
   <input type="file" id="photoFile" accept="image/*" multiple hidden>
   <div class="as-acts3 as-acts-more">
     <button type="button" id="btnAsRoute"><svg><use href="#i-route"/></svg>Ruta para seguir</button>
-    <button type="button" id="btnShareCard"><svg><use href="#i-camera"/></svg>Tarjeta</button>
+    <button type="button" id="btnShareCard"><svg><use href="#i-share"/></svg>Compartir</button>
     <button type="button" id="btnFav"><svg><use href="#i-star"/></svg>Favorita</button>
   </div>
   <div class="as-legacy"><button id="btnGmaps" type="button"></button><button id="btnExportRide" type="button"><span>Curvas CSV</span></button><button id="btnRename" type="button"></button><button id="btnDeleteRide" type="button">Borrar esta ruta</button></div>
@@ -868,42 +858,43 @@ textarea.note{width:100%;min-height:72px;border:2px solid var(--color-line);bord
 <div class="lightbox" id="lightbox" hidden><img id="lightboxImg" alt=""></div>
 
 <script data-cfasync="false" src="vendor/maplibre-gl.js"></script>
-<script data-cfasync="false" src="rg-i18n-en.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-i18n.js?v=0.59.1"></script>
-<script data-cfasync="false" src="lean-core.js?v=0.59.1"></script>
-<script data-cfasync="false" src="geo.js?v=0.59.1"></script>
-<script data-cfasync="false" src="db.js?v=0.59.1"></script>
-<script data-cfasync="false" src="achievements.js?v=0.59.1"></script>
-<script data-cfasync="false" src="platform.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-lib.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-mapstyle.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-offline.js?v=0.59.1"></script>
+<script data-cfasync="false" src="rg-i18n-en.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-i18n.js?v=0.60.0"></script>
+<script data-cfasync="false" src="lean-core.js?v=0.60.0"></script>
+<script data-cfasync="false" src="geo.js?v=0.60.0"></script>
+<script data-cfasync="false" src="db.js?v=0.60.0"></script>
+<script data-cfasync="false" src="achievements.js?v=0.60.0"></script>
+<script data-cfasync="false" src="platform.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-lib.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-mapstyle.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-offline.js?v=0.60.0"></script>
 <script data-cfasync="false" src="vendor/supabase.js"></script>
-<script data-cfasync="false" src="app.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-art.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-crop.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-app.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-thumbs.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-live.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-club.js?v=0.59.1"></script>
+<script data-cfasync="false" src="app.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-art.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-crop.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-app.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-thumbs.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-live.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-club.js?v=0.60.0"></script>
 <script data-cfasync="false" src="vendor/qrcode.js"></script>
-<script data-cfasync="false" src="rg-group.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-sync.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-extras.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-creador.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-tour.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-trips.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-photo.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-lean.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-groups.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-shell.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-solo.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-open.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-road.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-garage.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-social.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-oauth.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-routes.js?v=0.59.1"></script>
-<script data-cfasync="false" src="rg-ui.js?v=0.59.1"></script>
+<script data-cfasync="false" src="rg-group.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-sync.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-extras.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-creador.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-tour.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-trips.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-photo.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-lean.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-groups.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-shell.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-solo.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-open.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-road.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-garage.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-social.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-oauth.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-routes.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-share.js?v=0.60.0"></script>
+<script data-cfasync="false" src="rg-ui.js?v=0.60.0"></script>
 </body>
 </html>

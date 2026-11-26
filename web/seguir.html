@@ -51,19 +51,23 @@ h1{font:700 28px/1.05 "Barlow Condensed","Arial Narrow",sans-serif;text-transfor
   <div class="row" id="row"></div>
   <div class="btns" id="btns" hidden><a class="btn" id="goMaps" target="_blank" rel="noopener">Abrir en Google Maps</a><a class="btn sec" href="tel:112">Llamar al 112</a></div>
   <span class="muted" id="note">Esta página se actualiza sola. Solo la ve quien tenga este enlace.</span>
+  <span class="muted"><a href="#" id="lgSw" data-raw style="color:inherit"></a> · <a href="#" id="unSw" data-raw style="color:inherit"></a></span>
 </div>
+<script>(function(){var l;try{l=localStorage.getItem('rg.lang');if(!l){var n=navigator.language||'es';l=/^(es|ca|gl|eu)/i.test(n)?'es':'en';localStorage.setItem('rg.lang',l);if(/^en-(US|GB)/i.test(n))localStorage.setItem('rg.units','mi');}}catch(e){}if(l==='en')document.write('<script src="/rg-i18n-en.js"><\/script><script src="/i18n-web-en.js"><\/script>');})();</script>
+<script src="/rg-i18n.js"></script>
 <script src="https://regroupride-app.netlify.app/vendor/maplibre-gl.js"></script>
 <script>
 (function () {
   'use strict';
   var URL0 = 'https://lpkeaxtzfbuqjkkusjit.supabase.co', KEY = 'sb_publishable_lUo3IlFV8X0pVL5HUfbgNA_VLeizTOw';
   var token = (/[?&]s=([0-9a-f-]{36})/i.exec(location.search) || [])[1], $ = function (id) { return document.getElementById(id); };
-  var map = null, marker = null, first = true, el = null;
+  var map = null, marker = null, first = true, el = null, I = window.RGI18N, EN = !!(I && I.lang === 'en');
+  if (I) { $('lgSw').textContent = EN ? 'Español' : 'English'; $('unSw').textContent = I.mi ? 'km' : (EN ? 'miles' : 'millas'); $('lgSw').onclick = function (e) { e.preventDefault(); I.setLang(EN ? 'es' : 'en'); }; $('unSw').onclick = function (e) { e.preventDefault(); I.setUnits(I.mi ? 'km' : 'mi'); }; if (EN) document.title = 'Live tracking · ReGroupRide'; }
   function hhmm(ms) { return new Date(ms).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); }
   function show(d) {
     if (!d) { $('name').textContent = 'Enlace no válido'; $('state').textContent = 'Sin datos'; $('note').textContent = 'Este enlace de seguimiento no existe o ya se ha borrado.'; return; }
     var age = d.updated_at ? (d.now - d.updated_at) / 1000 : null, st = d.status;
-    $('name').textContent = d.name; document.title = d.name + ' · seguimiento en directo';
+    $('name').textContent = d.name; document.title = d.name + (EN ? ' · live tracking' : ' · seguimiento en directo');
     var p = $('state'); p.className = 'pill' + (st === 'alert' ? ' alert' : st === 'ended' ? ' end' : age == null || age > 180 ? ' old' : '');
     p.textContent = st === 'alert' ? 'No responde' : st === 'ended' ? 'Ruta terminada' : age == null ? 'Aún sin posición' : age > 180 ? 'Sin señal' : 'En directo';
     var a = $('alert'); a.style.display = st === 'alert' ? 'block' : 'none';

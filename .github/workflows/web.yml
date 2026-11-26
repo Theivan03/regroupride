@@ -26,6 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Idioma de las webs (el mismo que la app)
+        run: cp www/rg-i18n.js www/rg-i18n-en.js web/
       - name: Web de eventos
         if: env.NETLIFY_AUTH_TOKEN != ''
         run: npx --yes netlify-cli@17 deploy --prod --dir=web --site=c7a79f44-b24c-4062-b384-41c08167f46d --message "${{ github.sha }}"

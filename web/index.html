@@ -280,7 +280,9 @@ a{color:var(--marca)}
 <div class="bg" aria-hidden="true"><i></i><i></i><i></i><i></i><u></u><b></b></div>
 <header class="top"><button class="btn" id="bk" type="button" aria-label="Atrás" title="Atrás" hidden>←</button><a class="logo" href="/"><img src="/simbolo.svg" alt=""><span>ReGroup<i>Ride</i></span></a><span class="sp"></span><span id="who" class="muted small"></span><button class="btn txt" id="out" hidden>Salir</button></header>
 <main class="wrap" id="app"><p class="muted">Cargando…</p></main>
-<footer class="foot muted"><a href="/?about=1">Quién hace ReGroupRide</a> · <a href="/privacidad.html">Privacidad</a> · <a href="/condiciones.html">Condiciones</a></footer>
+<footer class="foot muted"><a href="/?about=1">Quién hace ReGroupRide</a> · <a href="/privacidad.html">Privacidad</a> · <a href="/condiciones.html">Condiciones</a> · <a href="#" id="lgSw" data-raw></a> · <a href="#" id="unSw" data-raw></a></footer>
+<script>(function(){var l;try{l=localStorage.getItem('rg.lang');if(!l){var n=navigator.language||'es';l=/^(es|ca|gl|eu)/i.test(n)?'es':'en';localStorage.setItem('rg.lang',l);if(/^en-(US|GB)/i.test(n))localStorage.setItem('rg.units','mi');}}catch(e){}if(l==='en')document.write('<script src="/rg-i18n-en.js"><\/script><script src="/i18n-web-en.js"><\/script>');})();</script>
+<script src="/rg-i18n.js"></script>
 <script src="/supabase.js"></script>
 <script src="/rg-art.js"></script>
 
@@ -297,6 +299,8 @@ a{color:var(--marca)}
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
   function safeUrl(u) { return /^https:\/\//i.test(u || '') ? u : ''; }
   var D = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'], DL = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'], M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'], ML = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  var EN = !!(window.RGI18N && RGI18N.lang === 'en'), DE = EN ? ' ' : ' de ';
+  if (EN) { D = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; DL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']; ML = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']; }
   function p2(n) { return (n < 10 ? '0' : '') + n; }
   function hhmm(d) { return p2(d.getHours()) + ':' + p2(d.getMinutes()); }
   function localInput(d) { return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + 'T' + hhmm(d); }
@@ -313,7 +317,7 @@ a{color:var(--marca)}
   /* ---------- navegación: historial del navegador y botón «atrás» en todas las pantallas ---------- */
   var depth = 0, fresh = true, backFn = null, inT = 0;
   function nav(url, rep) { history[rep ? 'replaceState' : 'pushState'](null, '', url); if (!rep) depth++; route(); }
-  function route() { fresh = true; app.classList.add('out'); window.scrollTo(0, 0); start(); }
+  function route() { app.removeAttribute('data-raw'); fresh = true; app.classList.add('out'); window.scrollTo(0, 0); start(); }
   function setBack(f) { backFn = f || null; $('#bk').hidden = !backFn; }
   function back(fallback) { return depth > 0 ? function () { history.back(); } : (fallback ? function () { nav(fallback, true); } : null); }
   $('#bk').onclick = function () { if (backFn) backFn(); };
@@ -325,6 +329,7 @@ a{color:var(--marca)}
   var bgEl = $('.bg'), glowEl = $('.bg u');
   window.addEventListener('pointermove', function (ev) { if (ev.pointerType === 'touch') return; bgEl.classList.add('on'); glowEl.style.transform = 'translate(' + ev.clientX + 'px,' + ev.clientY + 'px)'; }, { passive: true });
   document.addEventListener('pointerdown', function (ev) { var b = ev.target.closest && ev.target.closest('.btn'); if (!b || b.disabled || b.classList.contains('txt')) return; var r = b.getBoundingClientRect(), sp = document.createElement('span'); sp.className = 'rip'; sp.style.left = (ev.clientX - r.left) + 'px'; sp.style.top = (ev.clientY - r.top) + 'px'; b.appendChild(sp); setTimeout(function () { sp.remove(); }, 700); }, { passive: true });
+  (function () { var I = window.RGI18N, a = $('#lgSw'), b = $('#unSw'); if (!I) { a.hidden = b.hidden = true; return; } a.textContent = EN ? 'Español' : 'English'; b.textContent = I.mi ? 'km' : (EN ? 'miles' : 'millas'); a.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); I.setLang(EN ? 'es' : 'en'); }; b.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); I.setUnits(I.mi ? 'km' : 'mi'); }; })();
   var libs = {};
   function lib(k) { return libs[k] || (libs[k] = new Promise(function (ok, no) { var s = document.createElement('script'); s.src = LIB[k]; s.onload = ok; s.onerror = function () { libs[k] = null; no(new Error('No se ha podido cargar. Revisa la conexión.')); }; document.head.appendChild(s); })); }
   function coverHtml(u, cls) { var cv = safeUrl(u); return '<div class="cover' + (cls || '') + '"' + (cv ? ' style="background-image:url(&quot;' + esc(cv) + '&quot;)"' : '') + '>' + (cv ? '' : '<img class="sym" src="' + SYM + '" alt="">') + '</div>'; }
@@ -395,7 +400,7 @@ a{color:var(--marca)}
   /* ---------- página pública de un evento ---------- */
   function whenText(e) {
     var d = new Date(e.starts_at), f = e.ends_at ? new Date(e.ends_at) : null, same = f && f.toDateString() === d.toDateString();
-    return { d: d, day: DL[d.getDay()] + ', ' + d.getDate() + ' de ' + ML[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' de ' + d.getFullYear() : ''), hour: hhmm(d) + (f ? (same ? ' – ' + hhmm(f) + ' h' : ' h → ' + D[f.getDay()] + ' ' + f.getDate() + ' ' + M[f.getMonth()] + ', ' + hhmm(f) + ' h') : ' h') };
+    return { d: d, day: DL[d.getDay()] + ', ' + d.getDate() + DE + ML[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? DE + d.getFullYear() : ''), hour: hhmm(d) + (f ? (same ? ' – ' + hhmm(f) + ' h' : ' h → ' + D[f.getDay()] + ' ' + f.getDate() + ' ' + M[f.getMonth()] + ', ' + hhmm(f) + ' h') : ' h') };
   }
   function calStamp(ms) { return new Date(ms).toISOString().replace(/[-:]|\.\d{3}/g, ''); }
   function calData(e) { var end = e.ends_at || e.starts_at + 3 * 36e5, url = location.origin + '/?e=' + e.id; return { s: calStamp(e.starts_at), f: calStamp(end), loc: e.meet_name || '', det: url, url: url }; }
@@ -430,57 +435,64 @@ a{color:var(--marca)}
       else if (e.allow_guests) reg = '<form class="form" id="gf"><label>Nombre y apellidos<input id="gn" required minlength="2" maxlength="60" autocomplete="name"></label><div class="two"><label>Correo<input id="ge" type="email" required maxlength="120" autocomplete="email" value="' + esc(user ? user.email : '') + '"></label><label>Teléfono<input id="gp" type="tel" required minlength="9" maxlength="20" autocomplete="tel"></label></div><label>¿Con qué moto vienes?<input id="gb" required minlength="2" maxlength="80" placeholder="Marca y modelo"></label>' +
         qs.map(function (q, i) {
           var rq = q.required ? ' required' : '', lb = esc(q.label) + (q.required ? '' : ' (opcional)');
-          if (q.type === 'check') return '<label class="chk"><input type="checkbox" data-q="' + i + '"' + rq + '><span>' + esc(q.label) + '</span></label>';
+          if (q.type === 'check') return '<label class="chk"><input type="checkbox" data-q="' + i + '"' + rq + '><span data-raw>' + esc(q.label) + '</span></label>';
           if (q.type === 'select') return '<label>' + lb + '<select data-q="' + i + '"' + rq + '><option value="">Elige…</option>' + (q.options || []).map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select></label>';
           return '<label>' + lb + '<input data-q="' + i + '" maxlength="300"' + rq + '></label>';
         }).join('') +
         '<label class="chk"><input type="checkbox" id="gc"><span>Llevo acompañante (pasajero en mi moto)</span></label>' +
         '<button class="btn pri big" type="submit">' + join + '</button></form>' + (user ? '' : '<p class="small muted" style="margin:0;text-align:center">¿Usas la app de ReGroupRide? <button class="btn txt" id="login" type="button" style="min-height:0">Entrar con mi cuenta</button></p>');
       else if (!user) reg = '<p style="margin:0">Para apuntarte, entra con tu cuenta de ReGroupRide o crea una.</p><button class="btn pri big" id="login" type="button">' + (full ? 'Apuntarme a la lista de espera' : 'Apuntarme') + '</button>';
-      else reg = '<p style="margin:0">Este evento es de la comunidad <b>' + esc(e.community) + '</b>. Para apuntarte tienes que estar en ella: escribe el código de invitación que te han pasado.</p><form class="form" id="jf"><input id="code" required maxlength="12" placeholder="Código de la comunidad" autocomplete="off" style="text-transform:uppercase"><button class="btn pri big" type="submit">Unirme y apuntarme</button></form>';
+      else reg = '<p style="margin:0">Este evento es de la comunidad <b data-raw>' + esc(e.community) + '</b>. Para apuntarte tienes que estar en ella: escribe el código de invitación que te han pasado.</p><form class="form" id="jf"><input id="code" required maxlength="12" placeholder="Código de la comunidad" autocomplete="off" style="text-transform:uppercase"><button class="btn pri big" type="submit">Unirme y apuntarme</button></form>';
       var where = e.meet_name || (e.meet_url || e.meet_lat != null ? 'Punto de salida' : ''), hasLL = e.meet_lat != null && e.meet_lon != null;
       var rurl = /^https?:\/\//i.test(e.route_url || '') ? e.route_url : '', go = safeUrl(e.meet_url) || (hasLL ? 'https://www.google.com/maps/search/?api=1&query=' + e.meet_lat + ',' + e.meet_lon : ''), cal = calData(e);
-      var hd = 'Inscripción' + (e.capacity ? ' · ' + Math.min(taken, e.capacity) + ' de ' + e.capacity + ' plazas' : '') + (e.require_approval ? ' · con aprobación' : '');
-      var faces = e.going ? '<h2>Asistentes</h2><div class="faces">' + (e.faces || []).map(function (f) { return '<i>' + esc(f) + '</i>'; }).join('') + '<span>' + e.going + (e.going === 1 ? ' persona va' : ' personas van') + '</span></div>' + (e.names && e.names.length ? '<p class="muted small">' + esc(e.names.join(', ')) + '</p>' : '') : '';
+      var hd = (EN ? 'Sign-up' : 'Inscripción') + (e.capacity ? ' · ' + Math.min(taken, e.capacity) + ' de ' + e.capacity + ' plazas' : '') + (e.require_approval ? ' · con aprobación' : '');
+      var faces = e.going ? '<h2>Asistentes</h2><div class="faces">' + (e.faces || []).map(function (f) { return '<i data-raw>' + esc(f) + '</i>'; }).join('') + '<span>' + e.going + (e.going === 1 ? ' persona va' : ' personas van') + '</span></div>' + (e.names && e.names.length ? '<p class="muted small" data-raw>' + esc(e.names.join(', ')) + '</p>' : '') : '';
       app.innerHTML = '<div class="ev"><div>' + coverHtml(e.cover_url) +
-        '<div class="host"><span class="av">' + esc((e.community || '?').charAt(0).toUpperCase()) + '</span><div><span class="muted small">Organiza</span><br>' + (e.community_public ? '<a class="t" style="font-weight:700;text-decoration:none" href="/?com=' + e.community_id + '">' + esc(e.community) + '</a>' : '<b class="t">' + esc(e.community) + '</b>') + '</div></div>' +
+        '<div class="host"><span class="av">' + esc((e.community || '?').charAt(0).toUpperCase()) + '</span><div><span class="muted small">Organiza</span><br>' + (e.community_public ? '<a class="t" style="font-weight:700;text-decoration:none" href="/?com=' + e.community_id + '" data-raw>' + esc(e.community) + '</a>' : '<b class="t">' + esc(e.community) + '</b>') + '</div></div>' +
         (e.admin ? '<div class="acts2" style="margin-top:14px"><a class="btn mar" href="/?m=' + e.id + '">Inscritos y llegada</a><a class="btn" href="/?c=' + e.community_id + '&edit=' + e.id + '">Editar evento</a></div>' : '') +
         '<div class="acts2" style="margin-top:14px"><button class="btn" id="share" type="button">Compartir</button><a class="btn" target="_blank" rel="noopener" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(e.title) + '&dates=' + cal.s + '/' + cal.f + '&location=' + encodeURIComponent(cal.loc) + '&details=' + encodeURIComponent(cal.det) + '">Google Calendar</a><button class="btn" id="ics" type="button">Archivo de calendario</button></div></div>' +
-        '<div><h1>' + esc(e.title) + '</h1>' +
+        '<div><h1 data-raw>' + esc(e.title) + '</h1>' +
         '<div class="row"><div class="tile"><small>' + M[w.d.getMonth()] + '</small>' + w.d.getDate() + '</div><div><b>' + w.day + '</b><span>' + w.hour + '</span></div></div>' +
-        (where ? '<div class="row"><div class="tile"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.500C5 14.900 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></svg></div><div><b>' + esc(where) + '</b>' + (go ? '<span><a href="' + esc(go) + '" target="_blank" rel="noopener">Cómo llegar</a></span>' : '<span>Punto de salida</span>') + '</div></div>' : '') +
+        (where ? '<div class="row"><div class="tile"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.500C5 14.900 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></svg></div><div><b data-raw>' + esc(where) + '</b>' + (go ? '<span><a href="' + esc(go) + '" target="_blank" rel="noopener">Cómo llegar</a></span>' : '<span>Punto de salida</span>') + '</div></div>' : '') +
         (e.route_name || rurl ? '<div class="row"><div class="tile"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.500"/><circle cx="18" cy="6" r="2.500"/><path d="M8.500 18H14a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8"/></svg></div><div><b>' + esc(e.route_name || 'Recorrido') + '</b><span>' + (e.route_name ? (e.route_km ? String(e.route_km).replace('.', ',') + ' km · ' : '') + 'la ruta se carga en la app' : '') + (rurl ? (e.route_name ? ' · ' : '') + '<a href="' + esc(rurl) + '" target="_blank" rel="noopener">Ver la ruta en Google Maps</a>' : '') + '</span></div></div>' : '') +
         '<div class="card reg"><div class="hd">' + hd + '</div><div class="bd">' + reg + '<div id="msg" class="msg" hidden></div></div></div>' +
-        (e.description ? '<h2>Acerca del evento</h2><div class="md">' + md(e.description) + '</div>' : '') +
+        (e.description ? '<h2>Acerca del evento</h2><div class="md" data-raw>' + md(e.description) + '</div>' : '') +
         (e.trip ? tripHtml(e) : '') +
-        (where && (hasLL || e.meet_note) ? '<h2>Ubicación</h2><p style="margin:0 0 8px"><b class="t">' + esc(where) + '</b>' + (e.meet_note ? '<br><span class="muted">' + esc(e.meet_note) + '</span>' : '') + '</p>' + (hasLL ? '<iframe class="map" loading="lazy" title="Mapa del punto de salida" src="https://www.openstreetmap.org/export/embed.html?bbox=' + (e.meet_lon - 0.006) + ',' + (e.meet_lat - 0.004) + ',' + (e.meet_lon + 0.006) + ',' + (e.meet_lat + 0.004) + '&layer=mapnik&marker=' + e.meet_lat + ',' + e.meet_lon + '"></iframe>' : '') : '') +
+        (where && (hasLL || e.meet_note) ? '<h2>Ubicación</h2><p style="margin:0 0 8px"><b class="t" data-raw>' + esc(where) + '</b>' + (e.meet_note ? '<br><span class="muted" data-raw>' + esc(e.meet_note) + '</span>' : '') + '</p>' + (hasLL ? '<iframe class="map" loading="lazy" title="Mapa del punto de salida" src="https://www.openstreetmap.org/export/embed.html?bbox=' + (e.meet_lon - 0.006) + ',' + (e.meet_lat - 0.004) + ',' + (e.meet_lon + 0.006) + ',' + (e.meet_lat + 0.004) + '&layer=mapnik&marker=' + e.meet_lat + ',' + e.meet_lon + '"></iframe>' : '') : '') +
         faces +
         '<h2>En la app</h2><p class="muted">Con ReGroupRide ves al grupo en el mapa durante la ruta, avisas de una avería o de que necesitas gasolina y te reenganchas si te quedas atrás.</p><div class="acts2"><a class="btn mar" target="_blank" rel="noopener" href="https://regroupride-app.netlify.app">Abrir ReGroupRide en el navegador</a></div><p class="muted small">Funciona en iPhone, Android y ordenador, sin instalar nada.</p></div></div>';
       var again = function () { eventView(id); }, link = location.origin + '/?e=' + id;
       if ($('#qr')) drawQr($('#qr'), G ? G.code : e.ticket);
       $('#share').onclick = function () { var b = this; if (navigator.share) navigator.share({ title: e.title, url: link }).catch(function () {}); else copy(b, link, 'Enlace del evento'); };
       $('#ics').onclick = function () { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([icsText(e)], { type: 'text/calendar' })); a.download = 'evento.ics'; a.click(); };
-      var set = function (status, bike) {
-        var row = { status: status }; if (bike) row.bike = bike;
+      var set = function (status, bike, answers) {
+        var row = { status: status }; if (bike) row.bike = bike; if (answers) row.answers = answers;
         var q = e.mine ? sb.from('event_attendees').update(row).eq('event_id', id).eq('user_id', user.id).select('status') : sb.from('event_attendees').insert(Object.assign({ event_id: id, user_id: user.id }, row)).select('status');
         return q.then(function (r2) { if (r2.error) throw r2.error; ring(e.community_id, { kind: 'att', eid: id }); again(); });
       };
       if ($('#login')) $('#login').onclick = function () { authView(again, 'Para apuntarte a «' + e.title + '».', again); };
       // miembro de la comunidad: antes de apuntarse dice con qué moto viene y, si falta, su teléfono
+      // las preguntas del organizador, también para los miembros de la comunidad (antes solo las contestaban los invitados)
+      var QF = function (prev) { prev = prev || {}; return qs.map(function (q, i) {
+        var rq = q.required ? ' required' : '', lb = esc(q.label) + (q.required ? '' : ' (opcional)'), v = prev[q.id];
+        if (q.type === 'check') return '<label class="chk"><input type="checkbox" data-q="' + i + '"' + (v === true ? ' checked' : '') + rq + '><span data-raw>' + esc(q.label) + '</span></label>';
+        if (q.type === 'select') return '<label>' + lb + '<select data-q="' + i + '"' + rq + '><option value="">Elige…</option>' + (q.options || []).map(function (o) { return '<option' + (v === o ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select></label>';
+        return '<label>' + lb + '<input data-q="' + i + '" maxlength="300" value="' + esc(typeof v === 'string' ? v : '') + '"' + rq + '></label>';
+      }).join(''); };
       var memberForm = function (after) {
         Promise.all([sb.from('profiles').select('bike_brand,bike_model').eq('id', user.id).maybeSingle(), sb.from('profile_private').select('ride_phone').eq('id', user.id).maybeSingle()]).then(function (r) {
           var p = (r[0] && r[0].data) || {}, ph = ((r[1] && r[1].data) || {}).ride_phone || '', bk = [p.bike_brand, p.bike_model].filter(Boolean).join(' ');
-          $('.reg .bd').innerHTML = '<form class="form" id="mf"><label>¿Con qué moto vienes?<input id="mb" required minlength="2" maxlength="80" placeholder="Marca y modelo" value="' + esc(bk) + '"></label><label>Teléfono<input id="mp" type="tel" required minlength="9" maxlength="20" autocomplete="tel" value="' + esc(ph) + '"><span class="small">Solo lo ven los administradores de la ruta, para llamarte si no apareces a la salida.</span></label><button class="btn pri big" type="submit">Apuntarme</button></form><div id="msg" class="msg" hidden></div>';
+          $('.reg .bd').innerHTML = '<form class="form" id="mf"><label>¿Con qué moto vienes?<input id="mb" required minlength="2" maxlength="80" placeholder="Marca y modelo" value="' + esc(bk) + '"></label><label>Teléfono<input id="mp" type="tel" required minlength="9" maxlength="20" autocomplete="tel" value="' + esc(ph) + '"><span class="small">Solo lo ven los administradores de la ruta, para llamarte si no apareces a la salida.</span></label>' + QF(e.my_answers) + '<button class="btn pri big" type="submit">Apuntarme</button></form><div id="msg" class="msg" hidden></div>';
           $('#mf').onsubmit = function (ev) {
             ev.preventDefault();
-            busy($('#mf button'), function () { var np = $('#mp').value.trim(); return (np !== ph ? sb.from('profile_private').update({ ride_phone: np }).eq('id', user.id).then(function (x) { if (x.error) throw x.error; }) : Promise.resolve()).then(function () { return after($('#mb').value.trim()); }); });
+            busy($('#mf button'), function () { var np = $('#mp').value.trim(); return (np !== ph ? sb.from('profile_private').update({ ride_phone: np }).eq('id', user.id).then(function (x) { if (x.error) throw x.error; }) : Promise.resolve()).then(function () { var ans = null; if (qs.length) { ans = {}; $$('[data-q]', $('#mf')).forEach(function (el) { var q = qs[+el.dataset.q]; ans[q.id] = el.type === 'checkbox' ? el.checked : el.value.trim(); }); } return after($('#mb').value.trim(), ans); }); });
           };
         });
       };
-      if ($('#go')) $('#go').onclick = function () { memberForm(function (bike) { return set('going', bike).then(function () { if (!full) party(); }); }); };
-      if ($('#yes')) $('#yes').onclick = function () { memberForm(function (bike) { return set('going', bike); }); };
+      if ($('#go')) $('#go').onclick = function () { memberForm(function (bike, ans) { return set('going', bike, ans).then(function () { if (!full) party(); }); }); };
+      if ($('#yes')) $('#yes').onclick = function () { memberForm(function (bike, ans) { return set('going', bike, ans); }); };
       if ($('#leave')) $('#leave').onclick = function () { busy(this, function () { return set('no'); }); };
-      if ($('#jf')) $('#jf').onsubmit = function (ev) { ev.preventDefault(); busy($('#jf button'), function () { return rpc('join_community', { p_code: $('#code').value.trim().toUpperCase() }).then(function (cid) { if (cid !== e.community_id) throw new Error('Ese código es de otra comunidad.'); memberForm(function (bike) { return set('going', bike); }); }); }); };
+      if ($('#jf')) $('#jf').onsubmit = function (ev) { ev.preventDefault(); busy($('#jf button'), function () { return rpc('join_community', { p_code: $('#code').value.trim().toUpperCase() }).then(function (cid) { if (cid !== e.community_id) throw new Error('Ese código es de otra comunidad.'); memberForm(function (bike, ans) { return set('going', bike, ans); }); }); }); };
       if ($('#gf')) $('#gf').onsubmit = function (ev) {
         ev.preventDefault();
         busy($('#gf button[type=submit]'), function () {
@@ -501,9 +513,9 @@ a{color:var(--marca)}
       if (!c) { notFound('Comunidad no encontrada'); return; }
       document.title = c.name + ' · ReGroupRide'; setBack(back(user ? '/' : null));
       var now = Date.now(), up = c.events.filter(function (e) { return (e.ends_at || e.starts_at + 4 * 36e5) >= now; }), old = c.events.filter(function (e) { return up.indexOf(e) < 0; }).reverse();
-      var card = function (e) { var d = new Date(e.starts_at), left = e.capacity ? e.capacity - e.taken : null; return '<a class="card item" style="text-decoration:none;color:inherit" href="/?e=' + e.id + '">' + coverHtml(e.cover_url, ' wide') + '<div><span class="muted small">' + D[d.getDay()] + ' ' + d.getDate() + ' ' + M[d.getMonth()] + ' · ' + hhmm(d) + ' h</span><h3>' + esc(e.title) + '</h3><span class="muted small">' + esc(e.meet_name || '') + (left != null && e.starts_at > now ? (e.meet_name ? ' · ' : '') + (left > 0 ? (left === 1 ? 'queda 1 plaza' : 'quedan ' + left + ' plazas') : 'completo, con lista de espera') : '') + '</span></div></a>'; };
+      var card = function (e) { var d = new Date(e.starts_at), left = e.capacity ? e.capacity - e.taken : null; return '<a class="card item" style="text-decoration:none;color:inherit" href="/?e=' + e.id + '">' + coverHtml(e.cover_url, ' wide') + '<div><span class="muted small">' + D[d.getDay()] + ' ' + d.getDate() + ' ' + M[d.getMonth()] + ' · ' + hhmm(d) + ' h</span><h3 data-raw>' + esc(e.title) + '</h3><span class="muted small"><span data-raw>' + esc(e.meet_name || '') + '</span>' + (left != null && e.starts_at > now ? (e.meet_name ? ' · ' : '') + (left > 0 ? (left === 1 ? 'queda 1 plaza' : EN ? left + ' places left' : 'quedan ' + left + ' plazas') : 'completo, con lista de espera') : '') + '</span></div></a>'; };
       var feed = SB_URL.replace(/^https/, 'webcal') + '/functions/v1/ical?c=' + id;
-      app.innerHTML = '<div class="hd1"><span class="host" style="border:0;margin:0;padding:0"><span class="av" style="width:56px;height:56px;font-size:26px">' + esc(c.name.charAt(0).toUpperCase()) + '</span></span><h1>' + esc(c.name) + '</h1></div>' +
+      app.innerHTML = '<div class="hd1"><span class="host" style="border:0;margin:0;padding:0"><span class="av" style="width:56px;height:56px;font-size:26px">' + esc(c.name.charAt(0).toUpperCase()) + '</span></span><h1 data-raw>' + esc(c.name) + '</h1></div>' +
         (c.description ? '<div class="md" style="max-width:720px">' + md(c.description) + '</div>' : '') +
         '<div class="acts2" style="margin:0 0 22px"><a class="btn mar" href="' + feed + '">Suscribirme al calendario</a><button class="btn" id="share" type="button">Compartir</button>' + (c.admin ? '<a class="btn" href="/?c=' + id + '">Gestionar eventos</a>' : '') + '</div>' +
         '<h2>Próximos eventos</h2><div class="list">' + (up.length ? up.map(card).join('') : '<p class="muted">Ahora mismo no hay eventos previstos.</p>') + '</div>' +
@@ -521,7 +533,7 @@ a{color:var(--marca)}
       var n = function (f) { return rows.filter(f).length; }, has = function (s) { return function (x) { return x.status === s; }; };
       document.title = 'Inscritos · ' + e.title;
       setBack(back('/?e=' + id));
-      app.innerHTML = '<p class="muted" style="margin:0">' + esc(e.title) + '</p><div class="hd1"><h1>Inscritos</h1><button class="btn pri" id="scan" type="button">Leer entradas (QR)</button></div>' +
+      app.innerHTML = '<p class="muted" style="margin:0" data-raw>' + esc(e.title) + '</p><div class="hd1"><h1>Inscritos</h1><button class="btn pri" id="scan" type="button">Leer entradas (QR)</button></div>' +
         '<div class="stats"><div><b>' + n(function (x) { return x.status === 'going' || x.status === 'offered'; }) + (e.capacity ? '<span> / ' + e.capacity + '</span>' : '') + '</b><span>Con plaza</span></div><div><b>' + n(has('waiting')) + '</b><span>En espera</span></div><div><b>' + n(has('pending')) + '</b><span>Por aprobar</span></div><div><b>' + n(function (x) { return x.checked_in; }) + '</b><span>Han llegado</span></div></div>' +
         '<div class="acts2" style="margin:0 0 14px"><button class="btn" id="csv" type="button">Descargar lista (CSV)</button><button class="btn" id="cp" type="button">Copiar enlace del evento</button></div>' +
         '<input id="find" placeholder="Buscar por nombre, teléfono o correo" style="margin:0 0 14px"><div id="msg" class="msg" hidden></div><div class="card" style="padding:4px 6px" id="gl"></div>';
@@ -529,11 +541,11 @@ a{color:var(--marca)}
       var list = function () {
         var f = find.toLowerCase(), vis = rows.filter(function (x) { return !f || (x.name + ' ' + (x.phone || '') + ' ' + (x.email || '') + ' ' + (x.bike || '')).toLowerCase().indexOf(f) >= 0; });
         $('#gl').innerHTML = vis.length ? vis.map(function (x) {
-          var i = rows.indexOf(x), ans = x.kind === 'g' ? qs.map(function (q) { var v = (x.answers || {})[q.id]; return v === '' || v == null || v === false ? '' : esc(q.label) + ': ' + (v === true ? 'sí' : esc(v)); }).filter(Boolean).join(' · ') : '', b = '';
+          var i = rows.indexOf(x), ans = true ? qs.map(function (q) { var v = (x.answers || {})[q.id]; return v === '' || v == null || v === false ? '' : esc(q.label) + ': ' + (v === true ? 'sí' : esc(v)); }).filter(Boolean).join(' · ') : '', b = '';
           if (x.status === 'pending') b = '<button class="btn pri" data-a="approve">Aprobar</button><button class="btn" data-a="decline">Rechazar</button>';
           else if (x.status === 'going') b = '<button class="btn' + (x.checked_in ? '' : ' pri') + '" data-a="' + (x.checked_in ? 'uncheck' : 'checkin') + '">' + (x.checked_in ? 'Quitar llegada' : 'Ha llegado') + '</button>' + (x.kind === 'g' ? '<button class="btn del" data-a="remove">Quitar</button>' : '');
           else if (x.kind === 'g') b = (x.status === 'declined' ? '<button class="btn" data-a="approve">Aprobar</button>' : '<button class="btn" data-a="approve">Dar plaza</button><button class="btn del" data-a="remove">Quitar</button>');
-          return '<div class="g" data-i="' + i + '"><div><b>' + esc(x.name) + '</b>' + (x.companion ? '<span class="tag">+1</span>' : '') + '<span class="tag' + (x.status === 'going' ? '' : ' w') + '">' + STN[x.status] + '</span>' + (x.checked_in ? '<span class="tag ok">Ha llegado</span>' : '') + '<span class="tag">' + (x.kind === 'm' ? 'App' : 'Web') + '</span>' +
+          return '<div class="g" data-i="' + i + '"><div><b data-raw>' + esc(x.name) + '</b>' + (x.companion ? '<span class="tag">+1</span>' : '') + '<span class="tag' + (x.status === 'going' ? '' : ' w') + '">' + STN[x.status] + '</span>' + (x.checked_in ? '<span class="tag ok">Ha llegado</span>' : '') + '<span class="tag">' + (x.kind === 'm' ? 'App' : 'Web') + '</span>' +
             '<br><span class="muted small">' + [x.bike ? '<b>' + esc(x.bike) + '</b>' : 'Moto sin indicar', x.phone ? '<a href="tel:' + esc(x.phone) + '">Llamar · ' + esc(x.phone) + '</a>' : 'Sin teléfono', esc(x.email || '')].filter(Boolean).join(' · ') + (ans ? '<br>' + ans : '') + '</span></div><div class="acts2">' + b + '</div></div>';
         }).join('') : '<p class="muted" style="padding:12px">' + (rows.length ? 'Nadie coincide con la búsqueda.' : 'Todavía no se ha apuntado nadie.') + '</p>';
         $$('#gl [data-a]').forEach(function (bt) {
@@ -597,7 +609,7 @@ a{color:var(--marca)}
     var c = com(); setBack(null);
     if (!c) { app.innerHTML = '<div class="auth card"><h1>Aún no estás en ninguna comunidad</h1><p class="muted">Crea tu comunidad o únete a una desde la app de ReGroupRide (pestaña Comunidad). Después podrás crear sus eventos aquí.</p></div>'; return; }
     app.innerHTML = '<div class="hd1"><h1>Eventos</h1><a class="btn" href="/?com=' + c.id + '">Página pública</a>' + (c.admin ? '<button class="btn pri" id="new" type="button">+ Crear evento</button>' : '') + '</div>' +
-      (S.coms.length > 1 ? '<div class="coms">' + S.coms.map(function (x) { return '<button type="button" data-c="' + x.id + '" aria-pressed="' + (x.id === c.id) + '">' + esc(x.name) + '</button>'; }).join('') + '</div>' : '<p class="muted" style="margin-top:-8px">' + esc(c.name) + '</p>') +
+      (S.coms.length > 1 ? '<div class="coms">' + S.coms.map(function (x) { return '<button type="button" data-c="' + x.id + '" aria-pressed="' + (x.id === c.id) + '" data-raw>' + esc(x.name) + '</button>'; }).join('') + '</div>' : '<p class="muted" style="margin-top:-8px" data-raw>' + esc(c.name) + '</p>') +
       (c.admin ? '' : '<p class="msg">En esta comunidad no eres administrador: puedes ver los eventos y apuntarte, pero no crearlos.</p>') +
       '<div id="msg" class="msg" hidden></div><div class="list" id="list"><p class="muted">Cargando…</p></div>';
     $$('.coms button').forEach(function (b) { b.onclick = function () { S.cid = b.dataset.c; fresh = true; panel(); }; });
@@ -609,8 +621,8 @@ a{color:var(--marca)}
       $('#list').innerHTML = evs.length ? evs.map(function (e) {
         var d = new Date(e.starts_at);
         return '<div class="card item" data-id="' + e.id + '">' + coverHtml(e.cover_url, ' wide') + '<div>' +
-          '<span class="muted small">' + D[d.getDay()] + ' ' + d.getDate() + ' ' + M[d.getMonth()] + ' ' + d.getFullYear() + ' · ' + hhmm(d) + (d.getTime() < now ? ' · pasado' : '') + '</span><h3>' + esc(e.title) + '</h3>' +
-          '<span class="muted small">' + [e.capacity ? e.capacity + ' plazas' : 'Sin límite de plazas', e.meet_name ? esc(e.meet_name) : '', e.listed === false ? 'oculto en la página pública' : '', e.open_reg === false ? 'inscripciones cerradas' : ''].filter(Boolean).join(' · ') + '</span>' +
+          '<span class="muted small">' + D[d.getDay()] + ' ' + d.getDate() + ' ' + M[d.getMonth()] + ' ' + d.getFullYear() + ' · ' + hhmm(d) + (d.getTime() < now ? ' · pasado' : '') + '</span><h3 data-raw>' + esc(e.title) + '</h3>' +
+          '<span class="muted small">' + [e.capacity ? e.capacity + ' plazas' : 'Sin límite de plazas', e.meet_name ? '<span data-raw>' + esc(e.meet_name) + '</span>' : '', e.listed === false ? 'oculto en la página pública' : '', e.open_reg === false ? 'inscripciones cerradas' : ''].filter(Boolean).join(' · ') + '</span>' +
           '<div class="acts"><a class="btn" href="/?e=' + e.id + '">Ver página</a><button class="btn" data-a="copy" type="button">Copiar enlace</button>' + (c.admin ? '<a class="btn" href="/?m=' + e.id + '">Inscritos</a><button class="btn" data-a="edit" type="button">Editar</button>' : '') + '</div></div></div>';
       }).join('') : '<div class="card"><b class="t">Todavía no hay eventos</b><p class="muted" style="margin:6px 0 0">' + (c.admin ? 'Crea el primero con «Crear evento». Aparecerá también en la app, y a los miembros les llegará el aviso.' : 'Cuando un administrador cree uno, aparecerá aquí y en la app.') + '</p></div>';
       $$('.item').forEach(function (it) {
@@ -724,8 +736,8 @@ a{color:var(--marca)}
         '<p class="muted small" style="margin:0">' + [d.start ? 'Salida ' + esc(d.start) : '', num(d.km) ? Math.round(num(d.km)) + ' km' : '', d.from ? 'desde ' + esc(d.from) : ''].filter(Boolean).join(' · ') + '</p>' +
         (d.route_name ? '<p class="small" style="margin:0"><b>Ruta:</b> ' + esc(d.route_name) + (num(d.route_km) ? ' · ' + String(d.route_km).replace('.', ',') + ' km' : '') + ' (se sigue desde la app)</p>' : '') +
         (ok(d.route_url) ? '<a class="btn" href="' + esc(d.route_url) + '" target="_blank" rel="noopener">Ver la ruta</a>' : '') +
-        ((d.stops || []).length ? '<ul class="tstops">' + d.stops.map(function (p) { return '<li><time>' + esc(p.time || '') + '</time><span>' + esc(p.name) + '</span>' + (ok(p.url) ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">Mapa</a>' : '') + '</li>'; }).join('') + '</ul>' : '') +
-        (st.name ? '<div class="tstay"><span class="small muted">Dónde dormimos · ' + (KIND[st.kind] || 'Alojamiento') + '</span><b>' + esc(st.name) + '</b>' + (st.address ? '<span class="muted small">' + esc(st.address) + '</span>' : '') + '<span class="small">' + [num(st.price) ? eur(st.price) + ' por persona' : '', st.checkin ? 'entrada ' + esc(st.checkin) : '', st.parking ? 'parking para motos' : ''].filter(Boolean).join(' · ') + '</span>' + (st.note ? '<span class="small">' + esc(st.note) + '</span>' : '') + (ok(st.url) ? '<a href="' + esc(st.url) + '" target="_blank" rel="noopener">Ver alojamiento</a>' : '') + '</div>' : '') + '</div>';
+        ((d.stops || []).length ? '<ul class="tstops">' + d.stops.map(function (p) { return '<li><time>' + esc(p.time || '') + '</time><span data-raw>' + esc(p.name) + '</span>' + (ok(p.url) ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">Mapa</a>' : '') + '</li>'; }).join('') + '</ul>' : '') +
+        (st.name ? '<div class="tstay"><span class="small muted">Dónde dormimos · ' + (KIND[st.kind] || 'Alojamiento') + '</span><b data-raw>' + esc(st.name) + '</b>' + (st.address ? '<span class="muted small" data-raw>' + esc(st.address) + '</span>' : '') + '<span class="small">' + [num(st.price) ? eur(st.price) + ' por persona' : '', st.checkin ? 'entrada ' + esc(st.checkin) : '', st.parking ? 'parking para motos' : ''].filter(Boolean).join(' · ') + '</span>' + (st.note ? '<span class="small">' + esc(st.note) + '</span>' : '') + (ok(st.url) ? '<a href="' + esc(st.url) + '" target="_blank" rel="noopener">Ver alojamiento</a>' : '') + '</div>' : '') + '</div>';
     }).join('') +
       (nights || bud.length ? '<h2>Gastos previstos</h2><div class="card"><div class="kv">' + (nights ? '<span>Alojamiento</span><b>' + eur(nights) + '</b>' : '') + bud.map(function (b) { return '<span>' + esc(b.label) + (b.per === 'g' ? ' (a repartir)' : '') + '</span><b>' + eur(b.per === 'g' ? num(b.amount) / n : b.amount) + '</b>'; }).join('') + '<span><b>Total aproximado por persona</b></span><b>' + eur(per) + '</b></div>' + (num(t.deposit) ? '<p class="muted small" style="margin:10px 0 0">Señal por adelantado: ' + eur(t.deposit) + ' por persona, que se entrega al organizador.</p>' : '') + '</div>' : '') +
       (list.length ? '<h2>Qué llevar</h2><div class="card"><ul style="margin:0;padding-left:20px">' + list.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>' : '');
@@ -763,7 +775,7 @@ a{color:var(--marca)}
   /* ---------- panel del creador: resumen, comentarios, cuentas, comunidades y códigos ---------- */
   var DV = { tab: 'resumen', f: { fb: 'pend', us: 'all', co: 'all' }, q: '', d: null };
   function devView() {
-    setBack(back('/'));
+    setBack(back('/')); app.setAttribute('data-raw', '');
     if (!DV.d) app.innerHTML = '<p class="muted">Cargando…</p>';
     Promise.all([rpc('dev_stats'), rpc('dev_feedback'), rpc('dev_users'), rpc('dev_communities'), rpc('dev_codes'), rpc('dev_blocks').catch(function () { return []; }), rpc('dev_reports').catch(function () { return []; })]).then(function (r) { DV.d = { s: r[0], fb: r[1], us: r[2], co: r[3], cd: r[4], bl: r[5] || [], rp: r[6] || [] }; drawDev(); }, function (e) {
       app.innerHTML = '<div class="auth card"><h1>Panel del creador</h1><p class="msg bad">' + esc(/Solo el creador/.test(e.message || '') ? 'Esta página es solo para el creador de ReGroupRide.' : err(e)) + '</p><a class="btn" href="/">Ir al inicio</a></div>';

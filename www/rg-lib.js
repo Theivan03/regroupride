@@ -282,6 +282,18 @@ var RGLib = (function () {
     return { off: pr.d, along: along, lat: pt[1], lon: pt[0], finished: line.total - along < 150 };
   }
 
+  // Reengancharse al GRUPO: si el grupo va por delante, no se vuelve al punto más cercano de la ruta (llegarías por detrás y
+  // seguirías persiguiéndolo), sino a un punto por delante de donde va ahora: mientras tú llegas, ellos avanzan.
+  // groupAlong: metros de ruta que lleva el grupo (la mediana de sus miembros). Devuelve null si no hay nada que ganar.
+  function rejoinGroup(p, line, progress, groupAlong) {
+    var base = rejoinTarget(p, line, progress);
+    if (groupAlong == null || !(groupAlong > base.along + 800)) return null;
+    var gp = pointAt(line, Math.min(line.total, groupAlong)), toGroup = dist(p.lat, p.lon, gp[1], gp[0]);
+    var lead = Math.min(8000, Math.max(1000, toGroup * 0.7));
+    var along = Math.min(line.total, groupAlong + lead), pt = pointAt(line, along);
+    return { off: base.off, along: along, lat: pt[1], lon: pt[0], finished: line.total - along < 150, group: true };
+  }
+
   /* ---- indicaciones de giro (a partir de las maniobras de OSRM) ---- */
   var MOD = { 'uturn': 'da la vuelta', 'sharp right': 'giro cerrado a la derecha', 'right': 'gira a la derecha', 'slight right': 'mantente a la derecha',
     'straight': 'sigue recto', 'slight left': 'mantente a la izquierda', 'left': 'gira a la izquierda', 'sharp left': 'giro cerrado a la izquierda' };
@@ -479,6 +491,6 @@ var RGLib = (function () {
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
 
   return { dist: dist, findMapsUrl: findMapsUrl, parseMapsUrl: parseMapsUrl, parseMapsPoint: parseMapsPoint, mapsPointUrl: mapsPointUrl, isShortLink: isShortLink, extractUrl: extractUrl, makeLine: makeLine, project: project, pointAt: pointAt,
-    rejoinTarget: rejoinTarget, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, poiKind: poiKind, stopKind: stopKind, stopSteps: stopSteps, navSteps: navSteps, LEVELS: LEVELS, LEVEL_HINT: LEVEL_HINT, paceScore: paceScore, riderScore: riderScore, levelAdvice: levelAdvice, makeGroups: makeGroups, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
+    rejoinTarget: rejoinTarget, rejoinGroup: rejoinGroup, mapsLegs: mapsLegs, planToGpx: planToGpx, rankGroup: rankGroup, stepsFromOsrm: stepsFromOsrm, gpxToPlan: gpxToPlan, poiKind: poiKind, stopKind: stopKind, stopSteps: stopSteps, navSteps: navSteps, LEVELS: LEVELS, LEVEL_HINT: LEVEL_HINT, paceScore: paceScore, riderScore: riderScore, levelAdvice: levelAdvice, makeGroups: makeGroups, viaPoints: viaPoints, trackSteps: trackSteps, placeSteps: placeSteps, fmtDist: fmtDist, spokenDist: spokenDist, Tracker: Tracker, cap: cap };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = RGLib;

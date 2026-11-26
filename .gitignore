@@ -16,3 +16,6 @@ ios/App/App.xcodeproj/xcuserdata/
 ios/DerivedData/
 .DS_Store
 !android/debug.keystore
+# copias que hace el flujo web.yml al publicar
+web/rg-i18n.js
+web/rg-i18n-en.js

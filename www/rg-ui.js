@@ -15,7 +15,6 @@
   function group() { return window.RGGroup && RGGroup.state && RGGroup.state.s ? RGGroup.state.s : null; }
   function contacts() { return window.RGSolo ? RGSolo.contacts() : []; }
   function soloOn() { return !!(window.RGSolo && RGSolo.state.on); }
-  function km1(v) { return String(Math.round(v * 10) / 10).replace('.', ','); }
   var UI = { tripMode: false };
 
   /* ---------- aviso breve con «Deshacer» ---------- */
@@ -424,6 +423,37 @@
   document.addEventListener('click', function () {                      // después de que la pestaña haya hecho lo suyo, en el mismo instante
     var t = TAB; if (t && !t.done && (t.waiting || tabSig(t) !== t.sig)) tabGo(t, false);
   });
+  /* Deslizar para borrar (Rutas › Hechas y Planeadas): se arrastra la fila hacia la izquierda; al soltarla pasada la mitad del botón
+     se quita de la lista y sale «Deshacer» durante 5 segundos. Solo entonces se borra de verdad. */
+  (function () {
+    var host = $('#view-rides'); if (!host) return;
+    var row = null, x0 = 0, y0 = 0, dx = 0, lock = null, pending = null;
+    var flush = function () { if (!pending) return; var p = pending; pending = null; clearTimeout(p.t); (p.kind === 'ride' ? A.removeRide(p.id) : A.removePlan(p.id)).catch(function () {}); };
+    host.addEventListener('touchstart', function (ev) {
+      var r = ev.target.closest('[data-ride],[data-plan]'); if (!r || ev.touches.length !== 1) return;
+      row = r; x0 = ev.touches[0].clientX; y0 = ev.touches[0].clientY; dx = 0; lock = null; row.style.transition = 'none';
+    }, { passive: true });
+    host.addEventListener('touchmove', function (ev) {
+      if (!row) return; var t = ev.touches[0], ax = t.clientX - x0, ay = t.clientY - y0;
+      if (lock == null) { if (Math.abs(ax) < 8 && Math.abs(ay) < 8) return; lock = Math.abs(ax) > Math.abs(ay) * 1.3 && ax < 0 ? 'x' : 'y'; if (lock === 'x') row.classList.add('as-swiping'); }
+      if (lock !== 'x') return;
+      dx = Math.min(0, ax); row.style.transform = 'translateX(' + dx + 'px)'; row.classList.toggle('as-swipe-go', dx < -110);
+    }, { passive: true });
+    var end = function () {
+      if (!row) return; var r = row, go = lock === 'x' && dx < -110; row = null;
+      r.style.transition = 'transform .2s ease-out, opacity .2s linear';
+      if (!go) { r.style.transform = ''; setTimeout(function () { r.classList.remove('as-swiping', 'as-swipe-go'); r.style.transition = ''; }, 220); if (lock === 'x') r.addEventListener('click', function stop(e) { e.stopPropagation(); e.preventDefault(); r.removeEventListener('click', stop, true); }, true); return; }
+      flush();                                              // si había otra pendiente, se borra ya
+      r.style.transform = 'translateX(-110%)'; r.style.opacity = '0';
+      var kind = r.dataset.ride ? 'ride' : 'plan', id = r.dataset.ride || r.dataset.plan;
+      setTimeout(function () { r.hidden = true; }, 210);
+      pending = { kind: kind, id: kind === 'ride' ? +id : id, t: setTimeout(flush, 5200) };
+      snack(kind === 'ride' ? 'Ruta borrada' : 'Ruta planeada borrada', 'Deshacer', function () { if (!pending) return; clearTimeout(pending.t); pending = null; r.hidden = false; r.style.opacity = ''; r.style.transform = ''; r.classList.remove('as-swiping', 'as-swipe-go'); }, 5000);
+    };
+    host.addEventListener('touchend', end); host.addEventListener('touchcancel', end);
+    document.addEventListener('rg:view', flush); window.addEventListener('pagehide', flush);
+  })();
+
   window.RGUI = UI;
   UI.beforeStart = beforeStart; UI.who = who; UI.near = near; UI.snack = snack; UI.draw = draw; UI.sync = sync; UI.ruTab = ruTab; UI.yo = yo;
   sync();

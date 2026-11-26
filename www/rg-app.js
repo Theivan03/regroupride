@@ -133,13 +133,21 @@
     var p = plan(); if (!p || !nav.tr || nav.rejoinBusy) return;
     var going = nav.toStart && !nav.tr.state.started;      // aún de camino a la salida
     var t = going ? { lat: p.coords[0][1], lon: p.coords[0][0], off: L.dist(fix.lat, fix.lon, p.coords[0][1], p.coords[0][0]) } : L.rejoinTarget(fix, nav.tr.line, nav.tr.state.along);
+    // en grupo y con el grupo por delante: se apunta por delante de ellos
+    var toGroup = false;
+    if (!going && window.RGGroup && RGGroup.state && RGGroup.state.s && L.rejoinGroup) {
+      var gs = RGGroup.state, nowG = Date.now() + (gs.skew || 0), meId = user ? user.id : '';
+      var al = (gs.rows || []).filter(function (r) { return r.user_id !== meId && r.along != null && nowG - r.at < 90000; }).map(function (r) { return r.along; }).sort(function (x, y) { return x - y; });
+      var tg = al.length ? L.rejoinGroup(fix, nav.tr.line, nav.tr.state.along, al[Math.floor(al.length / 2)]) : null;
+      if (tg) { t = tg; toGroup = true; }
+    }
     nav.rejoinAt = Date.now(); nav.rejoinBusy = true;
     var straight = function () { return { coords: [[fix.lon, fix.lat], [t.lon, t.lat]], steps: [], dist: t.off }; };
     var url = 'https://router.project-osrm.org/route/v1/driving/' + fix.lon.toFixed(5) + ',' + fix.lat.toFixed(5) + ';' + t.lon.toFixed(5) + ',' + t.lat.toFixed(5) + '?overview=full&geometries=geojson&steps=true';
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctrl) setTimeout(function () { ctrl.abort(); }, 8000);
     var job = (navigator.onLine === false) ? Promise.resolve(straight()) : fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { return r.json(); }).then(function (j) {
       if (!j.routes || !j.routes[0]) throw new Error('sin ruta');
-      var st = L.stepsFromOsrm(j.routes[0]); if (st.length && st[st.length - 1].icon === 'arrive') st[st.length - 1].text = going ? 'llegas al punto de salida' : 'vuelves a la ruta';
+      var st = L.stepsFromOsrm(j.routes[0]); if (st.length && st[st.length - 1].icon === 'arrive') st[st.length - 1].text = going ? 'llegas al punto de salida' : toGroup ? 'vuelves a la ruta, por delante del grupo' : 'vuelves a la ruta';
       return { coords: j.routes[0].geometry.coordinates, steps: st, dist: j.routes[0].distance };
     }).catch(straight);
     job.then(function (x) {
@@ -148,7 +156,8 @@
       var tr = L.Tracker(x.coords, x.steps, { offDist: 70 });
       nav.rejoin = { coords: x.coords, tr: tr, dist: x.dist, last: tr.update(fix, Date.now()) };
       drawRejoin(); renderBanner(nav.last);
-      if (!announce && nav.last && !nav.last.started) say((going ? 'Te llevo al punto de salida. ' : 'Te llevo a la ruta. ') + L.cap(L.spokenDist(x.dist)) + '.');
+      if (!announce && nav.last && !nav.last.started) if (toGroup && !announce) A.toast('Te llevo a la ruta por delante del grupo.', 'ok');
+      if (!announce && nav.last && !nav.last.started) say((going ? 'Te llevo al punto de salida. ' : toGroup ? 'Te llevo a la ruta, por delante del grupo. ' : 'Te llevo a la ruta. ') + L.cap(L.spokenDist(x.dist)) + '.');
     });
   }
   function drawRejoin() {
@@ -615,6 +624,7 @@
   // La cuenta es obligatoria: sin sesión, la pantalla de entrada no se puede cerrar. (Las pruebas automáticas siguen pudiendo entrar sin cuenta.)
   var MUST = !navigator.webdriver; try { if (localStorage.getItem('rg.test.wall')) MUST = true; } catch (e) {}
   function openAuth(first, mode0) {
+    try { if (localStorage.getItem('rg.bye')) { localStorage.removeItem('rg.bye'); setTimeout(function () { A.toast('Tu cuenta se ha eliminado. Gracias por rodar con nosotros.', 'ok'); }, 900); } } catch (e) {}
     if (first && MUST && !user) document.documentElement.classList.add('rg-gate');
     var mode = mode0 || (first ? 'signup' : 'login');
     try { if (localStorage.getItem('rg.auth.mode') === 'signup') { mode = 'signup'; localStorage.removeItem('rg.auth.mode'); } } catch (e) {}
@@ -747,6 +757,48 @@
     };
     if (btn) busy(btn, job); else job();
   }
+  // Eliminar la cuenta: explica qué se borra, pide escribir ELIMINAR y lo hace el servidor. Si administras tú solo una comunidad
+  // con más gente, no deja: antes hay que nombrar a otro administrador (o borrar la comunidad).
+  function openDelete() {
+    if (!user) return;
+    sheet('<div class="head" data-full><h1>Eliminar mi cuenta</h1><button class="btn small icon" id="rgClose" type="button" title="Cerrar"><svg><use href="#i-close"/></svg></button></div>' +
+      '<div class="as-card"><p style="margin:0"><b>Esto no se puede deshacer.</b> Se borran para siempre:</p><ul class="rg-dellist"><li>tu perfil, tu foto y tu teléfono;</li><li>tus contactos de emergencia y tus enlaces de seguimiento;</li><li>tus inscripciones, tus mensajes en los chats y tus fotos;</li><li>las rutas que has publicado y tu copia en la cuenta;</li><li>lo que hay guardado en este teléfono (rutas, moto, gastos).</li></ul><p class="muted rg-small" style="text-align:left;margin:0">Las comunidades en las que solo estás tú se borran contigo. Si administras tú solo una comunidad con más gente, antes tienes que nombrar a otro administrador.</p></div>' +
+      '<div id="rgDelBlock"></div>' +
+      '<form class="rg-form" id="rgDelForm"><label>Para confirmar, escribe ELIMINAR<input id="rgDelWord" data-raw autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="' + (window.RGI18N && RGI18N.lang === 'en' ? 'DELETE' : 'ELIMINAR') + '"></label>' +
+      '<button class="btn big danger" type="submit">Eliminar mi cuenta para siempre</button><button class="btn big" id="rgDelNo" type="button">Cancelar</button></form>', 'full');
+    $('#rgClose').addEventListener('click', closeSheet); $('#rgDelNo').addEventListener('click', closeSheet);
+    $('#rgDelForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      if (!/^(ELIMINAR|DELETE)$/.test($('#rgDelWord').value.trim().toUpperCase())) { A.toast('Escribe ELIMINAR para confirmar.', 'warn'); return; }
+      var uid = user.id;
+      busy(ev.target.querySelector('button[type=submit]'), function () {
+        // lo que hay en el almacén (trazados y fotos de las rutas, foto de perfil) no se borra solo con la cuenta: se vacía antes
+        var purge = function (bucket, dir, deep) {
+          return sb.storage.from(bucket).list(dir, { limit: 1000 }).then(function (l) {
+            var it = (l && l.data) || [], files = it.filter(function (f) { return f.id; }).map(function (f) { return dir + '/' + f.name; }), dirs = it.filter(function (f) { return !f.id; });
+            return (files.length ? sb.storage.from(bucket).remove(files) : Promise.resolve()).then(function () { return deep > 0 ? Promise.all(dirs.map(function (f) { return purge(bucket, dir + '/' + f.name, deep - 1); })) : null; });
+          }).catch(function () {});
+        };
+        return sb.rpc('delete_my_account_blocked').then(function (c) {
+          if (!c.error && (c.data || []).length) return { data: { ok: false, blocked: c.data } };
+          return Promise.all([purge('rides', uid, 2), purge('avatars', uid, 0)]).then(function () { return sb.rpc('delete_my_account'); });
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          var d = r.data || {};
+          if (!d.ok) {
+            var box = $('#rgDelBlock'); if (box) { box.innerHTML = '<div class="notice bad" style="text-align:left"><b>Antes nombra a otro administrador</b><br>Eres el único administrador de: ' + (d.blocked || []).map(esc).join(', ') + '. Entra en Comunidad › Info › Gente, toca «···» en un miembro y elige «Hacer admin». Después vuelve aquí.</div>'; box.scrollIntoView({ block: 'center' }); }
+            return;
+          }
+          // la cuenta ya no existe: se limpia el teléfono y se vuelve a la pantalla de entrada
+          try { var RAp = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.RideAlerts; if (RAp && RAp.eventClear) RAp.eventClear().catch(function () {}); } catch (e) {}
+          return sb.auth.signOut({ scope: 'local' }).then(function () {}, function () {}).then(function () { return Sy ? Sy.wipeLocal() : null; }).then(function () {}, function () {}).then(function () {
+            try { Object.keys(localStorage).forEach(function (k) { if (/^rg\./.test(k) && !/^rg\.(lang|units|theme)$/.test(k)) localStorage.removeItem(k); }); localStorage.setItem('rg.wall', '1'); localStorage.setItem('rg.bye', '1'); } catch (e) {}
+            location.reload();
+          });
+        });
+      });
+    });
+  }
   function openPhone() {
     if (!user) { openAuth(false); return; }
     sb.from('profile_private').select('*').eq('id', user.id).maybeSingle().then(function (r) {
@@ -778,7 +830,9 @@
       var name = (profile && profile.name) || (user.user_metadata && user.user_metadata.name) || 'Tu cuenta';
       box.innerHTML = '<div class="rg-acc"><span class="rg-ava">' + (profile && /^https:\/\//.test(profile.avatar_url || '') ? '<img src="' + esc(profile.avatar_url) + '" alt="">' : esc(name.charAt(0).toUpperCase())) + '</span><div><b>' + esc(name) + '</b><span class="muted">' + esc(user.email || '') + '</span></div></div>' +
         '<button class="rg-level" id="rgPhone" type="button"><span>' + (ridePhone ? esc(ridePhone) : 'Teléfono para las rutas') + '</span><small>' + (ridePhone ? 'Teléfono para las rutas · tocar para cambiarlo' : 'Falta tu teléfono · para que puedan llamarte en una ruta') + '</small></button>' +
-        '<div class="rg-row"><button class="btn small" id="rgFeedback" type="button"><svg><use href="#i-info"/></svg>Sugerencias y fallos</button><button class="btn small" id="rgOut" type="button"><svg><use href="#i-exit"/></svg>Cerrar sesión</button></div>';
+        '<div class="rg-row"><button class="btn small" id="rgFeedback" type="button"><svg><use href="#i-info"/></svg>Sugerencias y fallos</button><button class="btn small" id="rgOut" type="button"><svg><use href="#i-exit"/></svg>Cerrar sesión</button></div>' +
+        '<button class="as-link rg-del" id="rgDelete" type="button">Eliminar mi cuenta</button>';
+      $('#rgDelete').addEventListener('click', openDelete);
       $('#rgPhone').addEventListener('click', openPhone);
       $('#rgOut').addEventListener('click', function (ev) { signOut(false, ev.currentTarget); });
     } else {
@@ -802,9 +856,25 @@
       '<div class="seg rg-wide" id="rgKind"><button type="button" data-k="fallo" aria-pressed="true">Algo falla</button><button type="button" data-k="mejora" aria-pressed="false">Una mejora</button></div>' +
       '<div class="rg-form"><label>¿Qué ha pasado o qué propones?<textarea id="rgMsg" class="note" maxlength="4000" placeholder="Cuanto más concreto, mejor: qué pantalla, qué tocaste, qué esperabas…"></textarea></label>' +
       '<button class="btn big primary" id="rgSend" type="button">Enviar</button></div>' +
-      '<span class="label">Lo que has enviado</span><div id="rgMine" class="rg-list"><p class="muted rg-load">Cargando…</p></div>');
+      '<p class="muted rg-small" id="rgPubNote" hidden style="text-align:left;margin:0">Las mejoras las ven los demás moteros, sin tu nombre, para que puedan votarlas. Los fallos solo los veo yo.</p>' +
+      '<span class="label">Lo que has enviado</span><div id="rgMine" class="rg-list"><p class="muted rg-load">Cargando…</p></div>' +
+      '<span class="label">Lo que pide la gente</span><p class="muted rg-small" style="text-align:left;margin:0">Vota las mejoras que más te interesen: las más votadas van primero.</p><div id="rgBoard" class="as-rows rg-board"><p class="muted rg-load">Cargando…</p></div>', 'full');
     $('#rgClose').addEventListener('click', closeSheet);
-    s.querySelectorAll('#rgKind button').forEach(function (b) { b.addEventListener('click', function () { kind = b.dataset.k; s.querySelectorAll('#rgKind button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
+    s.querySelectorAll('#rgKind button').forEach(function (b) { b.addEventListener('click', function () { kind = b.dataset.k; s.querySelectorAll('#rgKind button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); $('#rgPubNote').hidden = kind !== 'mejora'; }); });
+    function board() {
+      sb.rpc('feedback_board').then(function (r) {
+        var box = $('#rgBoard'); if (!box) return;
+        if (r.error) { box.innerHTML = '<p class="muted">' + esc(msg(r.error)) + '</p>'; return; }
+        var rows = r.data || [];
+        box.innerHTML = rows.length ? rows.map(function (f) {
+          return '<div class="rg-vote"><button class="btn rg-votebtn" type="button" data-v="' + f.id + '" aria-pressed="' + !!f.mine + '" title="Votar"><svg><use href="#i-up"/></svg><b>' + f.votes + '</b></button><span><span data-raw>' + esc(f.text) + '</span>' + (f.status === 'hecho' ? '<small class="ok">Hecho</small>' : f.status === 'en curso' ? '<small>En curso</small>' : '') + (f.own ? '<small>La propusiste tú</small>' : '') + '</span></div>';
+        }).join('') : '<p class="muted">Todavía no hay mejoras propuestas. Sé el primero.</p>';
+        box.querySelectorAll('[data-v]').forEach(function (b) { b.addEventListener('click', function () {
+          b.disabled = true;
+          sb.rpc('feedback_vote', { p_id: b.dataset.v }).then(function (q) { b.disabled = false; if (q.error) { A.toast(msg(q.error), 'warn'); return; } b.setAttribute('aria-pressed', String(!!q.data.mine)); b.querySelector('b').textContent = q.data.votes; });
+        }); });
+      });
+    }
     function load() {
       sb.from('feedback').select('id,kind,message,status,admin_note,created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(30).then(function (r) {
         var box = $('#rgMine'); if (!box) return;
@@ -817,12 +887,12 @@
     $('#rgSend').addEventListener('click', function (ev) {
       var text = $('#rgMsg').value.trim(); if (text.length < 3) { A.toast('Escribe un poco más.', 'warn'); return; }
       busy(ev.currentTarget, function () {
-        return deviceInfo().then(function (d) { return sb.from('feedback').insert({ kind: kind, message: text, device: d, app_version: d.app_version }); }).then(function (r) {
-          if (r.error) throw r.error; $('#rgMsg').value = ''; A.toast('Enviado. ¡Gracias!', 'ok'); load();
+        return deviceInfo().then(function (d) { var row = { kind: kind, message: text, device: d, app_version: d.app_version }; if (kind === 'mejora') row.public = true; return sb.from('feedback').insert(row); }).then(function (r) {
+          if (r.error) throw r.error; $('#rgMsg').value = ''; A.toast('Enviado. ¡Gracias!', 'ok'); load(); board();
         });
       });
     });
-    load();
+    load(); board();
   }
 
   /* ================= pantalla de ruta: poco intrusiva ================= */
@@ -983,7 +1053,24 @@
   });
   if (sb) sb.auth.onAuthStateChange(function (ev, session) { var had = !!user; user = (session && session.user) || null; if (had !== !!user) renderAccount(); if (MUST && had && !user && $('#rgSheet').hidden) openAuth(true, 'login'); });
   sync();
+  /* Registro de errores: lo que falla en un móvil llega al panel del creador con la versión, la pantalla y el modelo.
+     Sin datos personales en el texto; un mismo error se manda una vez por sesión y como mucho 15 por sesión. */
+  var errSeen = {}, errN = 0, NOISE = /ResizeObserver loop|Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The user aborted|cancell?ed|timeout|sin conexi/i;
+  function logError(m, src, stack) {
+    try {
+      m = String(m || '').slice(0, 300); if (!sb || !m || NOISE.test(m) || errN >= 15) return;
+      var key = m + '|' + (src || ''); if (errSeen[key]) return; errSeen[key] = 1; errN++;
+      var cap = window.Capacitor, plat = cap && cap.getPlatform ? cap.getPlatform() : 'web';
+      sb.rpc('log_client_error', { p_message: m, p_source: String(src || '').replace(/^https?:\/\/[^/]+\//, '').slice(0, 200), p_stack: String(stack || '').replace(/https?:\/\/[^/\s)]+\//g, '').slice(0, 1500),
+        p_view: (A && A.view ? A.view() : '') + (pageOpenTitle() ? ' › ' + pageOpenTitle() : ''), p_version: (A && A.version) || '', p_platform: plat, p_device: navigator.userAgent.replace(/^Mozilla\/5\.0 \(/, '').slice(0, 120) }).then(function () {}, function () {});
+    } catch (e) {}
+  }
+  function pageOpenTitle() { var p = $('#rgPage'); return p && !p.hidden ? String(p.dataset.t || '').slice(0, 24) : ''; }
+  window.addEventListener('error', function (e) { if (e && (e.message || e.error)) logError(e.message || e.error, (e.filename || '') + (e.lineno ? ':' + e.lineno + ':' + (e.colno || 0) : ''), e.error && e.error.stack); });
+  window.addEventListener('unhandledrejection', function (e) { var r = e && e.reason; if (r) logError('Promesa: ' + (r.message || r), '', r.stack); });
+  (window.__rgErrs || []).forEach(function (x) { logError(x.m, x.s, x.k); }); window.__rgErrs = { push: function (x) { logError(x.m, x.s, x.k); } };
+
   window.RGCloud = { sb: sb, cfg: { url: SB_URL, key: SB_KEY }, openAuth: openAuth, openFeedback: openFeedback, user: function () { return user; }, profile: function () { return profile; }, openRider: openRider, saveName: saveName, signOut: signOut, profileName: function () { return (profile && profile.name) || (user && user.user_metadata && user.user_metadata.name) || ''; },
     onChange: function (f) { authListeners.push(f); f(user); }, sheet: sheet, closeSheet: closeSheet, closePages: closePages, sheetBack: sheetBack, pageOpen: function () { var p = $('#rgPage'); return !!(p && !p.hidden); }, ridePhone: function () { return ridePhone; },
-    savePhone: function (ph) { return sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id).then(function (b) { if (b.error) throw b.error; ridePhone = ph; renderAccount(); }); }, busy: busy, msg: msg, esc: esc, refresh: refresh };
+    savePhone: function (ph) { return sb.from('profile_private').update({ ride_phone: ph }).eq('id', user.id).then(function (b) { if (b.error) throw b.error; ridePhone = ph; renderAccount(); }); }, busy: busy, msg: msg, esc: esc, refresh: refresh, logError: logError };
 })();

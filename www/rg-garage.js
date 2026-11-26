@@ -94,7 +94,38 @@
     if (LN) { var drop = Object.keys(ids).filter(function (id) { return !next[id]; }).map(function (id) { return { id: +id }; }); try { Promise.resolve(drop.length ? LN.cancel({ notifications: drop }) : null).catch(function () {}).then(function () { return add.length ? LN.schedule({ notifications: add }) : null; }).then(function () { jset('rg.docs.ln', next); }, function () {}); } catch (e) {} }
   }
   (window.RGToday = window.RGToday || []).push(function () { var x = allDocs().filter(function (q) { return q.n <= 30; })[0]; return x ? { i: 'cal', hot: x.n <= 7 ? 1 : 0, b: x.t + (x.n < 0 ? ' vencido' : x.n === 0 ? ' vence hoy' : ' vence en ' + x.n + ' días'), t: (x.v.name || 'Tu moto') + ' · ' + dmy(x.d.date), go: function () { A.showView('garage'); } } : null; });
-  setTimeout(remind, 9000);
+  /* Recordatorios del taller. Lo que va por fecha (cada X meses) se programa en el teléfono para un mes antes, una semana antes y el día;
+     lo que va por kilómetros no tiene fecha, así que se avisa al abrir la app o al terminar una ruta, cuando entra en «pronto» y cuando se pasa. */
+  function remindMaint() {
+    if (!A.maintStates) return;
+    var first = false; try { first = localStorage.getItem('rg.maint.told') == null; } catch (e) {}      // la primera vez no se avisa de todo lo atrasado de golpe: solo se toma nota
+    var told = jget('rg.maint.told'), ch = false, add = [], ids = jget('rg.maint.ln'), next = {}, km = function (n) { return Math.round(n).toLocaleString('es-ES') + ' km'; };
+    A.maintStates().forEach(function (g) {
+      var bike = g.v.name || 'tu moto';
+      g.items.forEach(function (x) {
+        var m = x.m, s = x.s, lvl = s.st === 'due' ? 2 : s.st === 'soon' ? 1 : 0, key = g.v.id + ':' + m.id + ':' + (m.lastAt || 0) + ':' + (m.lastKm || 0), was = told[key] || 0;
+        if (lvl > was) {
+          told[key] = lvl; ch = true;
+          var why = s.kmLeft != null && (s.kmLeft <= 0 || s.moLeft == null || s.kmLeft / (m.everyKm || 1) < (s.moLeft || 0) / (m.everyMonths || 1)) ? (s.kmLeft <= 0 ? 'se ha pasado por ' + km(-s.kmLeft) : 'quedan ' + km(s.kmLeft)) : (s.moLeft <= 0 ? 'ya toca por fecha' : 'toca en menos de un mes');
+          var body = m.name + ' de ' + bike + ': ' + why + '.';
+          if (!first) try { if (RA && RA.newsNow) RA.newsNow({ items: [{ kind: 'note', id: 'mnt-' + m.id + '-' + lvl + '-' + (m.lastAt || 0), community: 'Mi moto', head: lvl === 2 ? 'Mantenimiento pendiente' : 'Mantenimiento cerca', title: body }], silent: false }).catch(function () {}); else A.toast('Aviso del taller · ' + body, 'warn'); } catch (e) {}
+        }
+        if (m.everyMonths && m.lastAt) {
+          var due = new Date(m.lastAt); due.setMonth(due.getMonth() + m.everyMonths); due.setHours(10, 0, 0, 0);
+          [30, 7, 0].forEach(function (k) {
+            var at = due.getTime() - k * 864e5; if (at < Date.now() + 36e5) return;
+            var h = 0, kk = key + ':' + k; for (var i = 0; i < kk.length; i++) h = (h * 31 + kk.charCodeAt(i)) | 0; var id = 800000000 + Math.abs(h) % 90000000; next[id] = 1;
+            if (!ids[id]) add.push({ id: id, title: k ? 'Mantenimiento cerca' : 'Hoy toca mantenimiento', body: m.name + ' de ' + bike + (k ? ': toca en ' + k + ' días.' : ': toca hoy.'), schedule: { at: new Date(at), allowWhileIdle: true } });
+          });
+        }
+      });
+    });
+    Object.keys(told).forEach(function (k) { if (!A.maintStates().some(function (g) { return g.items.some(function (x) { return k === g.v.id + ':' + x.m.id + ':' + (x.m.lastAt || 0) + ':' + (x.m.lastKm || 0); }); })) { delete told[k]; ch = true; } });
+    if (ch || first) jset('rg.maint.told', told);
+    if (LN) { var drop = Object.keys(ids).filter(function (id) { return !next[id]; }).map(function (id) { return { id: +id }; }); try { Promise.resolve(drop.length ? LN.cancel({ notifications: drop }) : null).catch(function () {}).then(function () { return add.length ? LN.schedule({ notifications: add }) : null; }).then(function () { jset('rg.maint.ln', next); }, function () {}); } catch (e) {} }
+  }
+  setTimeout(remind, 9000); setTimeout(remindMaint, 12000);
+  var mntT = null; new MutationObserver(function () { clearTimeout(mntT); mntT = setTimeout(remindMaint, 4000); }).observe(document.getElementById('vehicles') || document.body, { childList: true });      // al cambiar algo del garaje o terminar una ruta
 
   /* ---------- repostajes, gastos y autonomía ---------- */
   function fuelForm(v, odo) {

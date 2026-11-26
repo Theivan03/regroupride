@@ -3,13 +3,15 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.59.1';
+  var APP_VERSION = '0.60.0';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
   var IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+  window.__rgErrs = window.__rgErrs || [];
   window.addEventListener('error', function (e) {
+    try { if (Array.isArray(window.__rgErrs)) window.__rgErrs.push({ m: e.message || String(e), s: (e.filename || '') + ':' + (e.lineno || 0), k: e.error && e.error.stack }); } catch (x) {}
     try { var n = document.getElementById('toast'); n.textContent = 'Error (v' + APP_VERSION + '): ' + (e.message || e); n.className = 'toast notice bad'; n.hidden = false; clearTimeout(window.__rgErrT); window.__rgErrT = setTimeout(function () { if (/^Error \(v/.test(n.textContent)) n.hidden = true; }, 7000); n.onclick = function () { n.hidden = true; }; } catch (x) {}
   });
   if (typeof LeanCore === 'undefined' || typeof Platform === 'undefined' || typeof Geo === 'undefined' || typeof DB === 'undefined') throw new Error('faltan archivos de la app (versión antigua en caché)');
@@ -482,7 +484,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     var q = (ridesQuery || '').trim().toLowerCase(), shown = plans.filter(function (p) { return !q || (p.name || '').toLowerCase().indexOf(q) >= 0; });
     if (!shown.length) { list.innerHTML = '<div class="empty"><b>' + (plans.length ? 'Ninguna coincide' : 'Sin rutas planeadas') + '</b>' + (plans.length ? 'Prueba con otro nombre.' : 'Dibuja una en el mapa, deja que la app te genere una vuelta o importa un GPX.') + '</div>'; return; }
     shown.forEach(function (p) {
-      var d = document.createElement('div'); d.className = 'as-plan';
+      var d = document.createElement('div'); d.className = 'as-plan'; d.dataset.plan = p.id;
       d.innerHTML = '<button class="as-plan-main" type="button"><span class="thumb">' + planThumb(p) + '</span><span class="as-plan-t"><b>' + esc(p.name) + '</b><small>' + fmtKm(p.dist) + ' · ' + fmtDur(p.dur * 1000) + ' · ' + (p.pub ? 'pública' : 'privada') + (activePlan && activePlan.id === p.id ? ' · cargada' : '') + '</small></span></button><button class="btn small" type="button" data-act="follow">Usar</button>';
       d.querySelector('.as-plan-main').addEventListener('click', function () { planSheet(p); });
       d.querySelector('[data-act=follow]').addEventListener('click', function () { followPlan(p, true); showView('map'); });
@@ -614,7 +616,6 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   // (avisos en ruta, novedades, fotógrafos cerca). Las confirmaciones de «hecho» o «guardado» ya no salen: se ve en pantalla.
   var TOAST_KEEP = /Confirma el correo|enviado un correo|Solicitud enviada|[Aa]viso|ha iniciado la ruta|está a \d+ km|Nuevo evento: |Nueva salida: |Avisos: |Info: |Ruta terminada para todos|Reparto|no te llegarán avisos/;
   function toast(msg, kind) { if (kind === 'ok' && !TOAST_KEEP.test(String(msg))) return; var n = $('#toast'); n.textContent = msg; n.className = 'toast notice' + (kind ? ' ' + kind : ''); n.hidden = false; if (toastTimer) clearTimeout(toastTimer); toastTimer = setTimeout(function () { n.hidden = true; }, kind === 'bad' ? 9000 : 5000); }
-  function showNotice(msg, kind) { var n = $('#notice'); n.textContent = msg; n.className = 'notice' + (kind ? ' ' + kind : ''); n.hidden = false; }
   function hideNotice() { $('#notice').hidden = true; }
   function render() {
     var now = performance.now(), ready = est.state.ready, phi = ready ? live.phi : 0, ar = Math.round(Math.abs(phi));
@@ -729,7 +730,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
         h.innerHTML = '<span class="label">' + monthName(d.getFullYear(), d.getMonth()) + ' <span class="muted">· ' + inMonth.length + (ridesFilter === 'trips' ? (inMonth.length === 1 ? ' trayecto' : ' trayectos') : (inMonth.length === 1 ? ' ruta' : ' rutas')) + '</span></span><span class="label">' + Math.round(inMonth.reduce(function (s, x) { return s + (x.dist || 0); }, 0)) + ' km</span>';
         list.appendChild(h);
       }
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'row';
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'row'; b.dataset.ride = r.id;
       var thumb = r.thumb && r.thumb.length > 1 ? Geo.thumbSvg(r.thumb.map(function (p) { return [0, p[0], p[1]]; }), 56) : '<svg width="28" height="28" viewBox="0 0 24 24"><use href="#i-gauge"/></svg>';
       b.innerHTML = '<span class="thumb">' + thumb + '</span>' +
         '<span class="date">' + esc(rideTitle(r)) + ' <span>· ' + fmtClock(r.start) + (r.recovered ? ' · recuperada' : '') + (r.imported ? ' · GPX' : '') + (r.demo ? ' · simulada' : '') + (r.trip ? ' · solo medida' : '') + '</span>' + (r.favorite ? '<svg class="fav" width="16" height="16" viewBox="0 0 24 24"><use href="#i-star"/></svg>' : '') + '</span>' +
@@ -946,7 +947,7 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     DB.getTrack(detailRide.id).then(function (pts) { return Platform.downloadCsv(rideFileBase(detailRide) + '.gpx', Geo.toGpx(detailRide, pts), 'Ruta Inclina ' + rideTitle(detailRide)); }).then(function () { return setFlag('gpxExport'); }).catch(exportFail);
   });
   $('#btnGmaps').addEventListener('click', function () { if (!detailRide) return; DB.getTrack(detailRide.id).then(function (pts) { var u = Geo.googleMapsUrl(pts); if (u) Platform.openExternal(u); else toast('Esta ruta no tiene trazado.', 'warn'); }); });
-  $('#btnShareCard').addEventListener('click', function () { if (!detailRide) return; DB.getTrack(detailRide.id).then(function (pts) { return makeShareCard(detailRide, pts); }).then(function (data) { return Platform.sharePng(rideFileBase(detailRide) + '.png', data, 'Ruta Inclina ' + rideTitle(detailRide)); }).then(function () { return setFlag('card'); }).catch(exportFail); });
+  $('#btnShareCard').addEventListener('click', function () { if (!detailRide) return; var r0 = detailRide; DB.getTrack(r0.id).then(function (pts) { if (window.RGShare) RGShare.open(r0, pts || [], rideTitle(r0)); setFlag('card'); }).catch(exportFail); });
   function csvFor(list) {
     var rows = [['fecha', 'hora_inicio', 'ruta', 'curva', 'hora_curva', 'lado', 'angulo_max_grados', 'velocidad_kmh', 'duracion_s', 'lat', 'lon', 'max_izq_ruta', 'max_dcha_ruta', 'km_ruta']];
     list.forEach(function (r) {
@@ -960,36 +961,6 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
   $('#btnExportAll').addEventListener('click', function () { Platform.downloadCsv('regroupride_todas_las_curvas.csv', csvFor(rides), 'Inclina: todas las curvas').catch(exportFail); });
 
   /* tarjeta para compartir (canvas 1080×1350) */
-  function makeShareCard(r, pts) {
-    var W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H; var g = c.getContext('2d');
-    var dark = isDark(), bg = dark ? '#121110' : '#F4F2EC', fg = dark ? '#F2EDE3' : '#15140F', fg2 = dark ? '#A39E93' : '#5C5A52', accent = dark ? '#FFAE1A' : '#B8420E', left = dark ? '#5FA8FF' : '#1D5FCC', right = dark ? '#FF66B8' : '#B3177A', line = dark ? '#3A3833' : '#C9C5B9';
-    var ready = document.fonts && document.fonts.load ? Promise.all([document.fonts.load('800 60px "Barlow Condensed"'), document.fonts.load('600 30px "Barlow"')]).catch(function () {}) : Promise.resolve();
-    return ready.then(function () {
-      g.fillStyle = bg; g.fillRect(0, 0, W, H);
-      g.fillStyle = accent; g.font = '800 54px "Barlow Condensed", sans-serif'; g.fillText('INCLINA', 72, 110);
-      g.fillStyle = fg2; g.font = '600 30px "Barlow", sans-serif'; g.fillText(fmtDateLong(r.start) + ' · ' + fmtClock(r.start), 72, 160);
-      g.fillStyle = fg; g.font = '700 64px "Barlow Condensed", sans-serif'; g.fillText(rideTitle(r), 72, 240);
-      // trazado
-      var box = { x: 72, y: 290, w: W - 144, h: 560 };
-      g.fillStyle = dark ? '#1C1B19' : '#FCFBF8'; roundRect(g, box.x, box.y, box.w, box.h, 24); g.fill(); g.strokeStyle = line; g.lineWidth = 3; g.stroke();
-      if (pts && pts.length > 1) {
-        var s = Geo.simplify(pts, 10), b = Geo.bounds(s), cosLat = Math.cos(((b[1] + b[3]) / 2) * Math.PI / 180), w = (b[2] - b[0]) * cosLat, h = (b[3] - b[1]), span = Math.max(w, h, 1e-6), pad = 50, k = Math.min((box.w - 2 * pad) / Math.max(w, 1e-6), (box.h - 2 * pad) / Math.max(h, 1e-6));
-        var ox = box.x + pad + ((box.w - 2 * pad) - w * k) / 2, oy = box.y + pad + ((box.h - 2 * pad) - h * k) / 2;
-        g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 14; g.strokeStyle = dark ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.9)';
-        g.beginPath(); s.forEach(function (p, i) { var x = ox + (p[2] - b[0]) * cosLat * k, y = oy + (b[3] - p[1]) * k; if (i) g.lineTo(x, y); else g.moveTo(x, y); }); g.stroke();
-        g.lineWidth = 8;
-        for (var i = 1; i < s.length; i++) { var a = s[i - 1], q = s[i]; g.strokeStyle = Geo.leanColor(Math.abs(a[6] || 0) >= Math.abs(q[6] || 0) ? (a[6] || 0) : (q[6] || 0)); g.beginPath(); g.moveTo(ox + (a[2] - b[0]) * cosLat * k, oy + (b[3] - a[1]) * k); g.lineTo(ox + (q[2] - b[0]) * cosLat * k, oy + (b[3] - q[1]) * k); g.stroke(); }
-      } else { g.fillStyle = fg2; g.font = '600 32px "Barlow", sans-serif'; g.textAlign = 'center'; g.fillText('Sin trazado', box.x + box.w / 2, box.y + box.h / 2); g.textAlign = 'left'; }
-      // cifras
-      var y0 = 930, cols = [[72, 'MÁX IZQ', Math.round(r.maxL) + '°', left], [W / 2 - 100, 'MÁX DCHA', Math.round(r.maxR) + '°', right], [W - 330, 'VEL. MÁX', (r.vMax || 0) + ' km/h', fg]];
-      cols.forEach(function (col) { g.fillStyle = fg2; g.font = '600 26px "Barlow Condensed", sans-serif'; g.fillText(col[1], col[0], y0); g.fillStyle = col[3]; g.font = '800 110px "Barlow Condensed", sans-serif'; g.fillText(col[2], col[0], y0 + 110); });
-      var y1 = 1160, cols2 = [[72, 'DISTANCIA', fmtKm(r.dist)], [W / 2 - 100, 'EN MARCHA', fmtDur((r.movingS || 0) * 1000)], [W - 330, 'CURVAS', String(r.corners.length)]];
-      cols2.forEach(function (col) { g.fillStyle = fg2; g.font = '600 26px "Barlow Condensed", sans-serif'; g.fillText(col[1], col[0], y1); g.fillStyle = fg; g.font = '700 64px "Barlow Condensed", sans-serif'; g.fillText(col[2], col[0], y1 + 70); });
-      g.fillStyle = fg2; g.font = '500 24px "Barlow", sans-serif'; g.fillText('Ángulo de inclinación medido con giróscopo · inclina.arrelbit.es', 72, H - 50);
-      return c.toDataURL('image/png');
-    });
-  }
-  function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
   /* ---------- estadísticas ---------- */
   var stats = { mode: 'month', y: new Date().getFullYear(), m: new Date().getMonth() };
@@ -1345,6 +1316,12 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
 
   /* ---------- puente para los módulos de ReGroupRide (rg-app.js) ---------- */
   window.RGApp = {
+    view: function () { return currentView; },
+    // borrar desde la lista (deslizando): una ruta hecha o una planeada
+    removeRide: function (id) { var r = rides.filter(function (x) { return String(x.id) === String(id); })[0]; if (!r) return Promise.resolve(); id = r.id; if (window.RGSync) RGSync.rideDeleted(id); return DB.deleteRide(id).then(reloadRides).then(renderRides); },
+    removePlan: function (id) { var p = plans.filter(function (x) { return String(x.id) === String(id); })[0]; if (!p) return Promise.resolve(); if (window.RGSync) RGSync.planDeleted(p); plans = plans.filter(function (x) { return x.id !== p.id; }); if (activePlan && activePlan.id === p.id) followPlan(null, false); return savePlans().then(renderRides); },
+    // estado del taller de cada vehículo (para los recordatorios): [{ v, odo, items: [{ m, s }] }]
+    maintStates: function () { return vehicles.map(function (v) { var mine = rides.filter(function (r) { return r.vehicleId === v.id || (!r.vehicleId && v.principal); }), odo = Math.round((v.odoStart || 0) + mine.reduce(function (t, r) { return t + (r.dist || 0); }, 0)); return { v: v, odo: odo, items: (v.maint || []).map(function (m) { return { m: m, s: maintState(m, odo) }; }) }; }); },
     stopRide: function () { if (rec) stopRide(); },
     setAvatar: function (d) { setAvatar(d); },
     version: APP_VERSION, toast: toast, settings: settings, saveSettings: saveSettings, showView: showView,
