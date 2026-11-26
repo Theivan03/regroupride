@@ -1,6 +1,6 @@
 {
   "name": "regroupride",
-  "version": "0.60.3",
+  "version": "0.60.4",
   "description": "ReGroupRide: rutas en grupo para moteros (Android + iOS con Capacitor)",
   "scripts": {
     "sync": "cap sync",

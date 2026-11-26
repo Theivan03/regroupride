@@ -32,7 +32,7 @@
     return '<svg viewBox="0 0 32 32"><g transform="rotate(' + a + ' 16 16)"><path d="M16 27V6m0 0-7.5 7.5M16 6l7.5 7.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g></svg>';
   }
 
-  var nav = { active: false, planId: null, tr: null, rejoin: null, rejoinAt: 0, rejoinBusy: false, last: null, notified: false, toStart: false, asked: false };
+  var nav = { active: false, planId: null, tr: null, rejoin: null, rejoinAt: 0, rejoinBusy: false, last: null, notified: false, toStart: false, asked: false, detour: null };
   // El cartel mide 60 px, pero una indicación muy larga lo hace crecer: los botones del mapa bajan con él.
   if (window.ResizeObserver && $('#navBanner')) new ResizeObserver(function () { var h = $('#navBanner').offsetHeight; if (h) document.documentElement.style.setProperty('--nav-h', h + 'px'); }).observe($('#navBanner'));
   /* Filas de filtros que no caben (Rutas, logros…): se ve que siguen y hay una flecha para avanzar. */
@@ -71,22 +71,26 @@
     }
     if (!on) renderBanner(null);
     document.body.classList.toggle('rg-rec', A.isRec());
+    if (nav.detour && !A.isRec()) { nav.detour = null; drawRejoin(); renderBanner(nav.last); }
     drawStops();
     if (window.RGGroup) RGGroup.sync();
   }
   function onFix(fix) {
-    if (!nav.active || !nav.tr) { if (window.RGGroup) RGGroup.onFix(fix, null); return; }
+    if (nav.detour) detourFix(fix);
+    if (!nav.active || !nav.tr) { if (nav.detour) renderBanner(null); if (window.RGGroup) RGGroup.onFix(fix, null); return; }
     if (!nav.asked) askStart(fix);
     var now = Date.now(), r = nav.tr.update(fix, now), i;
     nav.last = r;
     for (i = 0; i < r.events.length; i++) {
       var e = r.events[i];
       if (e.type === 'say') say(e.text);
-      else if (e.type === 'off') { offAlert(e.dist); makeRejoin(fix, true); }
+      else if (e.type === 'off') { if (!nav.detour) { offAlert(e.dist); makeRejoin(fix, true); } }   // de camino a la gasolinera no es «salirse»
+      else if (nav.detour && (e.type === 'back' || e.type === 'start')) { if (nav.detour.visited) endDetour('De vuelta en la ruta'); }
       else if (e.type === 'back' || e.type === 'start') { if (nav.rejoin) { nav.rejoin = null; drawRejoin(); } if (e.type === 'back') { say('De vuelta en la ruta'); A.toast('De vuelta en la ruta.', 'ok'); } nav.notified = false; }
       else if (e.type === 'finish') A.toast('Has llegado al final de la ruta.', 'ok');
     }
     // Aún no has llegado a la ruta (sales de casa, o te unes a mitad): te lleva al punto más cercano por delante.
+    if (nav.detour) { if (nav.detour.visited && r.started && !r.offRoute && r.off < 60) endDetour('De vuelta en la ruta'); renderBanner(r); if (window.RGGroup) RGGroup.onFix(fix, r); return; }
     if (!r.started && r.off > 150 && !nav.rejoin && !nav.rejoinBusy && now - nav.rejoinAt > 20000) makeRejoin(fix, false);
     if (nav.rejoin && (r.offRoute || !r.started)) {
       var rr = nav.rejoin.tr.update(fix, now);
@@ -130,6 +134,45 @@
     }
   }
   function askNotif() { if (P.LocalNotifications) { try { P.LocalNotifications.requestPermissions(); } catch (e) {} } }
+  /* ---- desvío a una gasolinera en marcha: te lleva hasta ella y, con ruta cargada, te devuelve a la ruta por delante ---- */
+  function detour(x, name) {
+    var fix = A.lastFix() || (A.anyFix && A.anyFix()); if (!fix || !x) return false;
+    nav.detour = { x: { lat: x.lat, lon: x.lon }, name: name || 'la gasolinera', coords: [], tr: null, last: null, visited: false, busy: false, made: 0, at: fix };
+    nav.rejoin = null; makeDetour(fix, true); renderBanner(nav.last); return true;
+  }
+  function endDetour(msg) { nav.detour = null; nav.rejoin = null; nav.rejoinAt = 0; drawRejoin(); if (msg) { say(msg); A.toast(msg + '.', 'ok'); } renderBanner(nav.last); }
+  function makeDetour(fix, announce) {
+    var d = nav.detour; if (!d || d.busy) return;
+    var p = plan(), back = nav.active && nav.tr && p ? L.rejoinTarget(d.visited ? fix : d.x, nav.tr.line, nav.tr.state.along) : null;
+    if (back && back.finished) back = null;
+    var pts = [[fix.lon, fix.lat]]; if (!d.visited) pts.push([d.x.lon, d.x.lat]); if (back) pts.push([back.lon, back.lat]);
+    if (pts.length < 2) { endDetour(); return; }
+    d.busy = true; d.made = Date.now();
+    var straight = function () { return { coords: pts, steps: [], dist: 0 }; };
+    var url = 'https://router.project-osrm.org/route/v1/driving/' + pts.map(function (q) { return q[0].toFixed(5) + ',' + q[1].toFixed(5); }).join(';') + '?overview=full&geometries=geojson&steps=true';
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctrl) setTimeout(function () { ctrl.abort(); }, 8000);
+    var job = (navigator.onLine === false) ? Promise.resolve(straight()) : fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.routes || !j.routes[0]) throw new Error('sin ruta');
+      var st = L.stepsFromOsrm(j.routes[0]); if (st.length && st[st.length - 1].icon === 'arrive') st[st.length - 1].text = back ? 'vuelves a la ruta' : 'llegas a la gasolinera';
+      return { coords: j.routes[0].geometry.coordinates, steps: st, dist: j.routes[0].legs && j.routes[0].legs[0] ? j.routes[0].legs[0].distance : j.routes[0].distance };
+    }).catch(straight);
+    job.then(function (r) {
+      if (nav.detour !== d) return; d.busy = false;
+      d.coords = r.coords; d.tr = L.Tracker(r.coords, r.steps, { offDist: 70 }); d.last = d.tr.update(fix, Date.now()); drawRejoin(); renderBanner(nav.last);
+      if (announce) { var km = r.dist ? ' ' + L.cap(L.spokenDist(r.dist)) + '.' : ''; say('Te llevo a la gasolinera.' + km + (back ? ' Después, de vuelta a la ruta.' : '')); A.toast('Te llevo a ' + d.name + (back ? ' y después de vuelta a la ruta.' : '.'), 'ok'); }
+    });
+  }
+  function detourFix(fix) {
+    var d = nav.detour, now = Date.now(); if (!d) return; d.at = fix;
+    if (d.tr) { d.last = d.tr.update(fix, now); for (var i = 0; i < d.last.events.length; i++) if (d.last.events[i].type === 'say') say(d.last.events[i].text); }
+    if (!d.visited && L.dist(fix.lat, fix.lon, d.x.lat, d.x.lon) < 90) {
+      d.visited = true;
+      if (nav.active && nav.tr && plan()) { say('Has llegado a la gasolinera. Al salir te llevo de vuelta a la ruta.'); A.toast('Gasolinera. Al salir te llevo de vuelta a la ruta.', 'ok'); }
+      else { endDetour('Has llegado a la gasolinera'); return; }
+    }
+    if (d.last && d.last.offRoute && !d.busy && now - d.made > 20000) makeDetour(fix, false);   // te has salido del desvío: se recalcula desde donde estás
+  }
+  (function () { var nb = $('#navBanner'); if (nb) nb.addEventListener('click', function () { if (!nav.detour) return; if (window.RGUI && RGUI.snack) RGUI.snack('Desvío a la gasolinera', 'Quitar', function () { endDetour(); A.toast('Desvío quitado.', 'ok'); }, 5000); }); })();
   function makeRejoin(fix, announce) {
     var p = plan(); if (!p || !nav.tr || nav.rejoinBusy) return;
     var going = nav.toStart && !nav.tr.state.started;      // aún de camino a la salida
@@ -163,15 +206,20 @@
   }
   function drawRejoin() {
     var m = A.map(); if (!m || !m.getSource('rejoin')) return;
-    var c = nav.active && nav.rejoin ? nav.rejoin.coords : [];
+    var c = nav.detour ? nav.detour.coords : nav.active && nav.rejoin ? nav.rejoin.coords : [];
     m.getSource('rejoin').setData(c.length > 1 ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: c } } : EMPTY);
   }
   var bannerKey = '';
   function renderBanner(r) {
     var b = $('#navBanner'); if (!b) return;
-    if (!nav.active) { if (!b.hidden) { b.hidden = true; bannerKey = ''; } return; }
+    if (!nav.active && !nav.detour) { if (!b.hidden) { b.hidden = true; bannerKey = ''; } return; }
     var cls = '', ico = 'straight', dist = '', text = 'Buscando tu posición…', sub = '';
-    if (r) {
+    if (nav.detour) {      // desvío a la gasolinera: manda él hasta volver a la ruta
+      var dl = nav.detour.last, dn = dl && dl.next; cls = 'to';
+      if (dn && dn.dist < 2500 && !dl.offRoute) { ico = dn.icon; dist = L.fmtDist(dn.dist); text = dn.text; }
+      else { dist = L.fmtDist(nav.detour.visited ? (dl ? dl.remaining : 0) : L.dist(nav.detour.at.lat, nav.detour.at.lon, nav.detour.x.lat, nav.detour.x.lon)); text = nav.detour.visited ? 'para volver a la ruta' : 'hasta la gasolinera'; }
+      sub = nav.detour.busy && !dl ? 'Calculando el camino…' : nav.detour.visited ? 'Volviendo a la ruta' : 'Yendo a la gasolinera';
+    } else if (r) {
       var rj = nav.rejoin && nav.rejoin.last, nx = null;
       if (r.offRoute || !r.started) {
         cls = r.offRoute ? 'off' : 'to';
@@ -460,7 +508,7 @@
     return gpxAsPlan({ name: name || 'Ruta grabada', title: 'Ruta para seguir', coords: coords, wps: [[a[1], a[0], 'Salida'], [b[1], b[0], 'Llegada']], pois: [] });
   }
 
-  window.RGNav = { preStart: preStart, gpxRoute: gpxRoute, togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx, resolvePoint: function (t) { return resolvePoint(t); } };
+  window.RGNav = { detour: detour, preStart: preStart, gpxRoute: gpxRoute, togglePublic: togglePublic, explore: explore, renderPublic: renderPublic, trackAsPlan: trackAsPlan, gpxPicked: gpxPicked, onFix: onFix, sync: sync, redraw: function () { drawRejoin(); stopKey = ''; drawStops(); if (window.RGGroup) RGGroup.redraw(); }, state: nav, openMaps: openMaps, exportGpx: exportGpx, resolvePoint: function (t) { return resolvePoint(t); } };
 
   /* ================= importar enlace de Google Maps ================= */
   function readClipboard() {

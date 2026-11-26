@@ -611,7 +611,17 @@ public class RideAlertsPlugin extends Plugin {
                 public void run() {
                     try {
                         KeyguardManager km = (KeyguardManager) a.getSystemService(Context.KEYGUARD_SERVICE);
-                        if (km != null) km.requestDismissKeyguard(a, null);
+                        if (km != null) km.requestDismissKeyguard(a, new KeyguardManager.KeyguardDismissCallback() {
+                            // desbloqueado: se avisa a la app para que quite los tres botones y enseñe el mapa
+                            @Override
+                            public void onDismissSucceeded() {
+                                RideAlertsPlugin p = instance;
+                                if (p == null) return;
+                                JSObject o = new JSObject();
+                                o.put("locked", false);
+                                p.notifyListeners("lock", o, true);
+                            }
+                        });
                     } catch (Exception ignored) { }
                 }
             });

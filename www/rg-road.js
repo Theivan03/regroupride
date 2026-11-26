@@ -123,7 +123,7 @@
     var k = F.kind, hd = '<div class="rd-fhead"><b>' + ic('fuel') + 'Gasolina ' + (k === 'g95' ? '95' : '98') + '</b><button class="btn small icon" data-fc="x" type="button" title="Cerrar">' + ic('close') + '</button></div>';
     FCARD.hidden = false; FCARD.dataset.on = '1'; FCARD.innerHTML = hd + '<span class="muted">Buscando gasolineras…</span>';
     var p = plan(), ahead = null;
-    if (p) { var bi = 0, bd = 1e12; for (var i = 0; i < p.coords.length; i += 2) { var d = dist(f.lat, f.lon, p.coords[i][1], p.coords[i][0]); if (d < bd) { bd = d; bi = i; } } ahead = bd < 3000 ? p.coords.slice(bi) : null; }
+    if (p) { var bi = 0, bd = 1e12; for (var i = 0; i < p.coords.length; i += 2) { var d = dist(f.lat, f.lon, p.coords[i][1], p.coords[i][0]); if (d < bd) { bd = d; bi = i; } } ahead = bd < 30000 ? p.coords.slice(bi) : null; }
     var near = fuelAround(f, 25).then(function (d) { return d.rows || []; }, function () { return []; });
     var box = ahead && ahead.length > 1 ? (function () { var bb = bbox(ahead); return sb.rpc('fuel_box', { a_lat: bb[0], a_lon: bb[1], b_lat: bb[2], b_lon: bb[3] }).then(function (r) { return r.error ? [] : (r.data || []); }, function () { return []; }); })() : Promise.resolve([]);
     Promise.all([near, box]).then(function (res) {
@@ -163,6 +163,8 @@
     if (p) { p.pois = (p.pois || []).filter(function (q) { return !(q[3] === 'fuel' && q[4] === 'pick'); }).concat([[x.lat, x.lon, label, 'fuel', 'pick']]); if (window.RGNav && RGNav.redraw) RGNav.redraw(); }
     else fuelMarks([x]);
     var map = A.map && A.map(); if (map && !(A.isRec && A.isRec())) map.easeTo({ center: [x.lon, x.lat], zoom: 13 });
+    // en marcha: el camino cambia para llevarte a ella y, con ruta cargada, devolverte después a la ruta
+    if (A.isRec && A.isRec() && window.RGNav && RGNav.detour && RGNav.detour(x, x.name)) return;
     if (x.along != null && x.off <= 400) { A.toast('Aviso: gasolinera marcada en tu ruta, a ' + kmTxt(x.along) + ' km: ' + label + '.', 'ok'); say('Gasolinera marcada en tu ruta, a ' + Math.round(x.along) + ' kilómetros.'); }
     else { A.toast('Aviso: ' + label + ' marcada en el mapa.', 'ok'); if (A.isRec && A.isRec()) say('Gasolinera marcada en el mapa.'); else gmaps(x.lat, x.lon); }
   }

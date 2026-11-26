@@ -169,7 +169,7 @@
         '<button class="btn rg-skip" data-k="unlock" type="button">Usar la app (desbloquear)</button></div>';
       [].forEach.call(el.querySelectorAll('[data-k]'), function (b) { b.addEventListener('click', function () {
         var x = b.dataset.k;
-        if (x === 'unlock') { if (RA && RA.unlock) RA.unlock().catch(noop); return; }
+        if (x === 'unlock') { if (RA && RA.unlock) RA.unlock().catch(noop); watchUnlock(); return; }
         if (navigator.vibrate) try { navigator.vibrate(120); } catch (e) {}
         sendAlert(x === 'cancel' ? null : x);
       }); });
@@ -177,6 +177,13 @@
     el.hidden = false; document.documentElement.classList.add('rg-locked');
   }
   function lockState(v) { LOCK.on = !!v; lockPanel(); }
+  // Tras «Usar la app»: se mira cada poco si el móvil ya está desbloqueado, para quitar los botones y dejar el mapa.
+  var unlockT = null;
+  function watchUnlock() {
+    if (!RA || !RA.lockState) return; clearInterval(unlockT); var n = 0;
+    unlockT = setInterval(function () { if (++n > 80 || !LOCK.on) { clearInterval(unlockT); return; } RA.lockState().then(function (r) { if (r && r.locked === false) { clearInterval(unlockT); lockState(false); } }, noop); }, 500);
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && LOCK.on && RA && RA.lockState) RA.lockState().then(function (r) { if (r) lockState(r.locked); }, noop); });
   if (RA && RA.addListener) RA.addListener('lock', function (e) { lockState(e && e.locked); });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && RA && RA.lockState) RA.lockState().then(function (s) { lockState(s && s.locked); }, noop);
