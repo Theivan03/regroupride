@@ -316,7 +316,7 @@
     clearTimeout(S.timer);
     return DB.wipe().catch(function () {}).then(function () {
       try {
-        var ks = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (/^rg\./.test(k) || k === 'inclina.rides' || k === 'inclina.recording') ks.push(k); }
+        var ks = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if ((/^rg\./.test(k) && !/^rg\.(lang|units)$/.test(k)) || k === 'inclina.rides' || k === 'inclina.recording') ks.push(k); }   // el idioma y las unidades son del aparato, no de la cuenta
         ks.forEach(function (k) { localStorage.removeItem(k); });
         var st = JSON.parse(localStorage.getItem('inclina.settings') || '{}'); delete st.activePlanId; delete st.layerRides; localStorage.setItem('inclina.settings', JSON.stringify(st));
       } catch (e) {}

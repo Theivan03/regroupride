@@ -844,7 +844,7 @@
           }
           // la cuenta ya no existe: se limpia el teléfono y se vuelve a la pantalla de entrada
           try { var RAp = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.RideAlerts; if (RAp && RAp.eventClear) RAp.eventClear().catch(function () {}); } catch (e) {}
-          return sb.auth.signOut({ scope: 'local' }).then(function () {}, function () {}).then(function () { return Sy ? Sy.wipeLocal() : null; }).then(function () {}, function () {}).then(function () {
+          return sb.auth.signOut({ scope: 'local' }).then(function () {}, function () {}).then(function () { return window.RGSync ? RGSync.wipeLocal() : null; }).then(function () {}, function () {}).then(function () {
             try { Object.keys(localStorage).forEach(function (k) { if (/^rg\./.test(k) && !/^rg\.(lang|units|theme)$/.test(k)) localStorage.removeItem(k); }); localStorage.setItem('rg.wall', '1'); localStorage.setItem('rg.bye', '1'); } catch (e) {}
             location.reload();
           });
@@ -1110,7 +1110,7 @@
   sync();
   /* Registro de errores: lo que falla en un móvil llega al panel del creador con la versión, la pantalla y el modelo.
      Sin datos personales en el texto; un mismo error se manda una vez por sesión y como mucho 15 por sesión. */
-  var errSeen = {}, errN = 0, NOISE = /ResizeObserver loop|Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The user aborted|cancell?ed|timeout|sin conexi/i;
+  var errSeen = {}, errN = 0, NOISE = /ResizeObserver loop|Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The user aborted|cancell?ed|timeout|sin conexi|webglcontextcreationerror|initialize WebGL|WatchId not found/i;   // lo último: navegadores sin gráficos (robots) y un aviso inofensivo del GPS
   function logError(m, src, stack) {
     try {
       m = String(m || '').slice(0, 300); if (!sb || !m || NOISE.test(m) || errN >= 15) return;

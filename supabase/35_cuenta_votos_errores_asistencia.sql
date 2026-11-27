@@ -201,3 +201,13 @@ begin
    where e.id = a.event_id and a.user_id = e.created_by and a.status = 'going' and a.checked_in_at is null;
   perform set_config('rg.sys', '', true);
 end $$;
+
+-- ---------- 8) Revisor de seguridad: search_path fijo en las funciones que no lo tenían ----------
+do $$
+declare r record;
+begin
+  for r in select p.oid::regprocedure as f from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('touch_updated_at','feedback_guard','offer_deadline','page_who','event_keep_community','km_between','phone_key')
+              and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%')
+  loop execute format('alter function %s set search_path = public', r.f); end loop;
+end $$;

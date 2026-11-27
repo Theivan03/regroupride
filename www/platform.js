@@ -23,9 +23,9 @@ var Platform = (function () {
         return Promise.resolve(P.Geolocation.watchPosition(opts, function (pos, err) {
           if (err) onError({ code: /denied|permission/i.test(err.message || '') ? 1 : 2, message: err.message });
           else if (pos) onFix(pos);
-        })).then(function (cid) { id = cid; if (stopped) P.Geolocation.clearWatch({ id: cid }); });
+        })).then(function (cid) { id = cid; if (stopped) P.Geolocation.clearWatch({ id: cid }).catch(function () {}); });
       }).catch(function (e) { onError({ code: 2, message: String(e) }); });
-      return function () { stopped = true; if (id != null) P.Geolocation.clearWatch({ id: id }); };
+      return function () { stopped = true; if (id != null) P.Geolocation.clearWatch({ id: id }).catch(function () {}); };
     }
     if (!('geolocation' in navigator)) { onError({ code: 0, message: 'unsupported' }); return function () {}; }
     var w = navigator.geolocation.watchPosition(onFix, onError, opts);

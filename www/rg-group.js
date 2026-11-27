@@ -109,8 +109,9 @@
   // Empieza la ruta: fuera lo que haya abierto (la ficha de la salida, un chat, una hoja) y al mapa.
   function toMap() { G.sheetOpen = false; try { if (Cl.closePages) Cl.closePages(); Cl.closeSheet(); } catch (e) {} A.showView('map'); }
   function checkStart(at, now, live) {
-    if (!G.s || G.s.owner) return;
-    var own = G.rows.filter(function (x) { return x.owner; })[0], riding = !!(own && live[own.user_id] && now - own.at < 90000), go = false;
+    if (!G.s) return;
+    // También vale para quien creó el grupo, si la inicia otro administrador (para él solo cuenta la hora de salida del servidor).
+    var own = G.rows.filter(function (x) { return x.owner; })[0], riding = !!(!G.s.owner && own && live[own.user_id] && now - own.at < 90000), go = false;
     if (at > (G.s.seen || 0)) { G.s.seen = at; if (now - at < 10 * 60000 || riding) { go = true; G.s.ownRiding = true; } }
     else if (riding && !G.s.ownRiding) { go = true; G.s.ownRiding = true; }
     else if (!riding && G.s.ownRiding && now - (G.s.seen || 0) > 120000) G.s.ownRiding = false;
@@ -130,8 +131,8 @@
   }
   function sync() {
     var rec = A.isRec();
-    if (G.s && G.wasRec && !rec) { G.busy = false; call({ p_clear: true }); }
-    if (!G.s && G.wasRec && !rec && A.dropGroupPlan) A.dropGroupPlan();   // salí del grupo en marcha: al parar, su ruta deja de seguirse   // he parado la ruta: se borra mi posición
+    if (G.s && G.wasRec && !rec) { G.busy = false; call({ p_clear: true }); }   // he parado la ruta: se borra mi posición
+    if (!G.s && G.wasRec && !rec && A.dropGroupPlan) A.dropGroupPlan();   // salí del grupo en marcha: al parar, su ruta deja de seguirse
     // Un administrador inicia a mano: se les inicia a los demás. (Si a mí me la ha iniciado otro, no la reenvío.)
     if (G.s && !G.wasRec && rec && !A.isDemo() && sb) {
       var auto = Date.now() - G.autoStart < 30000; G.autoStart = 0;
@@ -403,7 +404,7 @@
     var rt = d.route, job = Promise.resolve();
     if (rt && rt.coords && rt.coords.length > 1) job = A.usePlan({ id: parseInt(d.id.replace(/-/g, '').slice(0, 12), 16), name: rt.name || d.name, wps: rt.wps || [], pois: rt.pois || [], coords: rt.coords, dist: rt.dist || 0, dur: rt.dur || 0, routed: true, steps: rt.steps || [], created: Date.now(), groupId: d.id });
     return job.then(function () {
-      G.busy = false; var c = call(), go = function () { if (!A.isRec()) A.startRide(); };
+      G.busy = false; var c = call(), go = function () { if (A.isRec()) return; if (opts.late) G.autoStart = Date.now(); A.startRide(); };   // late: me sumo a una ya iniciada; no la «inicio» otra vez para los demás
       if (opts.start) toMap();
       if (opts.start && !A.isRec()) { if (!(window.RGNav && RGNav.preStart && RGNav.preStart(go))) go(); }   // lejos de la salida: primero, por dónde entrar
       return c;
@@ -425,7 +426,7 @@
   function askCall(c) {
     pop('call', '<span class="rg-pop-kind">Empieza la ruta</span><b>' + esc(c.name) + '</b><p>' + esc(c.by) + ' ha iniciado la ruta. ¿Vienes?</p><button class="btn big primary" id="clYes" type="button"><svg><use href="#i-check"/></svg>Sí, voy</button><button class="btn big" id="clNo" type="button">No voy</button>', function () {
       $('#clYes').addEventListener('click', function (ev) {
-        Cl.busy(ev.currentTarget, function () { return sb.rpc('ride_join_event', { p_id: c.id }).then(function (r) { if (r.error) throw r.error; unpop(); return enter(r.data, { start: true }); }); });
+        Cl.busy(ev.currentTarget, function () { return sb.rpc('ride_join_event', { p_id: c.id }).then(function (r) { if (r.error) throw r.error; unpop(); return enter(r.data, { start: true, late: true }); }); });
       });
       $('#clNo').addEventListener('click', function () { var no = declined(); no[c.id] = Date.now(); Object.keys(no).forEach(function (k) { if (Date.now() - no[k] > 36 * 3600e3) delete no[k]; }); try { localStorage.setItem('rg.calls.no', JSON.stringify(no)); } catch (e) {} unpop(); A.toast('Vale. Si cambias de idea, entra desde el evento en Comunidad.', 'ok'); });
     });

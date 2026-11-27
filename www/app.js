@@ -3,7 +3,7 @@
    rutas · detalle y reproducción · estadísticas · garaje · ajustes · simulación. */
 (function () {
   'use strict';
-  var APP_VERSION = '0.60.7';
+  var APP_VERSION = '0.60.8';
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var clamp = function (x, lo, hi) { return Math.max(lo, Math.min(hi, x)); };
@@ -1344,15 +1344,15 @@ function renderWx() { var e = $('#chipWx'); if (!wx.data) { e.hidden = true; ret
     recNow: function () { return rec ? { km: rec.dist || 0, movingS: rec.movingS || 0, peaks: rec.corners.map(function (c) { return Math.abs(c.peak || 0); }) } : null; },
     updatePlan: function (p) { plans = plans.map(function (x) { return x.id === p.id ? p : x; }); if (activePlan && activePlan.id === p.id) activePlan = p; return savePlans().then(function () { syncSoon(); if (currentView === 'rides') renderRides(); }); },
     // guarda (o actualiza) una ruta planificada sin ponerse a seguirla
-    savePlan: function (p) { delete p.preview; plans = plans.filter(function (x) { return x.id !== p.id; }); plans.unshift(p); return savePlans().then(function () { syncSoon(); if (currentView === 'rides') renderRides(); return setFlag('plan'); }); },
     // para la copia en la cuenta: añade las rutas recuperadas y guarda los cambios de las que ya estaban
     mergePlans: function (local, fresh, changed) { fresh.forEach(function (f) { if (!plans.some(function (x) { return x.id === f.id; })) plans.push(f); }); if (!changed) return Promise.resolve(); return savePlans().then(function () { if (currentView === 'rides') renderRides(); }); },
     reloadRides: function () { return reloadRides().then(function () { if (currentView === 'rides') renderRides(); }); },
     reloadVehicles: function () { return reloadVehicles().then(function () { if (currentView === 'garage') renderGarage(); }); },
     savePlan: function (p) {   // guarda una ruta en «mis rutas planificadas» sin tocar el mapa ni la ruta activa (la usan los viajes al importar un GPX)
+      delete p.preview;   // deja de ser una vista previa: es una ruta guardada
       var i = -1; plans.forEach(function (x, k) { if (x.id === p.id) i = k; });
       if (i >= 0) plans[i] = p; else plans.unshift(p);
-      return savePlans().then(function () { syncSoon(); try { renderRides(); } catch (e) {} });
+      return savePlans().then(function () { syncSoon(); try { renderRides(); } catch (e) {} return setFlag('plan'); });
     },
     usePlan: function (p) {   // guarda (o actualiza) una ruta planificada y la deja lista para «Iniciar ruta»
       if (p.groupId) return DB.set('groupPlan', p).then(function () {}, function () {}).then(function () { if (planMode) exitPlanMode(); showView('map'); followPlan(p, true); });   // prestada: se sigue, pero no se guarda en «Planeadas»

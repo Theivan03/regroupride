@@ -491,7 +491,7 @@
     var vas = going.map(function (e) {
       var full = EVS[e.id], days = full && full.trip && full.trip.days ? full.trip.days.length : (e.is_trip ? 2 : 0), km = full && full.route ? full.route.dist : 0, n = unreadOf(function (x) { return x.event === e.id; });
       var st = e.status === 'offered' ? '<i class="as-tag amber">Tienes plaza</i>' : e.status === 'waiting' ? '<i class="as-tag">En espera</i>' : '<i class="as-tag ink">Vas</i>';
-      return '<div class="as-ev" data-ev="' + e.id + '"><button class="as-ev-main" type="button" data-open="' + e.id + '"><span class="as-ev-cover" data-cover="' + e.id + '">' + dateBlock(e.starts_at) + '</span><span class="as-ev-t"><b>' + esc(e.title) + '</b><small>' + hm2(e.starts_at) + (e.meet_name ? ' · ' + esc(e.meet_name) : '') + '</small><small>' + [days > 1 ? days + ' días' : '', km ? Math.round(km) + ' km' : '', e.community || ''].filter(Boolean).map(esc).join(' · ') + '</small>' + goingTx(att, full || e) + '</span></button>' +
+      return '<div class="as-ev" data-ev="' + e.id + '"><button class="as-ev-main" type="button" data-open="' + e.id + '"><span class="as-ev-cover" data-cover="' + e.id + '">' + dateBlock(e.starts_at) + '</span><span class="as-ev-t"><b>' + esc(e.title) + '</b><small>' + hm2(e.starts_at) + (e.meet_name ? ' · ' + esc(e.meet_name) : '') + '</small><small>' + [days > 1 ? days + ' días' : '', km ? Math.round(km) + ' km' : '', e.community || ''].filter(Boolean).map(esc).join(' · ') + '</small>' + (full ? goingTx(att, full) : '') + '</span></button>' +
         '<div class="as-ev-b">' + st + '<button class="btn small" type="button" data-chat="' + e.id + '">' + icn('chat') + 'Chat' + nTag(n) + '</button></div></div>';
     }).join('');
     var prox = next.map(function (e) {
@@ -681,7 +681,7 @@
       if (r.error) throw r.error;
       var c = (r.data || []).filter(function (x) { return x.event_id === e.id; })[0];
       if (!c) { A.toast(RGGroup.state.s && RGGroup.state.s.eventId === e.id ? 'Ya estás dentro de esta ruta.' : 'Todavía no la ha iniciado ningún administrador.', 'warn'); return; }
-      return sb.rpc('ride_join_event', { p_id: c.id }).then(function (q) { if (q.error) throw q.error; return RGGroup.enter(q.data, { start: true }); });
+      return sb.rpc('ride_join_event', { p_id: c.id }).then(function (q) { if (q.error) throw q.error; return RGGroup.enter(q.data, { start: true, late: true }); });
     }); });
   }
   // Administradores solo de esta ruta: pueden iniciarla, reciben los avisos y reparten los grupos, sin serlo de la comunidad.

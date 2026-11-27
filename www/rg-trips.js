@@ -140,7 +140,7 @@
     }); });
     var en = $('#trEnter'); if (en) {
       sb.rpc('ride_calls').then(function (r) { var c = (r.data || []).filter(function (x) { return x.event_id === ev.id; })[0]; if (!c || !$('#trEnter')) return; en.hidden = false; en.textContent = '«' + c.name + '» está en marcha: unirme';
-        en.addEventListener('click', function () { Cl.busy(en, function () { return sb.rpc('ride_join_event', { p_id: c.id }).then(function (q) { var d = ok(q); Cl.closeSheet(); return RGGroup.enter(d, { start: true }); }); }); }); }, function () {});
+        en.addEventListener('click', function () { Cl.busy(en, function () { return sb.rpc('ride_join_event', { p_id: c.id }).then(function (q) { var d = ok(q); Cl.closeSheet(); return RGGroup.enter(d, { start: true, late: true }); }); }); }); }, function () {});
     }
   }
 
